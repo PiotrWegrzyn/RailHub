@@ -495,55 +495,121 @@ def sugar() -> Sprite:
     return p.sprite()
 
 
+def _boat(p: Painter, x: float, y: float, long: float, wide: float, hull: RGB, stripe: RGB) -> None:
+    """A rowing boat `long` by `wide` metres drawn up at (x, y), its bow to the front right: a
+    painted hull with a stripe under its gunwale, a dark planked inside, a thwart and two oars."""
+    m = METRE
+    h, w, d = long * m / 2, wide * m / 2, 0.7 * m
+
+    def at(u: float, v: float) -> Point:
+        return x + h * u + w * v, y + h * u / 2 - w * v / 2
+
+    near = [at(-0.92, -0.55), at(-0.5, -0.95), at(0.2, -0.9), at(0.7, -0.5), at(1, 0)]
+    far = [at(1, 0), at(0.7, 0.5), at(0.2, 0.9), at(-0.5, 0.95), at(-0.92, 0.55)]
+    p.blob(x - h - 0.4, y - 0.2, x + h + 0.6, y + h / 2 + 0.6, (122, 110, 86))
+    p.polygon(near + [(px, py + d) for px, py in reversed(near)], hull, shade(hull, 0.6))
+    p.line(near, stripe)
+    p.line([(px, py + 0.25 * m) for px, py in near], stripe)
+    p.polygon(near + far, (110, 78, 52), shade(hull, 0.7))
+    p.line([at(-0.1, -0.85), at(-0.1, 0.85)], (150, 112, 74))
+    oar = (196, 170, 120)
+    p.line([at(-0.6, -0.4), at(0.6, 0.3)], oar)
+    p.line([at(-0.5, 0.4), at(0.7, -0.2)], oar)
+
+
+def _fish(p: Painter, x: float, y: float, long: float) -> None:
+    """A silver fish `long` units long hung by its tail from (x, y)."""
+    silver = (204, 214, 220)
+    p.ellipse(x - long * 0.18, y + long * 0.15, x + long * 0.18, y + long, silver)
+    p.line([(x, y + long * 0.2), (x, y + long * 0.95)], shade(silver, 0.75))
+    p.polygon([(x - long * 0.15, y), (x + long * 0.15, y), (x, y + long * 0.2)], shade(silver, 0.7))
+
+
 def fishery() -> Sprite:
-    """A boarded fisherman's hut with a door, windows and a chimney, a rack of fish hung up to
-    dry, a basket of the catch, and a small boat with its sail furled drawn up on a shingle beach
-    at the water's edge, with a trodden path down to it from the hut door."""
-    p = Painter(30, 22, (15, 16))
+    """A fisherman's place on the shore: a boarded hut 8 by 6 m in weathered sea blue with white
+    trim under a slate roof, a silver fish turning on its ridge, nets hung to dry between poles, a
+    rack of silver fish drying, baskets of the catch, and a red-and-white rowing boat with its oars
+    drawn up on the shingle by a little jetty running out into the water."""
+    p = Painter(34, 26, (16, 17))
+    m = METRE
     shingle = (198, 184, 146)
-    p.polygon([(-2, 7), (7, 1.5), (15, -1.5), (15, 7)], shingle)
-    p.polygon([(6, 7), (14, 0.5), (15, 0.5), (15, 7)], shade(shingle, 0.8))
-    p.polygon([(8, 7), (15, 1), (15, 7)], WATER)
-    p.line([(8.5, 6.6), (15, 0.9)], (226, 236, 238))
-    p.line([(12, 5.4), (14.5, 3.4)], shade(WATER, 1.25))
-    for x, y in ((1, 5.6), (4, 3.8), (8.5, 1.4), (12.5, 0)):
-        p.point(x, y, shade(shingle, 0.7))
-    _track(p, [(-7, 2.6), (-5, 4.4), (-1, 5.2), (2, 5)])
-    _worn(p, -7.2, 3, 2.2)
-    p.shadow(12, 3)
-    wall, roof = (132, 112, 88), (84, 106, 130)
-    fish = (120, 170, 196)
-    pole = (88, 64, 44)
-    for x, y in ((2, 1), (6, -1)):
-        p.blob(x - 1.2, y - 0.4, x + 1.6, y + 0.8, FOOTING)
-    p.line([(2, 1), (2, -6)], pole)
-    p.line([(6, -1), (6, -8)], pole)
-    p.line([(2, -6), (6, -8)], shade(pole, 1.2))
-    for t in (0.2, 0.45, 0.7, 0.92):
-        fx, fy = 2 + 4 * t, -6 - 2 * t
-        p.line([(fx, fy + 1), (fx, fy + 3)], fish)
-        p.point(fx, fy + 3, shade(fish, 0.7))
-    top = p.box(-5, 0, 6, 5, wall, None)
+    p.polygon([(-2, 8), (8, 2.5), (17, -1.5), (17, 8)], shingle)
+    p.polygon([(6, 8), (15, 1.2), (17, 0.6), (17, 8)], shade(shingle, 0.82))
+    p.polygon([(9, 8), (17, 1.6), (17, 8)], WATER)
+    p.line([(9.5, 7.6), (17, 1.5)], (226, 236, 238))
+    p.line([(12.4, 6.4), (16, 3.6)], shade(WATER, 1.25))
+    plank = (150, 118, 80)
+    for k in range(4):
+        jx, jy = 11.4 + 1.1 * k, 3.6 + 0.55 * k
+        p.polygon(
+            [(jx, jy), (jx + 1.0, jy + 0.5), (jx + 2.2, jy - 0.1), (jx + 1.2, jy - 0.6)],
+            plank,
+            shade(plank, 0.7),
+        )
+    for jx, jy in ((12.0, 3.4), (15.2, 5.0)):
+        p.line([(jx, jy), (jx, jy + 1.4)], shade(plank, 0.6))
+    _track(p, [(-8, 3.0), (-5.5, 4.6), (-1.5, 5.4), (2, 5)])
+    _worn(p, -8, 3.2, 2.4)
+    p.shadow(10, 3)
+    pole, net = (92, 70, 48), (78, 70, 60)
+    for x0, y0 in ((-15.2, 1.4),):
+        a, b = (x0, y0), (x0 + 5.2, y0 - 2.6)
+        for px, py in (a, b):
+            p.line([(px, py), (px, py - 2.6 * m)], pole)
+        top_a, top_b = (a[0], a[1] - 2.4 * m), (b[0], b[1] - 2.4 * m)
+        p.line([top_a, top_b], shade(pole, 1.2))
+        for k in range(9):
+            t = (k + 0.5) / 9
+            tx, ty = _along(top_a, top_b, t)
+            sag = 1.3 * m * (1 - (2 * t - 1) ** 2) + 0.4 * m
+            p.line([(tx, ty), (tx - 0.3, ty + sag)], net)
+        for drop in (0.5 * m, 1.0 * m, 1.5 * m):
+            pts = []
+            for k in range(10):
+                t = k / 9
+                tx, ty = _along(top_a, top_b, t)
+                sag = min(drop, 1.3 * m * (1 - (2 * t - 1) ** 2) + 0.4 * m)
+                pts.append((tx - 0.3 * sag / (1.7 * m), ty + sag))
+            p.line(pts, net)
+        for k in range(5):
+            cx, cy = _along(top_a, top_b, (k + 0.5) / 5)
+            p.ellipse(cx - 0.2 * m, cy - 0.15 * m, cx + 0.2 * m, cy + 0.25 * m, (214, 170, 90))
+    wall, trim, roof = (88, 126, 146), (236, 234, 226), (70, 76, 88)
+    long, deep, high, rise = 8 * m, 6 * m, 3 * m, 2.6 * m
+    top = p.hall(-4, -1, long, deep, high, wall, None)
     left, front, right, _ = top
-    _footing(p, top, 5)
-    _boards(p, top, wall, (1.6, 3.2))
-    _plinth(p, top, wall, 5)
-    _window(p, left, front, (0.14, 0.34), 1)
-    _door(p, left, front, (0.56, 0.76), 1.5, 5)
-    _window(p, front, right, (0.4, 0.66), 1, shade(WINDOW, 0.8))
-    p.gable(top, 3, roof, wall)
-    _tiles(p, top, 3, roof, (0.5,))
-    _chimney(p, top, 3, 0.25, 1.2, STONE)
-    hull = (150, 62, 48)
-    p.blob(4, 5, 13, 7.4, shade(shingle, 0.62))
-    p.line([(8, 3), (8, -6)], pole)
-    p.line([(9, -5), (9, 1)], (226, 214, 190))
-    p.line([(8, -5), (11, -4)], pole)
-    p.polygon([(3, 3), (13, 3), (11, 6), (5, 6)], hull, (92, 40, 34))
-    p.line([(3, 3), (13, 3)], shade(hull, 1.35))
-    p.line([(4.5, 4.5), (11.5, 4.5)], (226, 214, 190))
-    _basket(p, -12, 4, (196, 204, 210))
-    p.point(-11, 0.5, fish)
+    _footing(p, top, high, reach=0.6)
+    _boards(p, top, wall, (high / 3, high * 2 / 3))
+    _plinth(p, top, wall, high, 0.4 * m)
+    _patch(p, left, front, (0, 1), (0, 0.25 * m), trim)
+    _patch(p, front, right, (0, 1), (0, 0.25 * m), shade(trim, 0.8))
+    _window(p, left, front, (0.14, 0.32), 0.7 * m)
+    _door(p, left, front, (0.56, 0.74), high - 2 * m, high, trim)
+    _window(p, front, right, (0.4, 0.64), 0.7 * m, shade(WINDOW, 0.8))
+    p.gable(top, rise, roof, wall)
+    _tiles(p, top, rise, roof, (0.5,))
+    _chimney(p, top, rise, 0.25, 1.2, STONE)
+    ridge_back, ridge_front = _ridge(top, rise)
+    vx, vy = _along(ridge_back, ridge_front, 0.7)
+    p.line([(vx, vy), (vx, vy - 1.2 * m)], (60, 58, 56))
+    silver = (204, 214, 220)
+    fx, fy = vx, vy - 1.3 * m
+    p.ellipse(fx - 0.8 * m, fy - 0.25 * m, fx + 0.5 * m, fy + 0.25 * m, silver)
+    p.polygon(
+        [(fx + 0.4 * m, fy), (fx + 0.9 * m, fy - 0.35 * m), (fx + 0.9 * m, fy + 0.35 * m)], silver
+    )
+    rx, ry = 3.2, 0.6
+    rack_end = (rx + 4.4, ry - 2.2)
+    for px, py in ((rx, ry), rack_end):
+        p.line([(px, py), (px, py - 2.4 * m)], pole)
+    top_a, top_b = (rx, ry - 2.2 * m), (rack_end[0], rack_end[1] - 2.2 * m)
+    p.line([top_a, top_b], shade(pole, 1.2))
+    for k in range(7):
+        hx, hy = _along(top_a, top_b, (k + 0.5) / 7)
+        _fish(p, hx, hy, 1.6 * m)
+    _boat(p, 8.2, 4.0, 7, 2.2, (240, 236, 226), (186, 52, 44))
+    for bx, by in ((-11.6, 4.4), (-10.2, 5.2), (-10.8, 3.6)):
+        _crate(p, bx, by, silver)
     return p.sprite()
 
 
@@ -615,29 +681,316 @@ def pasture() -> Sprite:
     return p.sprite()
 
 
-def plantation(wall: RGB, roof: RGB) -> Sprite:
-    """The small barn that stands on a field or grove: a plinth, a cross-braced door, a window
-    with a sill and a tiled roof, with the ground trodden bare before its door and a path off,
-    and sacks of the crop and a crate stood out on worn earth."""
-    p = Painter(18, 16, (9, 11))
-    _track(p, [(-2.6, 2.4), (-3.4, 4), (-3, 5.5)], 0.9)
-    _worn(p, -2.8, 2.4, 2.4)
-    _worn(p, 6, 3.8, 2.6)
-    p.shadow(6, 2)
-    top = p.box(0, 0, 5, 4, wall, None)
+def _ground_of(corner: Point, high: float) -> Point:
+    """Where the top corner of a wall `high` tall (Painter.hall) stands on the ground."""
+    return corner[0], corner[1] + high
+
+
+def _arches(
+    p: Painter, a: Point, b: Point, spans: tuple[tuple[float, float], ...], top: float, high: float
+) -> None:
+    """Round-headed openings in the wall under the edge from `a` to `b`, one over each of `spans`,
+    from `top` below the eaves to the ground `high` below them."""
+    for t0, t1 in spans:
+        _patch(p, a, b, (t0, t1), (top + 0.3 * METRE, high), (62, 44, 36))
+        x, y = _on_wall(a, b, (t0 + t1) / 2, top + 0.4 * METRE)
+        half = abs(_on_wall(a, b, t1, 0)[0] - _on_wall(a, b, t0, 0)[0]) / 2
+        p.ellipse(x - half, y - 0.45 * METRE, x + half, y + 0.35 * METRE, (62, 44, 36))
+
+
+def _bale(p: Painter, x: float, y: float, cloth: RGB, band: RGB) -> None:
+    """A pressed bale 1.6 by 1 m wrapped in `cloth` and bound with `band`, standing at (x, y)."""
+    m = METRE
+    left, front, _, _ = p.hall(x, y, 1.6 * m, 1 * m, 1 * m, cloth, shade(cloth, 1.08))
+    for t in (0.25, 0.75):
+        p.line([_on_wall(left, front, t, 0), _on_wall(left, front, t, 1 * m)], band)
+
+
+def _cask(p: Painter, x: float, y: float) -> None:
+    """A wine cask 1.2 m long lying on its side at (x, y), its head to the front."""
+    m = METRE
+    wood, hoop = (138, 88, 52), (70, 60, 56)
+    p.polygon(
+        [(x - 0.8 * m, y - 1.2 * m), (x, y - 0.8 * m), (x, y), (x - 0.8 * m, y - 0.4 * m)],
+        shade(wood, 0.8),
+    )
+    p.ellipse(x - 0.4 * m, y - 0.95 * m, x + 0.4 * m, y + 0.05 * m, wood)
+    p.ellipse(x - 0.25 * m, y - 0.75 * m, x + 0.25 * m, y - 0.15 * m, shade(wood, 1.15))
+    p.line([(x - 0.55 * m, y - 1.05 * m), (x - 0.55 * m, y - 0.3 * m)], hoop)
+
+
+def cotton_field() -> Sprite:
+    """A cotton gin house 12 by 7 m of whitewashed boards under a grey shingle roof, its wide
+    door open, a loading beam over the loft door in its gable, pressed bales of cotton in burlap
+    stacked by the door and a wagon heaped high with picked cotton; the cotton itself grows over
+    the cell round it."""
+    p = Painter(30, 24, (14, 16))
+    m = METRE
+    p.shadow(9, 3)
+    wall, roof = (238, 234, 222), (138, 134, 128)
+    long, deep, high, rise = 12 * m, 7 * m, 4.2 * m, 3 * m
+    top = p.hall(1, -1.5, long, deep, high, wall, None)
     left, front, right, _ = top
-    _footing(p, top, 4)
-    _plinth(p, top, wall, 4, 0.8)
-    _door(p, left, front, (0.3, 0.7), 1.3, 4)
-    brace = shade(DOOR, 1.5)
-    p.line([_on_wall(left, front, 0.3, 1.3), _on_wall(left, front, 0.7, 4)], brace)
-    p.line([_on_wall(left, front, 0.7, 1.3), _on_wall(left, front, 0.3, 4)], brace)
-    _window(p, front, right, (0.35, 0.65), 1, shade(WINDOW, 0.8))
-    p.gable(top, 3, roof, wall)
-    _tiles(p, top, 3, roof, (0.5,))
-    _crate(p, -6.5, 2.5, shade(wall, 0.9))
-    _sack(p, 7, 3, SACK)
-    _sack(p, 5, 4.6, shade(SACK, 0.92))
+    _footing(p, top, high, reach=0.6)
+    _boards(p, top, wall, (high / 3, high * 2 / 3))
+    _plinth(p, top, wall, high, 0.4 * m)
+    _patch(p, left, front, (0.36, 0.64), (high - 3.2 * m, high), (70, 56, 46))
+    _patch(p, left, front, (0.36, 0.64), (high - 3.2 * m, high - 2.9 * m), (210, 206, 196))
+    _window(p, left, front, (0.08, 0.2), 0.8 * m)
+    _window(p, left, front, (0.8, 0.92), 0.8 * m)
+    gx, gy = _along(front, right, 0.5)
+    _patch(p, front, right, (0.38, 0.62), (0.3 * m, 1.6 * m), (70, 56, 46))
+    p.line([(gx, gy - 0.4 * m), (gx + 1.2 * m, gy - 1.0 * m)], (96, 74, 52))
+    p.line([(gx + 1.2 * m, gy - 1.0 * m), (gx + 1.2 * m, gy + 0.6 * m)], (60, 56, 52))
+    p.gable(top, rise, roof, wall)
+    _tiles(p, top, rise, roof, (0.33, 0.66))
+    burlap, band = (204, 182, 140), (110, 86, 60)
+    bx, by = _ground_of(front, high)
+    for dx, dy in ((0.8, 0.9), (2.2, 1.6), (0.9, 2.4), (2.4, 3.1)):
+        _bale(p, bx + dx, by + dy, burlap, band)
+    cotton = (248, 248, 244)
+    wx, wy = -8.6, 3.2
+    wagon = (128, 90, 58)
+    p.hall(wx, wy, 3.6 * m, 1.8 * m, 0.7 * m, wagon, None)
+    p.blob(wx - 2.2, wy - 2.6, wx + 1.6, wy - 0.5, cotton)
+    p.blob(wx - 1.4, wy - 3.2, wx + 0.8, wy - 1.8, shade(cotton, 1.05))
+    p.blob(wx - 2.0, wy - 1.4, wx - 0.6, wy - 0.6, shade(cotton, 0.9))
+    for cx in (wx - 1.6, wx + 1.0):
+        p.ellipse(cx - 0.5 * m, wy - 0.2, cx + 0.5 * m, wy + 0.6 * m, (70, 52, 38))
+    for x, y in ((-5, 5.2), (-4, 4.4), (6.5, 5.4), (-11.5, 5.4)):
+        p.point(x, y, cotton)
+    return p.sprite()
+
+
+def vineyard() -> Sprite:
+    """A winegrower's house 11 by 7 m of pale stone under a wine-red roof, wine-red shutters at its
+    windows, a vine trained over a pergola before its door hung with dark grapes, an arched
+    cellar door in its gable, casks of wine lying by it and a wooden basket press; the vines
+    themselves grow in rows over the cell round it."""
+    p = Painter(30, 24, (14, 16))
+    m = METRE
+    p.shadow(9, 3)
+    wall, roof = (234, 218, 190), (124, 40, 62)
+    long, deep, high, rise = 11 * m, 7 * m, 4.6 * m, 2.6 * m
+    top = p.hall(1, -1.5, long, deep, high, wall, None)
+    left, front, right, _ = top
+    _footing(p, top, high, reach=0.6)
+    for k in range(16):
+        t, drop = (0.5 + k * 0.618) % 1, 0.4 * m + (0.5 + k * 0.382) % 1 * (high - 0.8 * m)
+        p.point(*_on_wall(left, front, t, drop), shade(wall, 0.86))
+    _plinth(p, top, wall, high, 0.4 * m)
+    shutter = (122, 42, 62)
+    for t in (0.12, 0.3, 0.7, 0.88):
+        _window(p, left, front, (t - 0.04, t + 0.04), 0.8 * m)
+        _patch(p, left, front, (t - 0.07, t - 0.045), (0.8 * m, 2.4 * m), shutter)
+        _patch(p, left, front, (t + 0.045, t + 0.07), (0.8 * m, 2.4 * m), shutter)
+    _door(p, left, front, (0.46, 0.56), high - 2.2 * m, high, (96, 64, 44))
+    _arches(p, front, right, ((0.36, 0.64),), high - 2.4 * m, high)
+    p.gable(top, rise, roof, wall)
+    _tiles(p, top, rise, roof, (0.3, 0.6))
+    _chimney(p, top, rise, 0.25, 1.2, shade(wall, 0.9))
+    gx, gy = _ground_of(_along(left, front, 0.51), high)
+    post, leaf, grape = (110, 82, 56), (82, 134, 56), (88, 40, 92)
+    for dx in (-1.6, 1.4):
+        p.line([(gx + dx, gy + 1.6), (gx + dx, gy - 1.2)], post)
+    p.blob(gx - 2.6, gy - 2.0, gx + 2.4, gy - 0.8, leaf)
+    p.blob(gx - 2.0, gy - 2.4, gx + 1.2, gy - 1.6, shade(leaf, 1.15))
+    for dx in (-1.6, -0.4, 0.8, 1.8):
+        p.blob(gx + dx - 0.3, gy - 1.0, gx + dx + 0.3, gy - 0.2, grape)
+    cx, cy = _ground_of(right, high)
+    for dx, dy in ((0.8, 1.2), (2.0, 1.8), (1.4, 0.4)):
+        _cask(p, cx + dx, cy + dy)
+    px, py = -9.0, 3.4
+    _turned(p, px, py, [(0, 0.8 * m), (1.1 * m, 0.8 * m)], (150, 106, 66))
+    p.line([(px, py - 1.1 * m), (px, py - 2.2 * m)], (70, 66, 62))
+    p.line([(px - 0.6 * m, py - 2.0 * m), (px + 0.6 * m, py - 2.0 * m)], (70, 66, 62))
+    _basket(p, -6.6, 5.0, grape)
+    return p.sprite()
+
+
+def coffee_plantation() -> Sprite:
+    """A coffee planter's house 12 by 7 m, washed the colour of milky coffee with dark coffee-brown
+    window frames under a cherry-red tile
+    roof, a shady veranda along its front, and before it a paved drying terrace where the red
+    coffee cherries and brown beans lie spread in rows to dry, a rake on them, and sacks of coffee
+    by the door; the coffee bushes grow over the cell round it."""
+    p = Painter(32, 24, (16, 16))
+    m = METRE
+    terrace = (208, 198, 180)
+    corners = _paddock(-8, 2.6, 8)
+    _ground(p, corners, terrace)
+    tl, tb, tr, tn = corners
+    for k in range(7):
+        t0, t1 = (k + 0.15) / 7, (k + 0.85) / 7
+        a0, a1 = _along(tl, tb, t0), _along(tl, tb, t1)
+        b0, b1 = _along(tn, tr, t0), _along(tn, tr, t1)
+        colour = ((156, 50, 40), (112, 70, 46), (170, 70, 46))[k % 3]
+        p.polygon([a0, a1, b1, b0], colour, shade(colour, 0.85))
+    rx, ry = -6.4, 3.0
+    p.line([(rx, ry), (rx + 1.8, ry - 0.9)], (150, 112, 70))
+    p.line([(rx - 0.4, ry + 0.2), (rx + 0.4, ry - 0.2)], (110, 84, 56))
+    p.shadow(9, 3)
+    wall, roof, frame = (228, 202, 166), (168, 70, 50), (96, 60, 40)
+    long, deep, high, rise = 12 * m, 7 * m, 3.8 * m, 2.6 * m
+    top = p.hall(4, -2.6, long, deep, high, wall, None)
+    left, front, right, _ = top
+    _footing(p, top, high, reach=0.6)
+    _plinth(p, top, wall, high, 0.5 * m)
+    for t in (0.12, 0.3, 0.7, 0.88):
+        _patch(p, left, front, (t - 0.05, t + 0.05), (0.7 * m, 2.6 * m), frame)
+        _patch(p, left, front, (t - 0.035, t + 0.035), (0.9 * m, 2.5 * m), shade(WINDOW, 0.9))
+    _door(p, left, front, (0.46, 0.56), high - 2.4 * m, high, frame)
+    _window(p, front, right, (0.35, 0.65), 0.8 * m, shade(WINDOW, 0.8))
+    p.gable(top, rise, roof, wall)
+    _tiles(p, top, rise, roof, (0.35, 0.7))
+    a, b = _ground_of(left, high), _ground_of(front, high)
+    eave = 2.6 * m
+    out = 1.8 * m
+    shade_roof = shade(roof, 0.9)
+    p.polygon(
+        [
+            (a[0], a[1] - eave),
+            (b[0], b[1] - eave),
+            (b[0] - out, b[1] - eave + out / 2),
+            (a[0] - out, a[1] - eave + out / 2),
+        ],
+        shade_roof,
+        shade(roof, 0.6),
+    )
+    for t in (0.02, 0.35, 0.65, 0.98):
+        x, y = _along(a, b, t)
+        p.line([(x - out, y + out / 2), (x - out, y + out / 2 - eave)], (240, 236, 226))
+    sx, sy = _ground_of(right, high)
+    for dx, dy in ((0.8, 1.0), (1.8, 1.6), (0.9, 2.2)):
+        _sack(p, sx + dx, sy + dy, (176, 146, 104))
+    return p.sprite()
+
+
+def rubber_plantation() -> Sprite:
+    """A rubber planter's bungalow 10 by 8 m raised on posts, of pale timber with wide eaves under
+    a rusty iron roof, a ladder up to its door, and beside it an open drying shed under a palm
+    thatch where cream sheets of rubber hang on poles to cure, with latex pails stood by it; the
+    rubber trees grow in rows over the cell round it."""
+    p = Painter(32, 26, (16, 18))
+    m = METRE
+    p.shadow(9, 3)
+    stilts, wall, roof = 1.4 * m, (206, 176, 128), (150, 92, 62)
+    long, deep, high, rise = 10 * m, 8 * m, 3.0 * m, 2.6 * m
+    x, y = 4.5, -2.4
+    top = p.hall(x, y - stilts, long, deep, high, wall, None)
+    left, front, right, _ = top
+    for corner in (left, front, right):
+        gx, gy = _ground_of(corner, high + stilts)
+        p.line([(gx, gy), (gx, gy - stilts)], (92, 70, 50))
+    gx, gy = _ground_of(_along(left, front, 0.5), high + stilts)
+    p.line([(gx, gy), (gx, gy - stilts)], (92, 70, 50))
+    _boards(p, top, wall, (high / 2,))
+    for t in (0.15, 0.32, 0.68, 0.85):
+        _patch(p, left, front, (t - 0.05, t + 0.05), (0.6 * m, 1.9 * m), (74, 56, 40))
+    _door(p, left, front, (0.46, 0.56), high - 2.2 * m, high, (90, 62, 42))
+    lx, ly = _ground_of(_along(left, front, 0.51), high)
+    p.line([(lx, ly), (lx - 1.0 * m, ly + stilts + 0.2)], (150, 112, 70))
+    p.line([(lx + 0.7 * m, ly - 0.3 * m), (lx - 0.3 * m, ly + stilts - 0.1)], (150, 112, 70))
+    _window(p, front, right, (0.3, 0.7), 0.6 * m, shade(WINDOW, 0.8))
+    p.gable(top, rise, roof, wall)
+    _tiles(p, top, rise, roof, (0.3, 0.6))
+    shed_x, shed_y = -8.6, 2.6
+    thatch = (176, 150, 92)
+    sheet = (238, 224, 180)
+    reach, tall = 4.6, 3 * m
+    for px, py in (
+        (shed_x - reach, shed_y),
+        (shed_x + reach, shed_y),
+        (shed_x, shed_y + reach / 2),
+    ):
+        p.line([(px, py), (px, py - tall)], (96, 74, 50))
+    for row in range(2):
+        for k in range(4):
+            hx = shed_x - 3.0 + 2.0 * k - 1.0 * row
+            hy = shed_y - 0.6 + 1.0 * k * 0.5 + 0.9 * row
+            p.line([(hx - 0.9, hy - tall + 0.6), (hx + 0.9, hy - tall + 0.1)], (110, 84, 56))
+            p.polygon(
+                [
+                    (hx - 0.8, hy - tall + 0.6),
+                    (hx + 0.8, hy - tall + 0.2),
+                    (hx + 0.8, hy - 1.0),
+                    (hx - 0.8, hy - 0.6),
+                ],
+                shade(sheet, 1 - 0.04 * k - 0.08 * row),
+                shade(sheet, 0.78),
+            )
+    rx, ry = shed_x, shed_y - tall
+    p.polygon(
+        [
+            (rx - reach - 0.6, ry),
+            (rx, ry - reach / 2 - 0.3),
+            (rx + reach + 0.6, ry),
+            (rx, ry + reach / 2 + 0.3),
+        ],
+        thatch,
+        shade(thatch, 0.7),
+    )
+    p.line([(rx - reach - 0.6, ry), (rx + reach + 0.6, ry)], shade(thatch, 1.15))
+    for dx in (-1.2, -0.2):
+        _turned(
+            p,
+            shed_x + reach + 1.6 + dx,
+            shed_y + 2.2,
+            [(0, 0.3 * m), (0.6 * m, 0.35 * m)],
+            (176, 180, 184),
+        )
+    return p.sprite()
+
+
+def orange_farm() -> Sprite:
+    """A white finca 12 by 7 m under an orange tile roof, a loggia of three arches along its front
+    and a little bell gable on its ridge, crates of oranges stacked before it, a picking ladder
+    and a basket of oranges by the door; the orange trees grow in rows over the cell round it."""
+    p = Painter(30, 24, (14, 16))
+    m = METRE
+    p.shadow(9, 3)
+    wall, roof = (246, 236, 214), (214, 112, 52)
+    orange = (244, 142, 36)
+    long, deep, high, rise = 12 * m, 7 * m, 4.2 * m, 2.4 * m
+    top = p.hall(1, -1.5, long, deep, high, wall, None)
+    left, front, right, _ = top
+    _footing(p, top, high, reach=0.6)
+    _plinth(
+        p,
+        top,
+        wall,
+        high,
+        0.5 * m,
+    )
+    _arches(p, left, front, ((0.12, 0.28), (0.42, 0.58), (0.72, 0.88)), high - 3.0 * m, high)
+    _window(p, front, right, (0.35, 0.65), 0.8 * m, shade(WINDOW, 0.8))
+    p.gable(top, rise, roof, wall)
+    _tiles(p, top, rise, roof, (0.35, 0.7))
+    ridge_back, ridge_front = _ridge(top, rise)
+    bx, by = _along(ridge_back, ridge_front, 0.8)
+    p.polygon(
+        [
+            (bx - 0.6 * m, by),
+            (bx + 0.6 * m, by),
+            (bx + 0.6 * m, by - 1.4 * m),
+            (bx, by - 2.0 * m),
+            (bx - 0.6 * m, by - 1.4 * m),
+        ],
+        wall,
+        shade(wall, 0.7),
+    )
+    p.ellipse(bx - 0.25 * m, by - 1.3 * m, bx + 0.25 * m, by - 0.7 * m, (176, 136, 60))
+    cx, cy = _ground_of(front, high)
+    for dx, dy in ((1.0, 1.0), (2.3, 1.6), (1.1, 2.3), (2.4, 2.9)):
+        _crate(p, cx + dx, cy + dy, orange)
+    _crate(p, cx + 1.6, cy + 0.8, orange)
+    ladder = (200, 164, 108)
+    lx, ly = _ground_of(_along(front, right, 0.2), high)
+    for side in (0, 0.6):
+        p.line([(lx + side, ly - side / 2), (lx + side + 0.4, ly - side / 2 - 3.2 * m)], ladder)
+    _basket(p, -6.0, 4.4, orange)
+    for x, y in ((-4.4, 5.2), (-3.2, 4.6), (7.6, 5.2)):
+        p.point(x, y, orange)
     return p.sprite()
 
 
