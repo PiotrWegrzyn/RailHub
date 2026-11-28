@@ -625,7 +625,7 @@ window (H) lists the same.
 | Big fish drying shed | 150 dried fish | 60 fish, 15 salt |  |
 | Mega fish drying shed | 562.5 dried fish | 225 fish, 56.25 salt |  |
 | Mine (1700) | 30 coal |  | 6 planks (from wood demand 2), 1.5 machinery (from machines and tools demand 8), 3 fuel (from oil and fuel demand 11) |
-| Iron mine | 30 iron ore |  | 1.5 machinery (from machines and tools demand 8), 3 fuel (from oil and fuel demand 11) |
+| Iron mine (era 2) | 30 iron ore |  | 1.5 machinery (from machines and tools demand 8), 3 fuel (from oil and fuel demand 11) |
 | Copper mine (era 4) | 25 copper |  | 3 fuel (from oil and fuel demand 11) |
 | Gold mine | 12 gold |  | 1.2 fuel (from oil and fuel demand 11) |
 | Diamond mine | 6 diamonds |  | 1.2 fuel (from oil and fuel demand 11) |
@@ -654,14 +654,14 @@ window (H) lists the same.
 | Gun factory (era 3) | 60 guns | 30 steel (from era 2), 15 planks |  |
 | Tank factory (era 5) | 12 tanks | 72 steel (from era 2), 24 fuel (from era 2) |  |
 | Aircraft factory (era 5) | 12 planes | 36 steel (from era 2), 12 copper (from era 4), 12 fuel (from era 2), 12 electronics (from era 6) |  |
-| Steel mill (era 2) | 120 steel | 150 iron ore, 300 coal (from 1700) |  |
+| Steel mill (era 2) | 120 steel | 150 iron ore (from era 2), 300 coal (from 1700) |  |
 | Shipyard | 20 goods | 13.33 steel (from era 2), 6.667 planks |  |
 | Sawmill | 25 planks, 5 wood chips | 25 logs | 3 machinery (from era 3), 2 fuel (from oil and fuel demand 11) |
 | Soy sauce brewery | 12 soy sauce | 6 soybeans, 6 wheat, 2.4 salt |  |
 | Gasworks (era 2) | 120 gas | 60 coal (from 1700) |  |
 | Potter | 25 pots | 12.5 clay |  |
 | Tile works | 20 stove tiles | 10 clay, 5 sand |  |
-| Foundry (era 2) | 25 castings | 12.5 iron ore, 6.25 sand |  |
+| Foundry (1800) | 25 castings | 12.5 iron ore (from era 2), 6.25 sand |  |
 | Dairy | 70 dairy products | 28 milk |  |
 | Railway works |  | 120 steel (from era 2) |  |
 | Machine works (era 3) | 25 machinery | 25 steel (from era 2), 12.5 copper (from era 4) |  |
@@ -688,14 +688,14 @@ window (H) lists the same.
 | Big juice works (1870) | 225 juice | 112.5 fruit, 112.5 glass, 56.25 plastics (from era 6) | 22.5 refined sugar (from 1800) |
 | Mega juice works (1870) | 843.8 juice | 421.9 fruit, 421.9 glass, 210.9 plastics (from era 6) | 84.38 refined sugar (from 1800) |
 | Cola bottling plant | 60 cola | 15 refined sugar (from 1800), 6 chemicals (from era 3), 3 coffee (from 1700) | 12 glass |
-| Big steel mill (era 2) | 300 steel | 375 iron ore, 750 coal (from 1700) |  |
-| Mega steel mill (era 2) | 750 steel | 937.5 iron ore, 1,875 coal (from 1700) |  |
+| Big steel mill (era 2) | 300 steel | 375 iron ore (from era 2), 750 coal (from 1700) |  |
+| Mega steel mill (era 2) | 750 steel | 937.5 iron ore (from era 2), 1,875 coal (from 1700) |  |
 | Big potter | 62.5 pots | 31.25 clay |  |
 | Mega potter | 156.2 pots | 78.12 clay |  |
 | Big tile works | 50 stove tiles | 25 clay, 12.5 sand |  |
 | Mega tile works | 125 stove tiles | 62.5 clay, 31.25 sand |  |
-| Big foundry (era 2) | 62.5 castings | 31.25 iron ore, 15.62 sand |  |
-| Mega foundry (era 2) | 156.2 castings | 78.12 iron ore, 39.06 sand |  |
+| Big foundry (1800) | 62.5 castings | 31.25 iron ore (from era 2), 15.62 sand |  |
+| Mega foundry (1800) | 156.2 castings | 78.12 iron ore (from era 2), 39.06 sand |  |
 | Big dairy | 262.5 dairy products | 105 milk |  |
 | Mega dairy | 984.4 dairy products | 393.8 milk |  |
 | Big gun factory (era 3) | 150 guns | 75 steel (from era 2), 37.5 planks |  |
@@ -1029,15 +1029,27 @@ and they pick one there and confirm. The same two boards can be looked at any ti
 The game is balanced for 1850 (`BENCHMARK_YEAR`): every tile makes, is wanted and earns its base
 at the levels it has then when the lowest always go up (`BASE_LEVELS`), and a tile that comes
 later at the levels it comes at. Each level above adds a flat share of that base, not compounded:
-on supply its period's share, growing from about 11% a level after 1850 to about 65% after 2000
-(more for tiles that come later, up to 123% for modern goods), so that every tile makes about ten
-times its base by 2050; on demand the same share every level, 31% for most tiles up to 67% for
-modern goods, about five times its base by 2050. Every price then falls from its base in 1850 to
-a little under three fifths of it in 2050. Each level below the base takes away a small share
+on supply its period's share, growing from about 9% a level after 1850 to about 50% after 2000
+(more for tiles that come later, up to 96% for modern goods), so that every tile's buildings make
+about eight times their base by 2050; on demand the same share every level, 31% for most tiles up
+to 67% for modern goods, about five times its base by 2050. Every price then falls from its base in
+1850 to about seven tenths of it in 2050. Each level below the base takes away a small share
 (4% on supply, 7–9% on demand), so before 1850 tiles make and are wanted about two thirds of it
 at about the base price. Supply raises only what buildings make and demand only what they take: a
 works that takes 100 and makes 50 takes 100 and makes 75 at +50% supply of what it makes, and
 takes 125 and still makes 50 at +25% demand for what it takes.
+
+Every level a supply tile goes up, picked or not and in the years before play too, also puts up
+buildings that make its goods (`SUPPLY_ORDERS`), each in a cell drawn by its chances there, as a
+yearly top-up is: a coal mine for coal; a clay pit, a limestone quarry, a sand pit and a salt
+works for ore and stone; two logging camps and a sawmill for wood; two farms or two herds of any
+kind, drawn by how likely each is on the map, for farming and animals; a luxury maker of any kind
+for luxuries; a paper mill and a printing works for mail and press, the printing works only until
+the internet comes in 1995; and the works of every other tile in turn, an iron mine then a steel
+mill for steel and metals, two at a time for food and drink and textiles and household, none for
+passengers. Only what is open comes up: a kind whose era, year or demand level has not come, or
+whose main inputs nothing on the map makes, gives way to the next on the list. Land bought gets a
+quarter of them, as of its top-ups. A tile's card tells what its next level puts up.
 
 Once every supply tile reaches an era's level, the era comes with its generation of wagons and new
 tiles, on both boards at the lowest level there: oil and fuel and steel and metals at level 9

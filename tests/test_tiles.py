@@ -41,7 +41,7 @@ def test_the_world_reaches_each_era_in_its_year_when_the_lowest_tiles_go_up() ->
 def test_every_supply_level_above_the_base_adds_its_periods_share_not_compounded() -> None:
     made = supply_factor(Tile.COAL, 1, 16)
 
-    assert made == pytest.approx(1.0 + 3 * 0.15 + 2 * 0.18)
+    assert made == pytest.approx(1.0 + 3 * 0.12 + 2 * 0.14)
 
 
 def test_every_supply_level_below_the_base_takes_away_its_share() -> None:
@@ -100,21 +100,21 @@ def test_every_good_earns_its_base_price_before_the_first_year_of_the_boards() -
     assert earned == 1.0
 
 
-def test_every_tile_makes_about_ten_times_and_is_wanted_about_five_times_its_base_by_2050() -> None:
+def test_every_tile_makes_about_eight_and_is_wanted_about_five_times_its_base_by_2050() -> None:
     boards = Tiles.until(2050).of_year(2050)
 
     made, wanted = boards.made, boards.wanted
 
-    assert made == {tile: pytest.approx(10.0, abs=0.1) for tile in Tile}
+    assert made == {tile: pytest.approx(8.0, abs=0.1) for tile in Tile}
     assert wanted == {tile: pytest.approx(5.0, abs=0.1) for tile in Tile}
 
 
-def test_every_good_earns_a_little_under_three_fifths_of_its_base_price_by_2050() -> None:
+def test_every_good_earns_about_seven_tenths_of_its_base_price_by_2050() -> None:
     boards = Tiles.until(2050).of_year(2050)
 
     earned = {tile: boards.price(TILE_GOODS[tile][0]) for tile in Tile}
 
-    assert earned == {tile: pytest.approx(0.58, abs=0.015) for tile in Tile}
+    assert earned == {tile: pytest.approx(0.686, abs=0.01) for tile in Tile}
 
 
 def test_the_picked_tiles_go_up_on_1_january_and_the_lowest_for_picks_not_made() -> None:
@@ -187,7 +187,7 @@ def test_the_era_brings_its_generation_of_wagons_and_news() -> None:
     assert news == [
         (
             "A new era: wagons of generation 2 and new tiles: oil and fuel, steel and metals. "
-            "From now on buildings make oil, steel, fuel, gas, castings."
+            "From now on buildings make iron ore, oil, steel, fuel, gas."
         )
     ]
 

@@ -76,6 +76,8 @@ class Event:
     towers_fall: int = 0
     # Whether its news stops the game until the player has read it.
     big: bool = False
+    # Kinds of building supply levels no longer put up (railroads.sim.tiles.SUPPLY_ORDERS).
+    ends_orders: frozenset[BuildingKind] = frozenset()
 
     def lasts(self, year: int) -> bool:
         if self.years == 0:
@@ -212,8 +214,10 @@ EVENTS = (
     Event(
         1995,
         "The internet",
-        "Homes go online. People read the news on screens and buy fewer papers.",
+        "Homes go online. People read the news on screens and buy fewer papers, and mail and "
+        "press levels no longer put up printing works.",
         wants={Need.NEWSPAPERS: 0.7, Need.ELECTRONICS: 1.3},
+        ends_orders=frozenset({BuildingKind.PRINTING_WORKS}),
     ),
     Event(
         2001,
@@ -366,6 +370,11 @@ def electricity_price(year: int) -> float:
 
 
 @cache
+def orders_ended(kind: BuildingKind, year: int) -> bool:
+    """Whether supply levels no longer put up a kind of building by a year."""
+    return any(kind in event.ends_orders for event in happening(year, east=True))
+
+
 def military_growth(year: int) -> int:
     """How many times as fast the military grows in a year."""
     return WAR_GROWTH if any(event.war for event in happening(year)) else 1

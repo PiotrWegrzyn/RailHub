@@ -98,6 +98,8 @@ The ideas every change to the game should follow.
   lowest for picks not made, and no tile gets more than two levels above the lowest on its board.
 - As a year turns the game waits for the picks: production cards first, then consumption.
   Each level adds a flat share of the tile's base, not compounded, by good and period.
+- Every supply level also puts up buildings that make the tile's goods, each where it is likeliest
+  to come up: what the land gives several at a time, works one or two at a time in turn.
 - Supply raises only what a building makes and demand only what it takes, never both: more supply
   makes more from the same inputs, more demand takes more for as much.
 - Eras come when every supply tile reaches a level, each with a generation of wagons and new tiles,

@@ -1,9 +1,10 @@
 """The supply and demand screen: both boards (railroads.sim.tiles) as cards filling the screen,
 production (supply) then consumption (demand), drawn as the start menu is: dark panels framed in
 glowing brass with corner brackets and titles in spaced capitals between fading rules. Every card
-shows a tile, its level, what its next level adds, the icons of its goods, what a unit of them
-earns now and once picked, and on demand the buyer it opens next; hovering a demand card lists
-every buyer it opens under it. Above every card a row of marks stands for its levels, reached and
+shows a tile, its level, what its next level adds, the icon of the need its goods meet or of the
+goods themselves with a triangle for the way their prices go once picked, hovered for what a unit
+of each earns now and then, on supply what the next level puts up on the map and on demand the
+buyer it opens next; hovering a demand card lists every buyer it opens under it. Above every card a row of marks stands for its levels, reached and
 ahead, from where the lowest on its board stood when the era came: a mark for a level that brings
 more than its share (railroads.sim.level_perks) shows what, and hovering one tells of it. The
 cards grow as large as the screen lets them.
@@ -19,11 +20,12 @@ from dataclasses import dataclass
 
 from imgui_bundle import hello_imgui, imgui
 
-from railroads.sim.goods import Good, Need, freight_of
+from railroads.sim.goods import General, Good, Need, freight_of
 from railroads.sim.level_perks import Perk, opened_at, perks
 from railroads.sim.tiles import (
     ERAS,
     MOST_APART,
+    SUPPLY_ORDERS,
     TILE_GOODS,
     Board,
     Tile,
@@ -77,6 +79,14 @@ HINTS = {
     Board.DEMAND: "More demand makes buyers take more of a tile's goods, and each unit earns more.",
 }
 ICONS_SHOWN = 6
+# The kind of need a tile's goods meet, shown on its card for them where they are one.
+CATEGORIES: dict[Tile, General | Need] = {
+    Tile.FARMING: General.FOOD,
+    Tile.ANIMALS: General.FOOD,
+    Tile.FOOD: General.PROCESSED_FOOD,
+    Tile.HOUSEHOLD: General.COMMON,
+    Tile.LUXURIES: Need.LUXURIES,
+}
 # How many levels above the highest tile on a board the marks over its cards reach: twice as many
 # on supply, which goes up two tiles a year, as on demand, with the most marks a row holds.
 MARKS_AHEAD = {Board.SUPPLY: 6, Board.DEMAND: 3}
@@ -173,6 +183,27 @@ def cards(tiles: Tiles, board: Board) -> list[Card]:
     return shown
 
 
+def card_icons(tile: Tile) -> tuple[Good | Need | General, ...]:
+    """What a card shows for its tile's goods: the kind of need they meet where they are one,
+    else the icons of its first goods."""
+    category = CATEGORIES.get(tile)
+    return (category,) if category is not None else TILE_GOODS[tile][:ICONS_SHOWN]
+
+
+def orders_line(tile: Tile, level: int) -> str:
+    """What a supply level of a tile puts up on the map (SUPPLY_ORDERS); "" for nothing."""
+    orders = SUPPLY_ORDERS[tile]
+    named: dict[str, int] = {}
+    for lot in orders.at(level)[: orders.each]:
+        name = lot[0].value if len(lot) == 1 else f"{tile.value} maker of any kind"
+        named[name] = named.get(name, 0) + 1
+    if not named:
+        return ""
+    return "Puts up " + ", ".join(
+        name if many == 1 else f"{many} × {name}" for name, many in named.items()
+    )
+
+
 def freight_line(card: Card, good: Good | None = None) -> str:
     """What carrying a unit of a good of a card's tile earns now, and once picked if it can be:
     of its main good unless another is given. Every good of a tile earns the same share more or
@@ -263,6 +294,27 @@ def _centred(
 ) -> None:
     left = middle - _text_width(text, size) / 2
     draw_list.add_text(imgui.get_font(), size, imgui.ImVec2(left, y), colour, text)
+
+
+def _wrapped(
+    draw_list: imgui.ImDrawList,
+    left: float,
+    right: float,
+    top: float,
+    text: str,
+    colour: int,
+    size: float,
+) -> None:
+    """Text wrapped between two edges, each line centred."""
+    lines: list[str] = []
+    for word in text.split(" "):
+        tried = f"{lines[-1]} {word}" if lines else word
+        if lines and _text_width(tried, size) <= right - left:
+            lines[-1] = tried
+        else:
+            lines.append(word)
+    for index, line in enumerate(lines):
+        _centred(draw_list, (left + right) / 2, top + index * size * 1.2, line, colour, size)
 
 
 def _titled(
@@ -541,8 +593,9 @@ class TilesWindow:
         y = low.y + 10 * scale
         _titled(draw_list, low.x + 4, high.x - 4, y, card.tile.value.upper(), 0.8 * max(0.8, scale))
         y += font * 1.3
-        big = font * 1.6 * scale
-        body = small * 1.6 + big * 1.25 + 26 * scale + small * 1.2
+        orders = orders_line(card.tile, card.number + 1) if board == Board.SUPPLY else ""
+        icon = 26.0 * scale
+        body = small * 1.6 + small * 1.5 + icon + 10 * scale + (small * 2.6 if orders else 0)
         band = small * 3.4 + 8 if card.opens else 0.0
         floor = high.y - 6 - band
         y += max(0.0, (floor - y - body) / 2)
@@ -551,16 +604,17 @@ class TilesWindow:
             draw_list, middle, y, level, color_u32(GROWN if card.picked else BRASS), small * 1.1
         )
         y += small * 1.6
-        _centred(draw_list, middle, y, f"+{card.step:.0%} {WORDS[board]}", color_u32(edge), big)
-        y += big * 1.25
-        self._draw_icons(draw_list, card, middle, y, scale)
-        y += 18 * scale + 8 * scale
-        self._draw_price(draw_list, card, middle, y, small, size - 16)
+        _centred(draw_list, middle, y, f"+{card.step:.0%} {WORDS[board]}", color_u32(edge), small)
+        y += small * 1.5
+        on_arrow = self._draw_icons(draw_list, card, board, middle, y, icon)
+        y += icon + 10 * scale
+        if orders:
+            _wrapped(draw_list, low.x + 8, high.x - 8, y, orders, color_u32(TEXT_DIM), small * 0.9)
         if card.opens:
             self._draw_unlock(draw_list, card, low, high, max(y + small * 1.5, floor), small)
         if picking and not pickable:
             draw_list.add_rect_filled(low, high, color_u32(SHADE), 6.0)
-        if hovered:
+        if hovered and not on_arrow:
             self._tip(card, board, low, high)
         if clicked and picking:
             if card.picked:
@@ -610,30 +664,53 @@ class TilesWindow:
 
     @staticmethod
     def _draw_icons(
-        draw_list: imgui.ImDrawList, card: Card, middle: float, top: float, scale: float
-    ) -> None:
-        """The icons of the first goods of a card's tile, side by side."""
-        goods = TILE_GOODS[card.tile][:ICONS_SHOWN]
-        icon = 18.0 * scale
-        gap = 4.0 * scale
-        left = middle - (len(goods) * icon + (len(goods) - 1) * gap) / 2
-        for index, good in enumerate(goods):
-            draw_good_icon(draw_list, good, (left + index * (icon + gap), top), icon)
-
-    @staticmethod
-    def _draw_price(
         draw_list: imgui.ImDrawList,
         card: Card,
+        board: Board,
         middle: float,
         top: float,
-        size: float,
-        room: float,
-    ) -> None:
-        """What carrying a unit of the tile's main good earns now and once picked, in grey, as
-        small as it must be to fit the card."""
-        line = freight_line(card)
-        size = min(size, size * room / max(_text_width(line, size), 1.0))
-        _centred(draw_list, middle, top, line, color_u32(TEXT_DIM), size)
+        icon: float,
+    ) -> bool:
+        """The icons of a card's tile (card_icons) side by side and beside them the way its
+        prices go once picked, as on a stock exchange: a red triangle down for supply, a green
+        one up for demand. Hovering the triangle tells what carrying each of its goods earns
+        now and once picked; returns whether it is hovered."""
+        shown = card_icons(card.tile)
+        if len(shown) > 1:
+            icon *= 0.7
+        gap = icon * 0.2
+        arrow = icon * 0.7
+        width = len(shown) * (icon + gap) + arrow
+        left = middle - width / 2
+        for index, good in enumerate(shown):
+            draw_good_icon(draw_list, good, (left + index * (icon + gap), top), icon)
+        x = left + len(shown) * (icon + gap)
+        y = top + (icon - arrow) / 2
+        if board == Board.SUPPLY:
+            points = (
+                (x, y + arrow * 0.15),
+                (x + arrow, y + arrow * 0.15),
+                (x + arrow / 2, y + arrow * 0.85),
+            )
+        else:
+            points = (
+                (x + arrow / 2, y + arrow * 0.15),
+                (x + arrow, y + arrow * 0.85),
+                (x, y + arrow * 0.85),
+            )
+        draw_list.add_triangle_filled(
+            *(imgui.ImVec2(*point) for point in points), color_u32(EDGES[board])
+        )
+        on_arrow = imgui.is_mouse_hovering_rect(
+            imgui.ImVec2(x - 2, y - 2), imgui.ImVec2(x + arrow + 2, y + arrow + 2)
+        )
+        if on_arrow:
+            imgui.begin_tooltip()
+            colored(BRASS, "Freight a unit")
+            for good in TILE_GOODS[card.tile]:
+                colored(TEXT_DIM, freight_line(card, good))
+            imgui.end_tooltip()
+        return on_arrow
 
     @staticmethod
     def _draw_unlock(
@@ -671,8 +748,8 @@ class TilesWindow:
     @staticmethod
     def _tip(card: Card, board: Board, low: imgui.ImVec2, high: imgui.ImVec2) -> None:
         """What a card stands for, beside it on the side with more room, so it stays on the
-        screen and leaves the cards in the next row to be seen: what carrying each of its goods
-        earns now and once picked, and on demand every buyer it opens."""
+        screen and leaves the cards in the next row to be seen: on supply what its next level
+        puts up, on demand every buyer it opens."""
         screen = imgui.get_io().display_size
         right = (low.x + high.x) / 2 < screen.x / 2
         lower = (low.y + high.y) / 2 > screen.y / 2
@@ -681,9 +758,13 @@ class TilesWindow:
             pivot=(0.0 if right else 1.0, 1.0 if lower else 0.0),
         )
         imgui.begin_tooltip()
-        colored(BRASS, "Freight a unit")
-        for good in TILE_GOODS[card.tile]:
-            colored(TEXT_DIM, freight_line(card, good))
+        colored(BRASS, f"Level {card.number + 1}: +{card.step:.0%} {WORDS[board]}")
+        orders = orders_line(card.tile, card.number + 1) if board == Board.SUPPLY else ""
+        if orders:
+            imgui.push_text_wrap_pos(imgui.get_font_size() * 24)
+            colored(TEXT_DIM, orders)
+            imgui.pop_text_wrap_pos()
+        colored(TEXT_DIM, "Hover the triangle for the freight of each good.")
         if board == Board.DEMAND:
             for line in all_unlocks(card.tile):
                 colored(GROWN, line)

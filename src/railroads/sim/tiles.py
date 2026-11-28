@@ -69,7 +69,7 @@ G = Good
 TILE_GOODS: Mapping[Tile, tuple[Good, ...]] = MappingProxyType(
     {
         Tile.COAL: (G.COAL,),
-        Tile.ORE: (G.IRON, G.CLAY, G.LIMESTONE, G.SAND, G.SALT),
+        Tile.ORE: (G.CLAY, G.LIMESTONE, G.SAND, G.SALT),
         Tile.WOOD: (G.LOGS, G.PLANKS, G.WOOD_CHIPS, G.BARRELS),
         Tile.FARMING: (
             G.WHEAT,
@@ -115,6 +115,7 @@ TILE_GOODS: Mapping[Tile, tuple[Good, ...]] = MappingProxyType(
             G.SHOES,
             G.FURNITURE,
             G.POTS,
+            G.CASTINGS,
             G.STOVE_TILES,
             G.PORCELAIN,
             G.BRICKS,
@@ -126,7 +127,7 @@ TILE_GOODS: Mapping[Tile, tuple[Good, ...]] = MappingProxyType(
         Tile.MAIL: (G.MAIL, G.PAPER, G.NEWSPAPERS),
         Tile.LUXURIES: (G.GOLD, G.DIAMONDS, G.INCENSE, G.LUXURIES),
         Tile.OIL: (G.OIL, G.FUEL, G.GAS),
-        Tile.STEEL: (G.STEEL, G.CASTINGS),
+        Tile.STEEL: (G.STEEL, G.IRON),
         Tile.MACHINES: (G.TOOLS, G.MACHINERY, G.GUNS),
         Tile.CHEMICALS: (G.CHEMICALS, G.CEMENT, G.FERTILISER),
         Tile.COPPER: (G.COPPER, G.RUBBER),
@@ -219,27 +220,27 @@ BEFORE_BASE: Mapping[Tile, tuple[float, float]] = MappingProxyType(
 
 # The supply level each period begins at; a level counts in the last period begun below it.
 PERIODS = (1, 8, 14, 17, 21, 25, 30)
-# The share of its base every supply level above it adds to a tile, by period: about ten times
+# The share of its base every supply level above it adds to a tile, by period: about eight times
 # its base by 2050, more a level later on, so that its price falls evenly against demand.
 SUPPLY_STEPS: Mapping[Tile, tuple[float, ...]] = MappingProxyType(
     {
-        T.COAL: (0.0, 0.15, 0.18, 0.23, 0.30, 0.40, 0.65),
-        T.ORE: (0.0, 0.15, 0.18, 0.23, 0.30, 0.40, 0.65),
-        T.WOOD: (0.0, 0.11, 0.18, 0.23, 0.30, 0.40, 0.65),
-        T.FARMING: (0.0, 0.11, 0.18, 0.23, 0.30, 0.40, 0.65),
-        T.ANIMALS: (0.0, 0.12, 0.18, 0.23, 0.30, 0.40, 0.64),
-        T.FOOD: (0.0, 0.12, 0.18, 0.23, 0.30, 0.40, 0.64),
-        T.HOUSEHOLD: (0.0, 0.13, 0.19, 0.25, 0.32, 0.43, 0.58),
-        T.PASSENGERS: (0.0, 0.14, 0.19, 0.25, 0.32, 0.43, 0.57),
-        T.MAIL: (0.0, 0.14, 0.19, 0.25, 0.32, 0.43, 0.57),
-        T.LUXURIES: (0.0, 0.14, 0.19, 0.25, 0.32, 0.43, 0.57),
-        T.OIL: (0.0, 0.15, 0.19, 0.25, 0.32, 0.43, 0.57),
-        T.STEEL: (0.0, 0.15, 0.19, 0.25, 0.32, 0.43, 0.57),
-        T.MACHINES: (0.0, 0.0, 0.20, 0.25, 0.33, 0.46, 0.64),
-        T.CHEMICALS: (0.0, 0.0, 0.20, 0.25, 0.33, 0.46, 0.64),
-        T.COPPER: (0.0, 0.0, 0.0, 0.27, 0.34, 0.49, 0.73),
-        T.VEHICLES: (0.0, 0.0, 0.0, 0.27, 0.34, 0.49, 0.73),
-        T.MODERN: (0.0, 0.0, 0.0, 0.0, 0.0, 0.57, 1.23),
+        T.COAL: (0.0, 0.12, 0.14, 0.18, 0.23, 0.31, 0.51),
+        T.ORE: (0.0, 0.12, 0.14, 0.18, 0.23, 0.31, 0.51),
+        T.WOOD: (0.0, 0.09, 0.14, 0.18, 0.23, 0.31, 0.51),
+        T.FARMING: (0.0, 0.09, 0.14, 0.18, 0.23, 0.31, 0.51),
+        T.ANIMALS: (0.0, 0.09, 0.14, 0.18, 0.23, 0.31, 0.50),
+        T.FOOD: (0.0, 0.09, 0.14, 0.18, 0.23, 0.31, 0.50),
+        T.HOUSEHOLD: (0.0, 0.10, 0.15, 0.19, 0.25, 0.33, 0.45),
+        T.PASSENGERS: (0.0, 0.11, 0.15, 0.19, 0.25, 0.33, 0.44),
+        T.MAIL: (0.0, 0.11, 0.15, 0.19, 0.25, 0.33, 0.44),
+        T.LUXURIES: (0.0, 0.11, 0.15, 0.19, 0.25, 0.33, 0.44),
+        T.OIL: (0.0, 0.12, 0.15, 0.19, 0.25, 0.33, 0.44),
+        T.STEEL: (0.0, 0.12, 0.15, 0.19, 0.25, 0.33, 0.44),
+        T.MACHINES: (0.0, 0.0, 0.16, 0.19, 0.26, 0.36, 0.50),
+        T.CHEMICALS: (0.0, 0.0, 0.16, 0.19, 0.26, 0.36, 0.50),
+        T.COPPER: (0.0, 0.0, 0.0, 0.21, 0.26, 0.38, 0.57),
+        T.VEHICLES: (0.0, 0.0, 0.0, 0.21, 0.26, 0.38, 0.57),
+        T.MODERN: (0.0, 0.0, 0.0, 0.0, 0.0, 0.44, 0.96),
     }
 )
 # The share of its base every demand level above it adds to what ordinary buyers want of a tile:
@@ -324,6 +325,130 @@ UNLOCKS: Mapping[tuple[BuildingKind, Need], tuple[Tile, int]] = MappingProxyType
 KIND_OPENED_BY: Mapping[BuildingKind, tuple[Tile, int]] = MappingProxyType(
     {K.COLA_BOTTLER: UNLOCKS[(K.HOUSE, Need.COLA)], K.SADDLER: (T.HOUSEHOLD, 7)}
 )
+
+
+@dataclass(frozen=True, slots=True)
+class Orders:
+    """What every level a supply tile goes up puts up on the map (railroads.sim.growth): `each`
+    of the lots on its list, round and round from where its level leaves off, so a level
+    starts where the one before ended. A lot is one building of one of its kinds, drawn by
+    how likely each is to come up on the map now."""
+
+    each: int
+    lots: tuple[tuple[BuildingKind, ...], ...]
+
+    def at(self, level: int) -> list[tuple[BuildingKind, ...]]:
+        """The lots the level a tile reaches puts up, in order; the ones after them follow if
+        any of these can't come up."""
+        if not self.lots:
+            return []
+        first = (level - 1) * self.each
+        many = max(len(self.lots), self.each)
+        return [self.lots[(first + step) % len(self.lots)] for step in range(many)]
+
+
+_FARMING = (
+    K.FARM,
+    K.POTATO_FARM,
+    K.RICE_PADDY,
+    K.SOY_FIELD,
+    K.SUGAR,
+    K.HOP_GARDEN,
+    K.FLAX_FIELD,
+    K.ORCHARD,
+    K.ORANGE_FARM,
+    K.BANANAS,
+    K.DATE_PALMS,
+    K.VINEYARD,
+    K.COFFEE_PLANTATION,
+    K.TEA_PLANTATION,
+)
+_ANIMALS = (K.CATTLE_RANCH, K.PIG_FARM, K.SHEEP_FARM, K.CHICKEN_FARM, K.FISHERY)
+_LUXURIES = (
+    K.GOLD_MINE,
+    K.DIAMOND_MINE,
+    K.INCENSE_GROVE,
+    K.CARPET_WEAVER,
+    K.CLOCK_MAKER,
+    K.MIRROR_MAKER,
+    K.SADDLER,
+)
+
+
+def _one_by_one(*kinds: BuildingKind) -> tuple[tuple[BuildingKind, ...], ...]:
+    return tuple((kind,) for kind in kinds)
+
+
+# What a supply level of each tile puts up: one of every raw producer of ore and stone, two
+# logging camps and a sawmill, two farms or two herds drawn from all of them, a luxury of any
+# kind, and the works of the other tiles in turn, food and household two at a time.
+SUPPLY_ORDERS: Mapping[Tile, Orders] = MappingProxyType(
+    {
+        T.COAL: Orders(1, _one_by_one(K.MINE)),
+        T.ORE: Orders(4, _one_by_one(K.CLAY_PIT, K.LIMESTONE_QUARRY, K.SAND_PIT, K.SALT_WORKS)),
+        T.WOOD: Orders(3, _one_by_one(K.LOGGING_CAMP, K.LOGGING_CAMP, K.SAWMILL)),
+        T.FARMING: Orders(2, (_FARMING,)),
+        T.ANIMALS: Orders(2, (_ANIMALS,)),
+        T.FOOD: Orders(
+            2,
+            _one_by_one(
+                K.BAKERY,
+                K.MEAT_FACTORY,
+                K.DAIRY,
+                K.BREWERY,
+                K.SAUSAGE_MAKER,
+                K.FOOD_PLANT,
+                K.SUGAR_REFINERY,
+                K.DISTILLERY,
+                K.JUICE_WORKS,
+                K.WINERY,
+                K.FISH_DRYER,
+                K.BEEKEEPER,
+                K.SAKE_BREWERY,
+                K.TOFU_MAKER,
+                K.MISO_MAKER,
+                K.SOY_SAUCE_BREWERY,
+                K.COLA_BOTTLER,
+            ),
+        ),
+        T.HOUSEHOLD: Orders(
+            2,
+            _one_by_one(
+                K.COTTON_FIELD,
+                K.TEXTILE_MILL,
+                K.BRICKWORKS,
+                K.POTTER,
+                K.TANNERY,
+                K.FURNITURE_MAKER,
+                K.GLASSWORKS,
+                K.SHOE_FACTORY,
+                K.TILE_WORKS,
+                K.FOUNDRY,
+                K.PORCELAIN_WORKS,
+                K.FACTORY,
+            ),
+        ),
+        T.PASSENGERS: Orders(0, ()),
+        T.MAIL: Orders(2, _one_by_one(K.PAPER_MILL, K.PRINTING_WORKS)),
+        T.LUXURIES: Orders(1, (_LUXURIES,)),
+        T.OIL: Orders(1, _one_by_one(K.OIL_WELL, K.REFINERY, K.GASWORKS)),
+        T.STEEL: Orders(1, _one_by_one(K.IRON_MINE, K.STEEL_MILL)),
+        T.MACHINES: Orders(1, _one_by_one(K.TOOL_WORKS, K.MACHINE_WORKS, K.GUN_FACTORY)),
+        T.CHEMICALS: Orders(1, _one_by_one(K.CHEMICAL_WORKS, K.CEMENT_WORKS)),
+        T.COPPER: Orders(1, _one_by_one(K.COPPER_MINE, K.RUBBER_PLANTATION)),
+        T.VEHICLES: Orders(1, _one_by_one(K.CAR_FACTORY, K.PLANE_FACTORY, K.TANK_FACTORY)),
+        T.MODERN: Orders(
+            1, _one_by_one(K.PLASTICS_WORKS, K.APPLIANCE_FACTORY, K.ELECTRONICS_PLANT)
+        ),
+    }
+)
+
+
+def ordered_kinds() -> frozenset[BuildingKind]:
+    """Every kind of building some supply level puts up."""
+    return frozenset(
+        kind for orders in SUPPLY_ORDERS.values() for lot in orders.lots for kind in lot
+    )
 
 
 # The tile level on a board each kind of bridge after wood is built from: stone once ore and stone

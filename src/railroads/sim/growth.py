@@ -92,7 +92,7 @@ from railroads.sim.constructions import (
 )
 from railroads.sim.dying import UNDYING, dies_after
 from railroads.sim.economy import Economy
-from railroads.sim.events import military_growth
+from railroads.sim.events import military_growth, orders_ended
 from railroads.sim.forests import change_forests
 from railroads.sim.goods import FITS, MAKES, RECIPES, Good
 from railroads.sim.grids import Cell, FlatIndices, FloatArray, Grid, IntArray
@@ -119,7 +119,14 @@ from railroads.sim.stats import History
 from railroads.sim.steps import Steps, finish
 from railroads.sim.surroundings import Land, Surroundings
 from railroads.sim.tilemap import REFERENCE_LAND, Relief, Terrain, TileMap, Vegetation
-from railroads.sim.tiles import KIND_OPENED_BY, era_come, kind_era, kind_opened
+from railroads.sim.tiles import (
+    KIND_OPENED_BY,
+    SUPPLY_ORDERS,
+    era_come,
+    kind_era,
+    kind_opened,
+    of_year,
+)
 from railroads.sim.towns import Towns
 from railroads.sim.trade import BONUS_PER_GOOD, Trade, levels_of
 from railroads.sim.year_caches import year_cached
@@ -271,6 +278,9 @@ class Growth:
     _starving: dict[BuildingKind, npt.NDArray[np.int32]] | None = None
     # How many buildings have died out since the game began.
     died_out = 0
+    # The last year whose supply levels have put up what they order (_order); None before the
+    # first.
+    _ordered_year: int | None = None
 
     def __init__(
         self,
@@ -881,6 +891,7 @@ class Growth:
             changed |= self.novelties.year(self, rng)
         if reached(MONTHS_PER_YEAR):
             changed |= build_power_plants(self)
+            changed |= self._order(rng)
             changed |= self._top_up(rng)
             changed |= self._join_clusters()
         if self.happenings is not None:
@@ -1108,6 +1119,63 @@ class Growth:
             self.add(cell, kind, 1)
             changed.add(cell)
         return changed
+
+    def _order(self, rng: np.random.Generator) -> set[Cell]:
+        """Puts up what every supply level a tile went up since the last time asked orders
+        (railroads.sim.tiles.SUPPLY_ORDERS), level by level; returns the cells that changed."""
+        last = self.year - 1 if self._ordered_year is None else self._ordered_year
+        self._ordered_year = self.year
+        changed: set[Cell] = set()
+        for year in range(last + 1, self.year + 1):
+            before, after = of_year(year - 1).supply, of_year(year).supply
+            for tile, level in after.items():
+                for reached in range(before.get(tile, level) + 1, level + 1):
+                    changed |= self._put_up(
+                        SUPPLY_ORDERS[tile].each, SUPPLY_ORDERS[tile].at(reached), rng
+                    )
+        return changed
+
+    def _put_up(
+        self, many: int, lots: list[tuple[BuildingKind, ...]], rng: np.random.Generator
+    ) -> set[Cell]:
+        """Puts up the first `many` of these lots that can come up, each a building of one of its
+        kinds drawn by how likely each is on the map, in a cell drawn by its chances there; on
+        land bought, each only at the rule's share (GrowthRule.orders_share). Returns the cells
+        that changed."""
+        changed: set[Cell] = set()
+        for lot in lots:
+            if many == 0:
+                break
+            places = [place for kind in lot if (place := self._orderable(kind)) is not None]
+            weights = [float(place.chances[place.cells].sum()) for place in places]
+            while places:
+                total = sum(weights)
+                if total <= 0:
+                    break
+                index = int(rng.choice(len(places), p=np.array(weights) / total))
+                place = places.pop(index)
+                weights.pop(index)
+                cell = self._drawn(place, rng)
+                if cell is None:
+                    continue
+                many -= 1
+                if rng.random() < self.rule.orders_share:
+                    kind = place.ladder.kinds[0]
+                    self.constructions.build(Building(cell, kind))
+                    self.add(cell, kind, 1)
+                    changed.add(cell)
+                break
+        return changed
+
+    def _orderable(self, kind: BuildingKind) -> _Place | None:
+        """Where a kind a supply level orders can come up now: its ladder's place, if the ladder
+        has opened, the map makes its main inputs and no event has ended its orders."""
+        place = next((p for p in self._places if p.ladder.kinds[0] == kind), None)
+        if place is None or not place.cells.size or orders_ended(kind, self.year):
+            return None
+        if not ladder_open(place.ladder, self.year) or not self.inputs_on_map(place.ladder):
+            return None
+        return place
 
     def _drawn(self, place: _Place, rng: np.random.Generator) -> Cell | None:
         """A cell a ladder's next building can go up in, drawn at random weighted by its chances

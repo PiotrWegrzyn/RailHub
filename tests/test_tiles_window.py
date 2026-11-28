@@ -4,7 +4,7 @@ import pytest
 from imgui_bundle import hello_imgui, imgui
 from screens import FakeTexture, gui_context
 
-from railroads.sim.goods import Good, freight_of
+from railroads.sim.goods import General, Good, freight_of
 from railroads.sim.tiles import ERAS, Board, Tile, Tiles
 from railroads.ui.tiles_window import (
     CARD_GAP,
@@ -14,6 +14,7 @@ from railroads.ui.tiles_window import (
     TilesWindow,
     all_unlocks,
     can_confirm,
+    card_icons,
     card_layout,
     cards,
     era_line,
@@ -21,6 +22,7 @@ from railroads.ui.tiles_window import (
     mark_levels,
     mark_tip,
     next_unlock,
+    orders_line,
 )
 
 
@@ -42,7 +44,7 @@ def test_every_tile_on_a_board_is_a_card_with_what_its_next_level_adds() -> None
     wood = next(card for card in shown if card.tile == Tile.WOOD)
 
     assert [card.tile for card in shown] == [tile for tile in Tile if tile in tiles.supply]
-    assert wood.adds == "next level +11% made"
+    assert wood.adds == "next level +9% made"
 
 
 def test_a_demand_card_says_who_its_next_level_lets_take_what() -> None:
@@ -196,4 +198,22 @@ def test_supply_marks_reach_twice_as_far_ahead_as_demand_ones() -> None:
 def test_a_mark_tells_what_its_level_adds_and_brings() -> None:
     lines = mark_tip(Board.SUPPLY, Tile.COAL, 13)
 
-    assert lines == ["Level 13: +15% supply", "New engine for sale: 0-6-2 tank engine"]
+    assert lines == ["Level 13: +12% supply", "New engine for sale: 0-6-2 tank engine"]
+
+
+def test_a_wood_card_tells_its_next_level_puts_up_two_logging_camps_and_a_sawmill() -> None:
+    line = orders_line(Tile.WOOD, 12)
+
+    assert line == "Puts up 2 × logging camp, sawmill"
+
+
+def test_a_card_shows_the_need_its_goods_meet_where_they_are_one() -> None:
+    food, coal = card_icons(Tile.FOOD), card_icons(Tile.COAL)
+
+    assert (food, coal) == ((General.PROCESSED_FOOD,), (Good.COAL,))
+
+
+def test_a_farming_card_tells_its_next_level_puts_up_two_of_any_kind() -> None:
+    line = orders_line(Tile.FARMING, 11)
+
+    assert line == "Puts up 2 × farming maker of any kind"

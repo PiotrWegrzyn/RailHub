@@ -71,7 +71,7 @@ def buy_lot_steps(
     grown = yield from seed_growth_steps(
         replace(place.window(*window), locked=~inside),
         saved.rng,
-        replace(GROWTH, top_ups=quarter_of_top_ups(saved.rng)),
+        replace(GROWTH, top_ups=quarter_of_top_ups(saved.rng), orders_share=TOP_UP_SHARE),
         months=(year - HISTORY_START) * MONTHS_PER_YEAR,
         progress=progress,
     )

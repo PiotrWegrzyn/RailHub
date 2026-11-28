@@ -187,7 +187,7 @@ def test_the_price_list_shows_every_tile_the_cheapest_first() -> None:
 
     rows = price_rows(tiles, 1900)
 
-    assert rows[0] == ("Textiles and household", "88%", "18", "9")
+    assert rows[0] == ("Textiles and household", "98%", "18", "9")
     assert rows[-1][0] == "Chemicals and building"
 
 
