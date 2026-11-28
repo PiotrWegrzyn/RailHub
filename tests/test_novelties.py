@@ -2,12 +2,16 @@ import numpy as np
 import pytest
 
 from builders import square_map
+from railroads.newgame import make_game
+from railroads.settings import MapChoice, Settings
+from railroads.sim.clock import END_YEAR
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.goods import MAKES, Good, Need
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import GrowthRule
 from railroads.sim.novelties import (
     NOVELTIES,
+    ByTown,
     Novelties,
     Novelty,
     olympic_year,
@@ -108,7 +112,8 @@ def test_space_centers_mostly_go_up_near_military_ground() -> None:
 
 
 def test_a_picked_novelty_goes_up_once_and_not_before_its_year() -> None:
-    palace = Novelty(BuildingKind.ROYAL_PALACE, 1900, BY_KIND[BuildingKind.ROYAL_PALACE].place)
+    royal = BY_KIND[BuildingKind.ROYAL_PALACE]
+    palace = Novelty(BuildingKind.ROYAL_PALACE, 1900, royal.place, royal.where)
     early = grown(1899, {(20, 20): BuildingKind.HOUSE})
     later = grown(1900, {(20, 20): BuildingKind.HOUSE})
     rng = np.random.default_rng(0)
@@ -148,7 +153,7 @@ def test_the_salt_mine_cathedral_stands_on_salt_and_digs_it() -> None:
 def test_novelties_want_only_goods_the_game_already_has_and_fill_a_whole_hex() -> None:
     constructions = Constructions(square_map())
 
-    for novelty in (*NOVELTIES, Novelty(BuildingKind.OLYMPIC_STADIUM, 1896, lambda *_: None)):
+    for novelty in (*NOVELTIES, Novelty(BuildingKind.OLYMPIC_STADIUM, 1896, lambda *_: None, "")):
         constructions.build(Building((5, 5), novelty.kind))
         assert constructions.space_left((5, 5)) == 0
         constructions.remove(Building((5, 5), novelty.kind))
@@ -175,3 +180,47 @@ def test_railway_works_go_up_from_1855_by_the_biggest_towns_apart_up_to_their_nu
 
     assert len(works) == most
     assert by_the_biggest_town is (most > 0)
+
+
+def test_a_long_game_on_poland_gets_one_off_buildings() -> None:
+    game = make_game(Settings(seed=1, map=MapChoice.POLAND), report=lambda _: None).game
+    growth = game.growth
+    novelties = growth.novelties
+    assert novelties is not None
+    one_offs = {novelty.kind for novelty in NOVELTIES} | {BuildingKind.OLYMPIC_STADIUM}
+    rng = np.random.default_rng(1)
+
+    for _ in range(growth.year, END_YEAR):
+        growth.start_year += 1
+        novelties.year(growth, rng)
+    standing = {kind for kind in one_offs if growth.count(kind).any()}
+
+    assert len(novelties.picked) >= 2
+    assert standing
+
+
+def test_town_novelties_go_up_by_a_big_town_and_not_by_a_hamlet() -> None:
+    city = grown(
+        1950,
+        {(20, 20): BuildingKind.FLATS, (20, 21): BuildingKind.FLATS, (21, 20): BuildingKind.FLATS},
+    )
+    hamlet = grown(1950, {(20, 20): BuildingKind.HOUSE})
+    by_town = [novelty for novelty in NOVELTIES if isinstance(novelty.place, ByTown)]
+
+    in_city = [n.place(city, n.kind, np.random.default_rng(0)) for n in by_town]
+    in_hamlet = [n.place(hamlet, n.kind, np.random.default_rng(0)) for n in by_town]
+
+    assert by_town and None not in in_city
+    assert set(in_hamlet) == {None}
+
+
+def test_the_odds_say_why_a_town_novelty_cannot_come_up_yet() -> None:
+    hamlet = grown(1950, {(20, 20): BuildingKind.HOUSE})
+    film = Novelties([BY_KIND[BuildingKind.FILM_STUDIO]], olympic_chance=0.05, railway_works=2)
+
+    odds = {found.kind: found for found in film.odds(hamlet)}
+
+    assert odds[BuildingKind.FILM_STUDIO].why_none is not None
+    assert "biggest town has 6" in odds[BuildingKind.FILM_STUDIO].why_none
+    assert odds[BuildingKind.OLYMPIC_STADIUM].chance == 0.05
+    assert odds[BuildingKind.RAILWAY_WORKS].why_none is None

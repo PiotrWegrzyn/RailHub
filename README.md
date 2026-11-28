@@ -986,27 +986,29 @@ one per 20,000 land cells; each sends and wants 120 passengers and 60 pieces of 
 ### Novelties
 
 Some games get one-off buildings the others never see (`railroads.sim.novelties`). When a game
-starts its seed picks 2 or 3 of them on a map with Poland's land, about 121,000 cells, and more or
-fewer as the land is bigger or smaller. Nothing is weighed cell by cell: once a year each picked
+starts its seed picks 2 or 3 of them on a place with Poland's land, about 121,000 cells, and more
+or fewer as the land is bigger or smaller, counting the whole place with the lots for sale, not
+only the quarter a game starts on. Nothing is weighed cell by cell: once a year each picked
 novelty whose era has come rolls a 15% chance, and only then looks for a free hex by its own
 rules, trying again the next year if none fits. Each fills a whole hex, appears once, and wants
-and sends only goods the game already has, in vast amounts.
+and sends only goods the game already has, in vast amounts. The growth window lists the game's
+picks under its buildings, each with its chance and, where none can come up now, why.
 
 | Novelty | From | Where | Wants each month | Sends |
 |---|---|---|---|---|
 | Royal palace | 1850 | by the biggest town, best on a hill or a river | 200 food, 50 wine, 20 porcelain, 20 furniture, 20 wax | 300 passengers |
 | Salt mine cathedral | 1850 | on a salt deposit | | 200 salt, 200 passengers |
 | Spa resort | 1850 | hills beside a river or lake | 100 food, 20 wine, 20 beer, 20 newspapers | 300 passengers |
-| World's Fair hall | 1880 to 1940 | by the biggest town, once 100 people live there | 200 goods, 100 glass, 100 steel | 1,000 passengers |
-| Film studio | 1920 | by the biggest town, once 150 people live there | 50 chemicals, 50 clothes, 30 electronics (from 1960) | 200 passengers |
-| Amusement park | 1950 | by the biggest town, once 100 people live there | 200 food, 100 beer, 50 fuel | 800 passengers |
+| World's Fair hall | 1880 to 1940 | by the biggest town, once it has 30 population points around, as a hotel wants | 200 goods, 100 glass, 100 steel | 1,000 passengers |
+| Film studio | 1920 | by the biggest town, once it has 40 population points around, as a department store wants | 50 chemicals, 50 clothes, 30 electronics (from 1960) | 200 passengers |
+| Amusement park | 1950 | by the biggest town, once it has 30 population points around | 200 food, 100 beer, 50 fuel | 800 passengers |
 | Space center | 1960 | anywhere on flat land, 20 times likelier within 10 hexes of military ground | 300 electronics, 1,000 fuel, 300 food | 500 passengers |
 | Pear Company headquarters | 1980 | once a skyscraper stands, as near as it can to the one with most people around | 500 electronics, 1,000 food | 1,000 passengers |
-| Battery gigafactory | 2030 | by the biggest town, once 100 people live there | 300 copper, 300 chemicals, 200 electronics, 200 steel | 400 passengers |
+| Battery gigafactory | 2030 | by the biggest town, once it has 30 population points around | 300 copper, 300 chemicals, 200 electronics, 200 steel | 400 passengers |
 
 Olympic stadiums are apart from the pick. In every real Summer Games year (1896 to 1912, 1920 to
 1936, 1948 to 2016, 2021, then every four years) a map hosts one with a 5% chance on Poland's land,
-scaled by the map's land up to 50%. The stadium goes up on the free hex nearest the biggest town
+scaled by the place's whole land up to 50%. The stadium goes up on the free hex nearest the biggest town
 that has not hosted yet, at least 10 hexes from every earlier host, and wants 300 food, 120 beer
 and 120 newspapers and sends 1,200 passengers.
 

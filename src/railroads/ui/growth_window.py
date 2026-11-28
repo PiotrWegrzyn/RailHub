@@ -1,6 +1,6 @@
 """How likely every kind of building is to come up (railroads.sim.growth_odds), shown three ways:
 the growth window listing every ladder's first kind with how many a year the map may get and why
-none if so, the growth lens tinting the land by the chance of the kind picked there in a year with
+none if so, and the one-off buildings this game may get (railroads.sim.novelties) with theirs, the growth lens tinting the land by the chance of the kind picked there in a year with
 a scale beside it, and the chances of the cell picked in its details, with why not."""
 
 import math
@@ -24,6 +24,7 @@ from railroads.sim.growth_odds import (
     yearly,
 )
 from railroads.sim.ladder_types import Ladder
+from railroads.sim.novelties import NoveltyOdds
 from railroads.ui.ornate import begin_ornate, end_ornate, section
 from railroads.ui.theme import (
     BRASS,
@@ -132,6 +133,7 @@ class GrowthOdds:
         self._kept: Kept[dict[int, tuple[FloatArray, LadderOdds]]] = Kept()
         self._tints: Kept[Tints] = Kept()
         self._cell: Kept[CellOdds] = Kept()
+        self._one_offs: Kept[list[NoveltyOdds]] = Kept()
 
     def all(self, growth: Growth) -> dict[int, tuple[FloatArray, LadderOdds]]:
         """Each ladder's monthly chances and odds, by the ladder's id."""
@@ -145,6 +147,14 @@ class GrowthOdds:
             return every
 
         return self._kept.get(key, work_out)
+
+    def one_offs(self, growth: Growth) -> list[NoveltyOdds]:
+        """The one-off buildings this game may get, with their chances and why none now."""
+        novelties = growth.novelties
+        if novelties is None:
+            return []
+        key = (growth, growth.months, growth.constructions.version)
+        return self._one_offs.get(key, lambda: novelties.odds(growth))
 
     def of(self, growth: Growth, ladder: Ladder) -> tuple[FloatArray, LadderOdds]:
         return self.all(growth)[id(ladder)]
@@ -212,6 +222,7 @@ class GrowthWindow:
             if imgui.is_item_hovered():
                 imgui.set_tooltip(_row_tip(odds))
             _draw_row(odds)
+        _draw_one_offs(self.odds.one_offs(growth))
         imgui.end_child()
 
     def _draw_picked(self, odds: LadderOdds, visit: Callable[[Cell], None]) -> None:
@@ -229,6 +240,19 @@ class GrowthWindow:
         imgui.same_line()
         if imgui.button(f"{fa.ICON_FA_TIMES}  Clear"):
             self.ladder = None
+
+
+def _draw_one_offs(one_offs: list[NoveltyOdds]) -> None:
+    """The one-off buildings this game may get: each one's chance, when, and why none now."""
+    if not one_offs:
+        return
+    section("One-off buildings this game may get")
+    for odds in one_offs:
+        name = odds.kind.value.capitalize()
+        colour = TEXT_DIM if odds.why_none is not None else TEXT
+        _wrapped(colour, f"{name}: {percent_text(odds.chance)} {odds.when}")
+        if odds.why_none is not None:
+            _wrapped(BRASS, odds.why_none)
 
 
 def _row_tip(odds: LadderOdds) -> str:

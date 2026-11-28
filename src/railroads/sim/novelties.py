@@ -1,8 +1,9 @@
 """Novelties: one-off buildings that fill a whole hex, want and send only goods the game already
 has, and come up in some games and not in others.
 
-When a game starts its seed picks NOVELTIES_PER_GAME of them, more on a bigger map
-(REFERENCE_LAND). Nothing is worked out cell by cell: once a year each picked novelty whose era
+When a game starts its seed picks NOVELTIES_PER_GAME of them, more on a place with more land
+(REFERENCE_LAND), counting the whole place with the lots for sale, not only the land a game starts
+on. Nothing is worked out cell by cell: once a year each picked novelty whose era
 has come rolls YEARLY_CHANCE, and only on a hit does it look for a hex by its own rules, building
 nothing that year if none fits. Olympic stadiums are apart from the pick: in every real Summer
 Games year a map hosts one with OLYMPIC_CHANCE, scaled by its land, in its biggest town without a
@@ -21,6 +22,7 @@ import numpy.typing as npt
 from railroads.sim.constructions import Building, BuildingKind
 from railroads.sim.grids import BoolGrid, Cell
 from railroads.sim.growth import Growth
+from railroads.sim.ladders import DEPARTMENT_STORES, HOTELS
 from railroads.sim.move import Move
 from railroads.sim.points import Points
 from railroads.sim.tilemap import REFERENCE_LAND, Deposit, Relief, Terrain, TileMap
@@ -53,8 +55,10 @@ HOSTS_APART = 10
 NEAR_MILITARY = 20.0
 MILITARY_STEPS = 10
 SPACE_CENTER_TRIES = 200
-FILM_TOWN = 150
-FAIR_TOWN = 100
+# A world's fair, an amusement park or a gigafactory wants a town big enough for a hotel, a film
+# studio one big enough for a department store.
+FAIR_TOWN = HOTELS.needs[Points.POPULATION]
+FILM_TOWN = DEPARTMENT_STORES.needs[Points.POPULATION]
 
 Placer = Callable[[Growth, BuildingKind, np.random.Generator], Cell | None]
 
@@ -64,7 +68,20 @@ class Novelty:
     kind: BuildingKind
     from_year: int
     place: Placer
+    # Where it goes up, as the player reads it when no place fits.
+    where: str
     until_year: int = 9999
+
+
+@dataclass(frozen=True, slots=True)
+class NoveltyOdds:
+    """A one-off building this game may get: its chance in a year it may come up, when that is,
+    and why none can come up now if so."""
+
+    kind: BuildingKind
+    chance: float
+    when: str
+    why_none: str | None = None
 
 
 def _free(growth: Growth, kind: BuildingKind, cell: Cell) -> bool:
@@ -199,16 +216,22 @@ class ByTown:
         return None if town is None else growth.constructions.nearest_free(kind, town, TOWN_STEPS)
 
 
+def _by_town(least: int) -> str:
+    return f"by a town of at least {least} population points around"
+
+
 NOVELTIES = (
-    Novelty(BuildingKind.ROYAL_PALACE, 1850, place_royal_palace),
-    Novelty(BuildingKind.SALT_CATHEDRAL, 1850, place_salt_cathedral),
-    Novelty(BuildingKind.SPA_RESORT, 1850, place_spa),
-    Novelty(BuildingKind.WORLDS_FAIR, 1880, ByTown(FAIR_TOWN), until_year=1940),
-    Novelty(BuildingKind.FILM_STUDIO, 1920, ByTown(FILM_TOWN)),
-    Novelty(BuildingKind.AMUSEMENT_PARK, 1950, ByTown(FAIR_TOWN)),
-    Novelty(BuildingKind.SPACE_CENTER, 1960, place_space_center),
-    Novelty(BuildingKind.PEAR_HQ, 1980, place_pear_hq),
-    Novelty(BuildingKind.GIGAFACTORY, 2030, ByTown(FAIR_TOWN)),
+    Novelty(BuildingKind.ROYAL_PALACE, 1850, place_royal_palace, "by the biggest town"),
+    Novelty(BuildingKind.SALT_CATHEDRAL, 1850, place_salt_cathedral, "on a salt deposit"),
+    Novelty(BuildingKind.SPA_RESORT, 1850, place_spa, "in hills beside a river or a lake"),
+    Novelty(
+        BuildingKind.WORLDS_FAIR, 1880, ByTown(FAIR_TOWN), _by_town(FAIR_TOWN), until_year=1940
+    ),
+    Novelty(BuildingKind.FILM_STUDIO, 1920, ByTown(FILM_TOWN), _by_town(FILM_TOWN)),
+    Novelty(BuildingKind.AMUSEMENT_PARK, 1950, ByTown(FAIR_TOWN), _by_town(FAIR_TOWN)),
+    Novelty(BuildingKind.SPACE_CENTER, 1960, place_space_center, "on flat land"),
+    Novelty(BuildingKind.PEAR_HQ, 1980, place_pear_hq, "by a skyscraper"),
+    Novelty(BuildingKind.GIGAFACTORY, 2030, ByTown(FAIR_TOWN), _by_town(FAIR_TOWN)),
 )
 
 
@@ -226,9 +249,10 @@ class Novelties:
     works: list[Cell] = field(default_factory=list)
 
     @classmethod
-    def pick(cls, tile_map: TileMap, rng: np.random.Generator) -> Novelties:
-        """Picks this game's novelties, more of them on a map with more land."""
-        land = int(_land(tile_map).sum()) / REFERENCE_LAND
+    def pick(cls, place: TileMap, rng: np.random.Generator) -> Novelties:
+        """Picks this game's novelties, more of them on a place with more land: the map of the
+        whole place, lots for sale included."""
+        land = int(_land(place).sum()) / REFERENCE_LAND
         low, high = NOVELTIES_PER_GAME
         count = min(len(NOVELTIES), max(1, round(int(rng.integers(low, high + 1)) * land)))
         chosen = rng.choice(len(NOVELTIES), size=count, replace=False)
@@ -259,6 +283,53 @@ class Novelties:
         if year >= RAILWAY_WORKS_YEAR and len(works) < wanted and rng.random() < YEARLY_CHANCE:
             changed |= self._railway_works(growth, works)
         return changed
+
+    def odds(self, growth: Growth) -> list[NoveltyOdds]:
+        """Each one-off building this game may get, with its chance and why none comes up now."""
+        year = growth.year
+        found = []
+        for novelty in self.picked:
+            when = f"a year from {novelty.from_year}"
+            if novelty.until_year < 9999:
+                when += f" to {novelty.until_year}"
+            why = None
+            if novelty.kind in self.built:
+                why = "Built: one a game."
+            elif year < novelty.from_year:
+                why = f"Not before {novelty.from_year}."
+            elif year > novelty.until_year:
+                why = f"Only until {novelty.until_year}."
+            elif novelty.place(growth, novelty.kind, np.random.default_rng(0)) is None:
+                why = f"No place fits now: it goes up {novelty.where}"
+                if isinstance(novelty.place, ByTown):
+                    biggest = int(growth.nearby(Points.POPULATION).max())
+                    why += f", and the biggest town has {biggest}"
+                why += "."
+            found.append(NoveltyOdds(novelty.kind, YEARLY_CHANCE, when, why))
+        games = next(y for y in range(year, year + 5) if olympic_year(y))
+        found.append(
+            NoveltyOdds(
+                BuildingKind.OLYMPIC_STADIUM,
+                self.olympic_chance,
+                f"in each Summer Games year, next in {games}, in the biggest town without one",
+            )
+        )
+        wanted = getattr(self, "railway_works", 0)
+        works = len(getattr(self, "works", []))
+        why = None
+        if works >= wanted:
+            why = f"All {wanted} this map gets stand."
+        elif year < RAILWAY_WORKS_YEAR:
+            why = f"Not before {RAILWAY_WORKS_YEAR}."
+        found.append(
+            NoveltyOdds(
+                BuildingKind.RAILWAY_WORKS,
+                YEARLY_CHANCE,
+                f"a year, {works} of {wanted} built, by the biggest town with none near",
+                why,
+            )
+        )
+        return found
 
     def _railway_works(self, growth: Growth, works: list[Cell]) -> set[Cell]:
         """Puts railway works by the biggest town with none near it yet."""
