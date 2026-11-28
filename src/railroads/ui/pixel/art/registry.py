@@ -25,6 +25,13 @@ from railroads.ui.pixel.art import (
 )
 from railroads.ui.pixel.art.built import modelled
 from railroads.ui.pixel.art.churches import basilica, cathedral, church, st_peters
+from railroads.ui.pixel.art.collieries import (
+    coal_mine,
+    copper_mine,
+    diamond_mine,
+    gold_mine,
+    iron_mine,
+)
 from railroads.ui.pixel.art.commerce import (
     airport,
     builders_yard,
@@ -138,12 +145,10 @@ from railroads.ui.pixel.art.mines import (
     clay_pit,
     limestone_quarry,
     logging_camp,
-    mine,
     oil_well,
     salt_works,
     sand_pit,
     sawmill,
-    shaft_mine,
 )
 from railroads.ui.pixel.art.nature import leafy, pine, rocks
 from railroads.ui.pixel.art.painter import (
@@ -221,14 +226,14 @@ SPRITES: dict[str, Callable[[], Sprite]] = {
     "big_factory": big_factory,
     "mega_factory": mega_factory,
     "skyscraper": skyscraper,
-    "mine": mine,
+    "mine": coal_mine,
     "logging_camp": logging_camp,
     "sawmill": sawmill,
     "orchard": orchard,
-    "iron_mine": lambda: shaft_mine((104, 72, 62), (176, 98, 70)),
-    "copper_mine": lambda: shaft_mine((96, 84, 66), (206, 130, 76)),
-    "gold_mine": lambda: shaft_mine((88, 78, 62), (255, 214, 60)),
-    "diamond_mine": lambda: shaft_mine((58, 60, 72), (190, 238, 255)),
+    "iron_mine": iron_mine,
+    "copper_mine": copper_mine,
+    "gold_mine": gold_mine,
+    "diamond_mine": diamond_mine,
     "oil_well": oil_well,
     "salt_works": salt_works,
     "fishery": fishery,
