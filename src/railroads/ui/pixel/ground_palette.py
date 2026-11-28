@@ -375,13 +375,12 @@ FLOOR_FROM = 0.8
 BARE_ABOVE = 0.3
 BARE_MARGIN = 1e-4
 CLEARING = -4.0
-# Logging camps stand in the woods: their cells keep their trees, but for the clearing the camp's
-# own picture fills with its trodden floor and the trees round it, MILL_CLEARING of its reach
-# across and half that down, its edge frayed, its middle CLEARING_DROP art pixels in front of the
-# camp's foot.
+# Logging camps stand in the woods: their cells keep their trees, but for a small clearing round
+# the camp itself, MILL_CLEARING of its yard's reach across and half that down, its edge frayed,
+# its middle CLEARING_DROP art pixels in front of the camp so its yard shows below it.
 IN_THE_WOODS = (BuildingKind.LOGGING_CAMP,)
-MILL_CLEARING = 0.6
-CLEARING_DROP = 1.0
+MILL_CLEARING = 1.2
+CLEARING_DROP = 3.0
 # Where the woods' share of the ground is worked out around each point: the point itself and six
 # around it, in cells.
 AROUND = (
