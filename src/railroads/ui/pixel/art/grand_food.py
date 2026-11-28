@@ -1,19 +1,31 @@
-"""Big and mega wineries, breweries, distilleries, canneries, sugar refineries, meat works,
-sausage makers and cooperages, each drawn as a building of its own: a cream château among
-terraced vines, a brick brewhouse under a copper dome, a whitewashed still house among bonded
-warehouses, a cannery quarter round a water tank made like a tin can, a red-brick refinery banded in
-sugar white and blue among its beet,
-a brick slaughterhouse with a white cold store, a half-timbered sausage works with smokehouses and
-a timber cooperage with barrels firing over the coals."""
+"""Big and mega wineries, breweries, distilleries, sake breweries, canneries, sugar refineries,
+meat works, sausage makers and cooperages, each drawn as a building of its own: a cream château
+with round towers among terraced vines, a honey-brick brewery of brew towers and copper kettle
+houses crowned with a gilt sheaf, a whitewashed distillery of pagoda kilns, copper stills and
+bonded warehouses, a walled sake brewery of white kura and great cedar vats, a cannery quarter
+round a water tank made like a tin can, a red-brick refinery banded in sugar white and blue among
+its beet, a brick slaughterhouse with a white cold store, a sausage works with smokehouses, and a
+cooperage of stave yards and cask pyramids."""
 
+import itertools
 import math
-from collections.abc import Callable
+from collections.abc import (
+    Callable,
+)
 
 import numpy as np
 
+from railroads.ui.pixel.art.crafts import (
+    _hip,
+)
 from railroads.ui.pixel.art.industry import (
+    BREW_BRICK,
+    CHARRED,
     COLD_TILE,
+    COOPER_ROOF,
+    COOPER_WALL,
     DRESSING,
+    FOAM,
     FOOD_APPLE,
     FOOD_BRICK,
     FOOD_CASE,
@@ -31,10 +43,19 @@ from railroads.ui.pixel.art.industry import (
     FOOD_TIN,
     FOOD_TOMATO,
     GILT,
+    GRAVEL,
+    HOP,
+    KETTLE,
+    LATTICE,
+    MALT_TILE,
     MILL_GLASS,
     MILL_SLATE,
+    NAMAKO,
     NORTH_LIGHT,
+    OAK,
+    PLASTER,
     PUDDLE,
+    SETTS,
     STILL_SLATE,
     STRAW,
     SUGAR_BEET,
@@ -43,9 +64,31 @@ from railroads.ui.pixel.art.industry import (
     SUGAR_CREAM,
     SUGAR_GROUND,
     SUGAR_WHITE,
+    SUGI,
+    TAR,
+    TURF,
+    WHISKY,
+    WINE,
+    WINE_ROOF,
+    YARD,
     _bed,
+    _brew_dray,
+    _brew_louvres,
+    _brew_sheaf,
+    _brew_sign,
+    _brew_wheel,
+    _brew_window,
     _butcher_sign,
+    _cask,
+    _cask_at,
+    _cask_hoops,
+    _cask_rack,
+    _cask_raised,
+    _cask_stack,
+    _cask_staves,
+    _cask_straw,
     _cold_door,
+    _cooper_shavings,
     _door,
     _food_basket,
     _food_cart,
@@ -57,22 +100,23 @@ from railroads.ui.pixel.art.industry import (
     _food_wheel,
     _food_window,
     _footing,
-    _heap,
     _meat_wagon,
     _mill_window,
     _north_lights,
     _on_roof,
-    _pagoda,
-    _pipe,
-    _puddle,
-    _ring,
     _roof_rows,
     _round_head,
+    _sake_ball,
+    _sake_namako,
+    _sake_noren,
+    _sake_roof,
     _smoke,
-    _smoking_chimney,
-    _spill,
-    _stack,
     _stains,
+    _still_pagoda,
+    _still_peat,
+    _still_pot,
+    _still_window,
+    _still_worm,
     _sugar_awning,
     _sugar_bags,
     _sugar_beet,
@@ -85,12 +129,15 @@ from railroads.ui.pixel.art.industry import (
     _sugar_window,
     _track,
     _window,
+    _wine_cart,
+    _wine_press,
+    _wine_vines,
+    _wine_window,
     _works_siding,
 )
 from railroads.ui.pixel.art.painter import (
-    BARREL,
     BRICK,
-    COPPER,
+    DIGITS,
     DOORWAY,
     METAL,
     RGB,
@@ -102,7 +149,6 @@ from railroads.ui.pixel.art.painter import (
     Point,
     Sprite,
     Top,
-    chimney_top,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -112,7 +158,6 @@ from railroads.ui.pixel.art.parts import (
     _band,
     _bands,
     _bar,
-    _barrel,
     _cow,
     _fence,
     _gable_across,
@@ -122,41 +167,8 @@ from railroads.ui.pixel.art.parts import (
     _plinth,
     _ridge,
     _turned,
-    _windows,
+    _vault,
 )
-
-WINE_WALL: RGB = (238, 224, 192)
-WINE_ROOF: RGB = (178, 86, 58)
-WINE_STAIN: RGB = (110, 52, 76)
-VINE: RGB = (78, 130, 50)
-GRAPE: RGB = (112, 50, 124)
-POST: RGB = (110, 84, 58)
-DUG: RGB = (118, 96, 66)
-CELLAR: RGB = (176, 168, 150)
-TURF: RGB = (104, 140, 70)
-SHUTTER: RGB = (90, 120, 70)
-
-
-def _cask(p: Painter, x: float, y: float) -> None:
-    """A cask lying on its side on (x, y), hooped."""
-    p.ellipse(x - 2.5, y - 3, x + 2.5, y, BARREL)
-    for dx in (-1, 1):
-        p.line([(x + dx, y - 2.8), (x + dx, y - 0.2)], shade(BARREL, 0.55))
-    p.point(x - 2, y - 2.2, shade(BARREL, 1.3))
-
-
-def _casks(p: Painter, x: float, y: float, base: int) -> None:
-    """A pyramid of casks lying on their sides, `base` along the bottom, its foot on (x, y)."""
-    for row in range(base):
-        for k in range(base - row):
-            _cask(p, x + 5 * k + 2.5 * row, y - 2.6 * row)
-
-
-def _keg(p: Painter, x: float, y: float) -> None:
-    """A small upright keg standing on (x, y)."""
-    p.ellipse(x - 1.4, y - 3.6, x + 1.4, y, BARREL)
-    p.line([(x - 1.3, y - 1.2), (x + 1.3, y - 1.2)], shade(BARREL, 0.55))
-    p.line([(x - 1.3, y - 2.5), (x + 1.3, y - 2.5)], shade(BARREL, 0.55))
 
 
 def _cart(p: Painter, x: float, y: float, load: tuple[RGB, ...] = ()) -> None:
@@ -173,477 +185,229 @@ def _cart(p: Painter, x: float, y: float, load: tuple[RGB, ...] = ()) -> None:
     p.point(x + 0.3, y - 1, shade(TIMBER, 1.2))
 
 
-def _vines(p: Painter, x: float, y: float, posts: int) -> None:
-    """A row of vines trained along a trellis over a strip of dug earth, from (x, y) down along
-    the ground, hung with grapes."""
-    span = 3 * (posts - 1)
-    p.polygon(
-        [(x - 1, y), (x + span, y + span / 2), (x + span, y + span / 2 + 1.5), (x - 1, y + 1.5)],
-        DUG,
-    )
-    ends = [(x + 3 * k, y + 1.5 * k) for k in range(posts)]
-    for ex, ey in ends:
-        p.line([(ex, ey), (ex, ey - 5)], POST)
-    p.line([(ex, ey - 4) for ex, ey in ends], VINE)
-    p.line([(ex, ey - 5) for ex, ey in ends], shade(VINE, 1.25))
-    for ex, ey in ends[:-1]:
-        p.point(ex + 1.5, ey - 2.5, GRAPE)
-        p.point(ex + 1, ey - 3.5, shade(VINE, 0.8))
-
-
-def _cellar(p: Painter, x: float, y: float, half: float, doors: tuple[float, ...]) -> None:
-    """A wine cellar dug into a grassy bank on (x, y), its stone front opened by dark arched doors
-    at each of `doors` along it."""
-    top = p.box(x, y, half, 3, CELLAR, TURF)
-    left, front, _, back = top
-    for t in doors:
-        _patch(p, left, front, (t - 0.12, t + 0.12), (1, 3), (42, 34, 30))
-        p.line(
-            [_on_wall(left, front, t - 0.14, 0.5), _on_wall(left, front, t + 0.14, 0.5)],
-            shade(STONE, 1.3),
-        )
-    p.point(*_on_wall(left, back, 0.5, -0.5), shade(TURF, 1.25))
-
-
-def _shutters(p: Painter, a: Point, b: Point, spans: tuple[float, ...], drop: float) -> None:
-    """Windows with green shutters folded back either side, on the wall under the edge from `a`
-    to `b`."""
-    for t in spans:
-        _window(p, a, b, (t - 0.025, t + 0.025), drop, tall=1.6)
-        for side in (-0.05, 0.05):
-            p.point(*_on_wall(a, b, t + side, drop + 0.2), SHUTTER)
-
-
-def _round_tower(p: Painter, x: float, y: float, r: float, tall: float, cone: float) -> None:
-    """A round cream tower standing on (x, y) under a pointed cone of red tiles, with windows up
-    its lit side and a gold vane on top."""
-    _turned(p, x, y, [(0, r), (tall, r)], WINE_WALL)
-    for h in (tall * 0.3, tall * 0.65):
-        p.line([(x - r * 0.4, y - h), (x - r * 0.4, y - h - 1.4)], WINDOW)
-    p.ellipse(x - r - 0.8, y - tall - r / 2, x + r + 0.8, y - tall + r / 2 + 0.4, WINE_ROOF)
-    apex = (x, y - tall - cone)
-    p.polygon([(x - r - 0.8, y - tall), apex, (x + r / 3, y - tall + r / 2)], WINE_ROOF)
-    p.polygon(
-        [(x + r / 3, y - tall + r / 2), apex, (x + r + 0.8, y - tall)], shade(WINE_ROOF, 0.72)
-    )
-    p.line(
-        [(x - r * 0.5, y - tall - 0.5), (x - 0.5, y - tall - cone + 1.5)], shade(WINE_ROOF, 1.25)
-    )
-    p.line([apex, (apex[0], apex[1] - 2)], (60, 56, 54))
-    p.point(apex[0] + 0.5, apex[1] - 2.5, (230, 188, 70))
-
-
-def _terrace(p: Painter, x: float, y: float, length: float, height: float) -> None:
-    """A terrace of vines cut into a hillside: a stone retaining wall `height` high round a green
-    strip on (x, y) planted with two rows of trellised vines hung with grapes."""
-    top = p.hall(x, y, length, 6, height, CELLAR, shade(VINE, 0.8))
-    left, front, right, back = top
-    _band(p, left, front, 0.6, shade(CELLAR, 1.12))
-    for t in (0.2, 0.5, 0.8):
-        p.point(*_on_wall(left, front, t, height * 0.6), shade(CELLAR, 0.8))
-    posts = round(length / 3)
-    for depth in (0.3, 0.75):
-        ends = []
-        for k in range(posts + 1):
-            a = _on_wall(left, front, k / posts, 0)
-            b = _on_wall(back, right, k / posts, 0)
-            ends.append((a[0] + (b[0] - a[0]) * depth, a[1] + (b[1] - a[1]) * depth))
-        for ex, ey in ends:
-            p.line([(ex, ey), (ex, ey - 3)], POST)
-        p.line([(ex, ey - 2) for ex, ey in ends], VINE)
-        p.line([(ex, ey - 3) for ex, ey in ends], shade(VINE, 1.3))
-        for ex, ey in ends[:-1]:
-            p.point(ex + 1.5, ey - 1.5, GRAPE)
-
-
 def big_winery() -> Sprite:
-    """A two-storey cream winery under red tiles with green-shuttered windows and an arched door,
-    a square cream press tower behind it under a tiled pyramid, three rows of trellised vines
-    before it, a cellar dug into a grassy bank with two dark doors, and a pyramid of casks on
-    ground stained with spilt wine."""
-    p = Painter(52, 45, (27, 29))
-    foot = _footing(2, -3, 18, 8)
-    _bed(p, foot)
-    p.blob(4, 6, 14, 10, (112, 92, 70))
-    p.shadow(17, 4.5)
-    _track(p, foot[0], foot[1], (0.62, 0.76), 4, ruts=False)
-    tower = p.box(12, -8, 4, 14, WINE_WALL, None)
-    tl, tf, tr, _ = tower
-    _plinth(p, tower, 14, WINE_WALL)
-    _shutters(p, tl, tf, (0.5,), 2)
-    _window(p, tf, tr, (0.4, 0.6), 2, shade(WINDOW, 0.85), 1.6)
-    apex = (tf[0], (tl[1] + tr[1]) / 2 - 5)
-    p.polygon([tl, tf, apex], WINE_ROOF, shade(WINE_ROOF, 0.6))
-    p.polygon([tf, tr, apex], shade(WINE_ROOF, 0.72), shade(WINE_ROOF, 0.5))
-    top = p.hall(2, -3, 18, 8, 9, WINE_WALL, None)
-    left, front, right, _ = top
-    _plinth(p, top, 9, WINE_WALL)
-    _stains(p, left, front, 9, (0.05, 0.3, 0.9), shade(WINE_WALL, 0.66), 1.4)
-    _shutters(p, left, front, (0.12, 0.3, 0.48, 0.86), 1.6)
-    _shutters(p, left, front, (0.12, 0.3, 0.48), 5.4)
-    _door(p, left, front, (0.62, 0.76), 4.4, 9, (110, 74, 50), shade(WINE_WALL, 0.8))
-    _window(p, front, right, (0.35, 0.65), 2, shade(WINDOW, 0.85), 1.6)
-    p.gable(top, 4, WINE_ROOF, WINE_WALL)
-    _roof_rows(p, top, 4, WINE_ROOF)
-    x, y = _on_roof(top, 4, 0.2, 0.9)
-    p.rect(x - 0.6, y - 3, x + 0.6, y, shade(WINE_WALL, 0.9))
-    for x, y in ((-24, -2), (-21, 2.5), (-18, 7)):
-        _vines(p, x, y, 4)
-    _cellar(p, 17, 4, 5, (0.3, 0.7))
-    _casks(p, -2, 13, 3)
-    p.blob(10, 10.5, 13, 12, WINE_STAIN)
-    _barrel(p, 12, 10)
+    """A winery grown into a château: a two-storey house of cream stone under a hipped wine-red
+    roof with dormers, its windows between wine-red shutters and its door up steps under a
+    pediment with a gilt oculus, a round corner tower under a tall wine-red cone, an open press
+    shed with a basket press and racked casks, a cellar vaulted into a grassy bank, grape carts
+    and casks in the gravel court and a vineyard of six rows beside it."""
+    m = METRE
+    p = Painter(62, 48, (28, 30))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 9) * m, (v - 3) * m)
+
+    p.polygon([at(-1, -5), at(25, -5), at(25, 4), at(-1, 4)], (206, 192, 160))
+    p.shadow(18, 5, 5)
+    for k, v in enumerate((9.5, 7, 4.5, 2, -0.5, -3)):
+        _wine_vines(p, *at(-15 + 0.5 * (k % 2), v), 7)
+    _drink_chateau(p, *at(9.5, 9), 19, 10, 2, 7)
+    _drink_round_tower(p, *at(19.5, 3.6), 2.6, 13, 5.5)
+    _drink_press_shed(p, *at(29, 9.5), 9, 6)
+    _drink_cellar(p, *at(28, 0.5), 6, 6)
+    _cask_rack(p, *at(4, 2.2), 6, 2)
+    _wine_cart(p, *at(12, -1.6))
+    _wine_cart(p, *at(17.5, -3.8))
+    wx, wy = at(23, -1)
+    p.blob(wx - 1.4 * m, wy - 0.5 * m, wx + 1.4 * m, wy + 0.7 * m, (126, 58, 74), 150)
     return p.sprite()
 
 
 def mega_winery() -> Sprite:
-    """A wine château: a long cream house of two storeys under red tiles with green-shuttered
-    windows and a round tower at its corner under a pointed red cone, a hillside of three vine
-    terraces walled in stone rising behind it, cellars dug into a grassy bank with three arched
-    doors, a pyramid of casks and a cart of casks on ground stained with wine, and a row of vines
-    before it all."""
-    p = Painter(63, 56, (32, 37))
-    for x, y, h in ((-6, -17, 10), (-11, -14.5, 7), (-16, -12, 4)):
-        _terrace(p, x, y, 14, h)
-    foot = _footing(6, -2, 22, 9)
-    _bed(p, foot)
-    p.blob(-2, 8, 10, 12, (112, 92, 70))
-    p.shadow(22, 5)
-    _track(p, foot[0], foot[1], (0.52, 0.64), 5, ruts=False)
-    top = p.hall(6, -2, 22, 9, 11, WINE_WALL, None)
-    left, front, right, _ = top
-    _plinth(p, top, 11, WINE_WALL)
-    _stains(p, left, front, 11, (0.25, 0.45, 0.9), shade(WINE_WALL, 0.66), 1.4)
-    _shutters(p, left, front, (0.28, 0.4, 0.74, 0.86), 2)
-    _shutters(p, left, front, (0.28, 0.4, 0.58, 0.74, 0.86), 6.2)
-    _patch(p, left, front, (0.52, 0.64), (5.6, 6.2), (230, 188, 70))
-    _door(p, left, front, (0.53, 0.63), 7, 11, (110, 74, 50), shade(WINE_WALL, 0.8))
-    _windows(p, front, right, (0.3, 0.7), (2, 6.2), 2, shade(WINDOW, 0.85))
-    p.gable(top, 5, WINE_ROOF, WINE_WALL)
-    _roof_rows(p, top, 5, WINE_ROOF, (0.25, 0.5, 0.75))
-    for along in (0.3, 0.75):
-        x, y = _on_roof(top, 5, along, 0.95)
-        p.rect(x - 0.6, y - 3, x + 0.6, y, shade(WINE_WALL, 0.9))
-    _round_tower(p, -9, -4, 3.6, 18, 8)
-    _vines(p, -29, 2, 5)
-    _vines(p, -26, 7, 4)
-    _cellar(p, 22, 6, 6, (0.2, 0.5, 0.8))
-    _casks(p, -14, 15, 3)
-    p.blob(2, 13, 7, 15, WINE_STAIN)
-    _cart(p, 8, 14, (BARREL, BARREL, BARREL))
+    """A grand château of cream stone among its vines: a two-storey house with dormers in its
+    hipped wine-red roof, its windows between wine-red shutters and its door up steps under a
+    pediment with a gilt oculus, flanked by two round towers under tall wine-red cones with gilt
+    vanes; terraces of vines stepping up the hillside behind, a stone fountain in the gravel
+    court, two cellars vaulted into grassy banks, an open press shed with a basket press, casks
+    racked in the court and grape carts, and a vineyard spreading before it."""
+    m = METRE
+    p = Painter(72, 56, (34, 34))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 9) * m, (v - 3) * m)
+
+    for v, high in ((18.5, 5.4), (13.3, 3.6), (8.1, 1.8)):
+        _drink_terrace(p, *at(-10, v), 16, high, 2)
+    p.polygon([at(-1, -6), at(27, -6), at(27, 4), at(-1, 4)], (206, 192, 160))
+    p.shadow(22, 6, 6)
+    for k, v in enumerate((3, 0.5, -2, -4.5)):
+        _wine_vines(p, *at(-17 + 0.5 * (k % 2), v), 6)
+    _drink_cellar(p, *at(31, 11), 6, 6)
+    _drink_chateau(p, *at(12, 10), 22, 10, 2, 9)
+    _drink_press_shed(p, *at(32, 3), 8, 6)
+    for u in (0.5, 23.5):
+        _drink_round_tower(p, *at(u, 4.4), 3, 15, 6.5)
+    _drink_fountain(p, *at(12, -0.8))
+    _cask_rack(p, *at(2, 1.6), 5, 2)
+    _cask_rack(p, *at(18.5, 1.6), 5, 2)
+    _wine_cart(p, *at(5, -4.2))
+    _wine_cart(p, *at(20, -4.4))
+    _drink_cellar(p, *at(31.5, -4), 6, 5)
     return p.sprite()
 
 
-BREW_ROOF: RGB = (84, 76, 80)
-HOP: RGB = (110, 170, 70)
-GRAIN: RGB = (176, 150, 92)
-COWL: RGB = (236, 232, 222)
-STEAM: RGB = (236, 236, 238)
-
-
-def _copper_dome(p: Painter, x: float, y: float, r: float) -> None:
-    """A green-tinged copper dome on (x, y), banded, glinting and topped with a vent pipe."""
-    rise = r * 1.35
-    _turned(
-        p,
-        x,
-        y,
-        [
-            (0, r),
-            (rise * 0.33, r * 0.93),
-            (rise * 0.66, r * 0.67),
-            (rise * 0.9, r * 0.33),
-            (rise, 0),
-        ],
-        COPPER,
-    )
-    _ring(p, x, y - rise * 0.25, r * 0.95, shade(COPPER, 0.7))
-    p.blob(x - r * 0.65, y - rise * 0.8, x - r * 0.2, y - rise * 0.4, shade(COPPER, 1.3))
-    p.line([(x, y - rise), (x, y - rise - 2)], (90, 80, 70))
-
-
-def _kiln(p: Painter, x: float, y: float, half: float, tall: float) -> None:
-    """A square brick malt kiln standing on (x, y) under a steep slate pyramid, a white cowl on
-    its top letting out a wisp of steam."""
-    top = p.box(x, y, half, tall, BRICK, None)
-    left, front, right, _ = top
-    _plinth(p, top, tall, BRICK)
-    _windows(p, left, front, (0.5,), (tall * 0.3,), 2, WINDOW, shade(BRICK, 1.35))
-    apex = (front[0], (left[1] + right[1]) / 2 - half * 1.6)
-    p.polygon([left, front, apex], BREW_ROOF, shade(BREW_ROOF, 0.6))
-    p.polygon([front, right, apex], shade(BREW_ROOF, 0.72), shade(BREW_ROOF, 0.5))
-    cx, cy = apex
-    p.rect(cx - 1, cy - 3, cx + 1, cy + 0.5, COWL)
-    p.polygon([(cx - 1.6, cy - 3), (cx, cy - 4.6), (cx + 2.2, cy - 3.4)], shade(COWL, 0.8))
-    _smoke(p, cx + 2, cy - 6, STEAM, 2)
-
-
-def _hop_sign(p: Painter, x: float, y: float, size: float) -> None:
-    """A green hop cone hung on a wall at (x, y)."""
-    p.polygon(
-        [(x, y - 1.5 * size), (x + 1.4 * size, y), (x, y + 1.8 * size), (x - 1.4 * size, y)],
-        HOP,
-        shade(HOP, 0.6),
-    )
-    p.line([(x - 0.8 * size, y - 0.2), (x + 0.8 * size, y + 0.4)], shade(HOP, 0.75))
-    p.point(x - 0.5 * size, y - 0.6 * size, shade(HOP, 1.3))
-
-
-def _brewhouse(p: Painter, x: float, y: float, length: float, height: float) -> Top:
-    """A brick brewhouse over a dark plinth: rows of arched windows, a door under a light lintel and
-    a cream painted sign with a hop cone on it, under a dark slate gable."""
-    lintel = shade(BRICK, 1.3)
-    top = p.hall(x, y, length, 9, height, BRICK, None)
-    left, front, right, _ = top
-    _plinth(p, top, height, BRICK)
-    _stains(p, left, front, height, (0.04, 0.38, 0.62, 0.9), shade(BRICK, 0.62), 1.8)
-    rows = tuple(2 + 3.4 * k for k in range(int((height - 3) // 3.4)))
-    _windows(p, left, front, (0.45, 0.58, 0.72, 0.86), rows, 2, arch=lintel)
-    _door(p, left, front, (0.62, 0.7), height - 3.4, height, DOORWAY, lintel)
-    _patch(p, left, front, (0.04, 0.36), (1, 5.2), (222, 210, 180))
-    _patch(p, left, front, (0.04, 0.36), (1, 1.5), shade(BRICK, 0.8))
-    for drop in (3.6, 4.2):
-        p.line(
-            [_on_wall(left, front, 0.2, drop), _on_wall(left, front, 0.34, drop)], (150, 130, 96)
-        )
-    _hop_sign(p, *_on_wall(left, front, 0.1, 3), 1)
-    _windows(p, front, right, (0.3, 0.7), rows, 2, shade(WINDOW, 0.8), shade(BRICK, 1.1))
-    p.gable(top, 4.5, BREW_ROOF, BRICK)
-    _roof_rows(p, top, 4.5, BREW_ROOF)
-    return top
-
-
-def _brew_tower(p: Painter, x: float, y: float, half: float, tall: float) -> Top:
-    """A tall brick brew tower with arched windows up it and a hoist door near its top."""
-    tower = shade(BRICK, 1.08)
-    top = p.box(x, y, half, tall, tower, None)
-    left, front, right, _ = top
-    _plinth(p, top, tall, tower)
-    _stains(p, front, right, tall, (0.1, 0.9), shade(tower, 0.5), 1.6)
-    _bands(p, left, front, right, 0.8, shade(tower, 1.25), shade(tower, 1.0))
-    drops = tuple(3 + 5 * k for k in range(int((tall - 6) // 5)))
-    _windows(p, left, front, (0.5,), drops, 2, arch=shade(BRICK, 1.35))
-    _windows(p, front, right, (0.5,), drops[:1], 2, shade(WINDOW, 0.8), shade(BRICK, 1.1))
-    _door(p, front, right, (0.3, 0.7), tall - 4, tall, (70, 50, 40), shade(BRICK, 1.1))
-    return top
-
-
 def big_brewery() -> Sprite:
-    """A big brewery: a long brick brewhouse with two rows of arched windows and a hop cone on its
-    sign, a tall brick tower under a copper dome, a malt kiln behind under a slate pyramid with a
-    white cowl steaming, a dray loaded with kegs, barrels by the door on a path wet with beer and a
-    heap of spent grain."""
-    p = Painter(48, 53, (24, 37))
-    foot = _footing(-6, -1, 18, 9)
-    tower_foot = _footing(8, 4, 5, 5)
-    _bed(p, foot)
-    _bed(p, tower_foot)
-    p.shadow(18, 4.5)
-    _track(p, foot[0], foot[1], (0.62, 0.7), 4, ruts=False)
-    _track(p, tower_foot[1], tower_foot[2], (0.3, 0.7), 4)
-    _kiln(p, 15, -7, 4, 11)
-    top = _brewhouse(p, -6, -1, 18, 9)
-    x, y = _on_roof(top, 4.5, 0.3, 0.85)
-    cap = _stack(p, x - 1, y, y - 6, BRICK)
-    _smoke(p, x + 0.5, cap - 2, STEAM, 2)
-    tower = _brew_tower(p, 8, 4, 5, 19)
-    tl, tf, tr, _ = tower
-    _copper_dome(p, tf[0], (tl[1] + tr[1]) / 2, 5.2)
-    _puddle(p, -8, 9, 1.8)
-    for x, y in ((-12, 7), (-5, 9.5)):
-        _barrel(p, x, y)
-    _heap(p, 18, 6, 2.6, 2, GRAIN)
-    _cart(p, 13, 11, (BARREL, BARREL, BARREL))
+    """A brewery grown into a works of honey brick: a long brewhouse 24 by 10 m with four copper
+    kettles gleaming through its tall arched windows and a vapour stack steaming on its ridge, a
+    brew tower 20 m high crowned with a gilt sheaf of barley, a square malt kiln under a white
+    cowl, a hop-green sign by the door, two drays loaded with casks in the cobbled yard, and a
+    cooperage yard with a cooper's shop, casks being raised and long stacks of oak casks."""
+    m = METRE
+    p = Painter(62, 54, (28, 32))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 10) * m, (v - 2) * m)
+
+    p.polygon([at(-10, -8), at(24, -8), at(36, -3), at(36, 13), at(22, 13), at(-10, 2)], SETTS)
+    _bed(p, _footing(*at(4, 8), 24 * m, 10 * m), margin=0.8)
+    p.shadow(20, 6, 5)
+    _drink_kiln(p, *at(-12.5, 8.5), 7, 9, BREW_BRICK, MALT_TILE, HOP, pagoda=False)
+    house = _drink_brewhouse(p, *at(4, 8), 24, 10, 11, 4)
+    _drink_cooper_shed(p, *at(30, 9.5), 9, 6, 4.5)
+    _drink_tower(p, *at(19.25, 7.5), 6.5, 7, 20, 3.2)
+    _brew_sign(p, *_on_wall(house[0], house[1], 0.012, 2.4 * m))
+    _cask_staves(p, *at(26, 2.5), 8)
+    _cask_staves(p, *at(26, 4.2), 6)
+    for u, v in ((29, 4.6), (31, 3.4)):
+        _cask_raised(p, *at(u, v))
+    _cask_raised(p, *at(33, 4.8), fire=True)
+    for k, rows in enumerate(((8, 7, 6), (7, 6))):
+        _cask_stack(p, *at(25 + 1.2 * k, -0.4 - 2.2 * k), rows)
+    _brew_dray(p, *at(-6, -2.2))
+    _brew_dray(p, *at(5, -5.6))
+    for u, v in ((-8, -6.2), (-7, -7)):
+        _cask(p, *at(u, v), "up")
     return p.sprite()
 
 
 def mega_brewery() -> Sprite:
-    """A great brewery: a long three-storey brick brewhouse with rows of arched windows and a hop
-    cone on its sign, a tall brew tower crowned with a big copper dome, two malt kilns behind under
-    slate pyramids with white cowls steaming, a tall chimney smoking, casks stacked by the door, a
-    dray loaded with kegs, a big hop cone hung from the tower and a heap of spent grain."""
-    p = Painter(61, 80, (30, 59))
-    foot = _footing(-6, 0, 24, 9)
-    tower_foot = _footing(11, 6, 6, 6)
-    _bed(p, foot)
-    _bed(p, tower_foot)
-    _spill(p, 22, 8, 2.8, GRAIN)
-    p.shadow(24, 5.5)
-    _track(p, foot[0], foot[1], (0.62, 0.7), 5, ruts=False)
-    _track(p, tower_foot[1], tower_foot[2], (0.3, 0.7), 5)
-    _smoking_chimney(p, 20, -6, -44, smoke=(200, 200, 204), puffs=4, close=True)
-    for x, y in ((-18, -12), (-9, -15)):
-        _kiln(p, x, y, 4.5, 14)
-    top = _brewhouse(p, -6, 0, 24, 13)
-    tower = _brew_tower(p, 11, 6, 6, 28)
-    tl, tf, tr, _ = tower
-    _copper_dome(p, tf[0], (tl[1] + tr[1]) / 2, 6.6)
-    dx, dy = tf[0], (tl[1] + tr[1]) / 2 - 6.6 * 1.35
-    p.rect(dx - 1.4, dy - 3, dx + 1.4, dy + 0.5, (222, 210, 180))
-    p.line([(dx - 0.4, dy - 2.2), (dx - 0.4, dy - 0.6)], WINDOW)
-    p.ellipse(dx - 2, dy - 4.4, dx + 2, dy - 2.4, COPPER)
-    p.line([(dx, dy - 4.4), (dx, dy - 6.5)], (230, 188, 70))
-    left, front, _, _ = top
-    bx, by = _on_wall(left, front, 0.02, 2)
-    p.line([(bx, by), (bx - 3.5, by)], (60, 56, 54))
-    _hop_sign(p, bx - 3.5, by + 3.5, 1.6)
-    _puddle(p, -9, 11, 2)
-    _casks(p, -24, 9, 3)
-    _heap(p, 22, 8, 2.8, 2.2, GRAIN)
-    _cart(p, 3, 15, (BARREL, BARREL, BARREL))
-    _cart(p, 14, 16, (BARREL, BARREL))
+    """A great brewery of honey brick spread along its own siding: twin malt kilns under white
+    cowls, a brewhouse with three copper kettles gleaming through its arched windows, a grand
+    brew tower 26 m high under a copper-domed cupola carrying a great gilt sheaf of barley, a
+    kettle house whose copper hoods rise through its roof letting off steam, a second brew tower
+    with a gilt sheaf, drays in the cobbled yard, a cooperage yard of long cask stacks, and cask
+    wagons lined in gold waiting on the siding."""
+    m = METRE
+    p = Painter(72, 76, (34, 50))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 10) * m, (v - 2) * m)
+
+    p.polygon([at(-16, -7), at(42, -7), at(42, 13), at(30, 13), at(-16, 1)], SETTS)
+    _bed(p, _footing(*at(10, 8), 52 * m, 10 * m), margin=0.8)
+    p.shadow(26, 7, 6)
+    for v in (11.5, 4.5):
+        _drink_kiln(p, *at(-19.5, v), 6.5, 9, BREW_BRICK, MALT_TILE, HOP, pagoda=False)
+    house = _drink_brewhouse(p, *at(-6, 8), 20, 10, 12, 3)
+    kettle = p.hall(*at(23, 8), 18 * m, 10 * m, 12 * m, BREW_BRICK, None)
+    k_left, k_front, k_right, _ = kettle
+    _plinth(p, kettle, 12 * m, BREW_BRICK, 0.7 * m)
+    for a, b in ((k_left, k_front), (k_front, k_right)):
+        _bar(p, _on_wall(a, b, 0, 0.22 * m), _on_wall(a, b, 1, 0.22 * m), 0.45 * m, FOAM)
+    for k in range(5):
+        _bar(
+            p,
+            _on_wall(k_left, k_front, k / 4, 0.45 * m),
+            _on_wall(k_left, k_front, k / 4, 11.3 * m),
+            0.5 * m,
+            shade(BREW_BRICK, 0.88),
+        )
+    for t in (0.125, 0.375, 0.625, 0.875):
+        _brew_window(p, k_left, k_front, 18 * m, t, 2.6 * m, (1.4 * m, 10.8 * m))
+    for t in (0.3, 0.7):
+        _mill_window(
+            p, k_front, k_right, 10 * m, t, 1.4 * m, (1.6 * m, 5 * m), shade(MILL_GLASS, 0.85)
+        )
+        _mill_window(
+            p, k_front, k_right, 10 * m, t, 1.4 * m, (6.6 * m, 10.4 * m), shade(MILL_GLASS, 0.85)
+        )
+    p.gable(kettle, 4 * m, MALT_TILE, BREW_BRICK)
+    _roof_rows(p, kettle, 4 * m, MALT_TILE, (0.25, 0.5, 0.75))
+    for t in (0.2, 0.5, 0.8):
+        dx, dy = _on_roof(kettle, 4 * m, t, 0.75)
+        _drink_copper_dome(p, dx, dy + 0.6 * m, 2.2)
+    _drink_tower(p, *at(36, 8), 6, 6.5, 20, 2.6)
+    grand = at(8, 8)
+    apex = _drink_tower(p, *grand, 8, 8, 26, 0)
+    g_left, g_front = _footing(*grand, 8 * m, 8 * m)[:2]
+    _drink_clock(p, _drink_up(*g_left, 26), _drink_up(*g_front, 26), 0.5, 5.4 * m, 1.5)
+    _drink_cupola(p, apex[0], apex[1] + 1.2 * m, 7)
+    _brew_sign(p, *_on_wall(house[0], house[1], 0.012, 2.4 * m))
+    for k, rows in enumerate(((9, 8, 7), (8, 7, 6))):
+        _cask_stack(p, *at(31 + 1.4 * k, -0.2 - 2.4 * k), rows)
+    _brew_dray(p, *at(-12, -1.6))
+    _brew_dray(p, *at(-1, -4.2))
+    _brew_dray(p, *at(12, -2.0))
+    _drink_siding(p, *at(-12, -9.5), 55)
+    for u in (-10, -2.8, 4.4, 20):
+        _drink_cask_wagon(p, *at(u, -9.5))
     return p.sprite()
 
 
-PEAT: RGB = (112, 84, 60)
-DAMP: RGB = (204, 204, 194)
-TAR: RGB = (44, 46, 52)
-
-
-def _still_house(p: Painter, x: float, y: float, length: float, depth: float, height: float) -> Top:
-    """A whitewashed house on a stone plinth, its foot greyed by the damp, with dark windows and
-    a door under a slate gable."""
-    top = p.hall(x, y, length, depth, height, WHITEWASH, None)
-    left, front, right, _ = top
-    _patch(p, left, front, (0, 1), (height - 1, height), STONE)
-    _patch(p, front, right, (0, 1), (height - 1, height), shade(STONE, 0.78))
-    spans = tuple((k + 0.5) / 8 for k in range(8))
-    for t in spans:
-        p.point(*_on_wall(left, front, t, height - 0.6), shade(STONE, 0.75))
-    _stains(p, left, front, height - 1, spans[::2], DAMP, 1.4)
-    _stains(p, front, right, height - 1, (0.2, 0.75), shade(WHITEWASH, 0.66), 1.4)
-    return top
-
-
-def _pot_still(p: Painter, x: float, y: float, size: float, worm: float) -> None:
-    """A copper pot still standing on (x, y), its swan neck bent over into a lyne arm running
-    `worm` along to a wooden worm tub."""
-    s = size
-    _turned(
-        p,
-        x,
-        y,
-        [(0, 3 * s), (2 * s, 4 * s), (4 * s, 3.5 * s), (6 * s, 1.5 * s), (8 * s, 1 * s)],
-        COPPER,
-    )
-    p.blob(x - 3 * s, y - 6 * s, x - 1 * s, y - 3 * s, shade(COPPER, 1.3))
-    _ring(p, x, y - 3 * s, 3.6 * s, shade(COPPER, 0.7))
-    p.line([(x, y - 8 * s), (x, y - 9.5 * s), (x + worm, y - 7 * s)], shade(COPPER, 0.8))
-    tx, ty = x + worm + 1, y + 1
-    p.line([(x + worm, y - 7 * s), (x + worm, ty - 4)], shade(COPPER, 0.8))
-    p.ellipse(tx - 2.2, ty - 4, tx + 2.2, ty, BARREL)
-    p.line([(tx - 2, ty - 2), (tx + 2, ty - 2)], shade(BARREL, 0.55))
-    p.blob(x - 4 * s, y - 0.5, x + 4 * s, y + 1.5, (98, 126, 146))
-
-
-def _warehouse(p: Painter, x: float, y: float, length: float, height: float) -> None:
-    """A long whitewashed bonded warehouse under a tarred roof, its small windows barred and a
-    black band of lettering along its wall."""
-    top = _still_house(p, x, y, length, 6, height)
-    left, front, right, _ = top
-    _patch(p, left, front, (0.15, 0.85), (0.8, 2), TAR)
-    for k in range(7):
-        t = 0.2 + k * 0.1
-        p.point(*_on_wall(left, front, t, 1.2), shade(WHITEWASH, 0.9))
-    _windows(p, left, front, (0.1, 0.3, 0.5, 0.7, 0.9), (3.2,), 1, TAR)
-    _door(p, front, right, (0.3, 0.7), height - 3.4, height - 1, TAR)
-    p.gable(top, 3, TAR, WHITEWASH)
-    _roof_rows(p, top, 3, TAR, (0.5,))
-
-
-def _thin_stack(p: Painter, x: float, foot: float, top: float) -> None:
-    """A tall thin brick stack banded in white, smoking, lowered (chimney_top)."""
-    top = chimney_top(foot, top)
-    colour = (150, 80, 60)
-    p.rect(x, top, x + 1.6, foot, colour)
-    for f in (0.06, 0.4):
-        y = top + (foot - top) * f
-        p.line([(x, y), (x + 1.6, y)], (230, 228, 222))
-    p.rect(x - 0.5, top - 1, x + 2.1, top, (90, 52, 42))
-    _smoke(p, x + 1, top - 3, (190, 190, 194), 3)
-
-
 def big_distillery() -> Sprite:
-    """A big distillery: a long whitewashed still house on a stone plinth greyed by the damp, two
-    pagoda-roofed kiln vents on its slate roof, a tall thin banded stack smoking, a whitewashed
-    bonded warehouse behind under a tarred roof, two copper pot stills at its side running to
-    their worm tubs over wet ground, casks stacked out front and a heap of peat."""
-    p = Painter(51, 70, (24, 55))
-    foot = _footing(-6, -1, 18, 8)
-    _bed(p, foot)
-    _spill(p, -18, 6, 2.6, PEAT)
-    p.shadow(19, 4.5)
-    _track(p, foot[0], foot[1], (0.48, 0.62), 4)
-    _thin_stack(p, 4, -6, -42)
-    _warehouse(p, 14, -6, 14, 7)
-    top = _still_house(p, -6, -1, 18, 8, 8)
-    left, front, right, _ = top
-    _windows(p, left, front, (0.1, 0.25, 0.4, 0.72, 0.87), (2,), 2, TAR)
-    _windows(p, left, front, (0.1, 0.25, 0.4, 0.72, 0.87), (5.4,), 1, TAR)
-    _door(p, left, front, (0.5, 0.62), 4, 8, (60, 48, 42), shade(WHITEWASH, 0.8))
-    _windows(p, front, right, (0.3, 0.7), (2,), 2, TAR)
-    p.gable(top, 4.5, STILL_SLATE, WHITEWASH)
-    _roof_rows(p, top, 4.5, STILL_SLATE, (0.5,))
-    for along in (0.25, 0.6):
-        _pagoda(p, *_on_roof(top, 4.5, along, 1), 1.1)
-    _pot_still(p, 11, 7, 1, 4)
-    _pot_still(p, 18, 4, 0.8, 3)
-    _heap(p, -18, 6, 2.6, 2.2, PEAT)
-    _casks(p, -9, 12, 2)
-    _barrel(p, 3, 11)
+    """A distillery grown into a works, whitewashed over tarred plinths under slate: a malt kiln
+    crowned with a pagoda ventilator, a long malt barn with a black board lettered in gold, a
+    still house with its amber doors open on three onion-shaped copper stills and worm tubs at
+    its end, a low bonded warehouse with numbered black doors, a peat yard of neat stacks, and
+    oak casks in long pyramids in the gravel yard."""
+    m = METRE
+    p = Painter(62, 50, (28, 32))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 7) * m, (v - 2) * m)
+
+    p.polygon([at(-15, -9), at(31, -9), at(31, 3), at(-15, 3)], GRAVEL)
+    p.shadow(20, 6, 5)
+    _drink_kiln(p, *at(-9, 9), 6, 8, WHITEWASH, STILL_SLATE, WHISKY, pagoda=True)
+    _drink_malt_barn(p, *at(3, 8.5), 18, 7, 7)
+    _drink_still_house(p, *at(19, 7), 14, 8, 7.5, 3)
+    for v in (4.6, 8.6):
+        _still_worm(p, *at(27.8, v))
+    _drink_bond(p, *at(-3, -3), 22, 7, 5.5, (1, 2))
+    for u, v in ((11, -5.5), (14.4, -7.4)):
+        _still_peat(p, *at(u, v))
+    _cask_stack(p, *at(19, -2.2), (6, 5, 4))
+    _cask_stack(p, *at(22, -6.4), (5, 4))
+    for u, v in ((26.6, -3.4), (27.4, -4.4), (13.6, -1.6)):
+        _cask(p, *at(u, v), "up")
     return p.sprite()
 
 
 def mega_distillery() -> Sprite:
-    """A great distillery: a tall whitewashed still house whose big windows show the copper stills
-    gleaming inside, a malt house beside it with three pagoda-roofed kiln vents, two long bonded
-    warehouses under tarred roofs behind, a tall banded stack smoking, a big copper pot still
-    outside running to its worm tub, a pyramid of casks, a cart of casks and stacks of peat."""
-    p = Painter(64, 81, (31, 59))
-    _spill(p, -24, 8, 3, PEAT)
-    _warehouse(p, -10, -16, 20, 7)
-    _warehouse(p, 16, -10, 18, 7)
-    _thin_stack(p, 8, -10, -46)
-    malt_foot = _footing(-14, -2, 14, 8)
-    foot = _footing(7, 3, 16, 9)
-    _bed(p, malt_foot)
-    _bed(p, foot)
-    p.shadow(24, 5.5)
-    _track(p, malt_foot[0], malt_foot[1], (0.55, 0.7), 4)
-    _track(p, foot[0], foot[1], (0.42, 0.58), 5)
-    malt = _still_house(p, -14, -2, 14, 8, 7)
-    ml, mf, mr, _ = malt
-    _windows(p, ml, mf, (0.15, 0.32, 0.8), (2,), 2, TAR)
-    _door(p, ml, mf, (0.55, 0.7), 3, 7, (60, 48, 42), shade(WHITEWASH, 0.8))
-    _windows(p, mf, mr, (0.5,), (2,), 2, TAR)
-    p.gable(malt, 4, STILL_SLATE, WHITEWASH)
-    _roof_rows(p, malt, 4, STILL_SLATE, (0.5,))
-    for along in (0.15, 0.48, 0.81):
-        _pagoda(p, *_on_roof(malt, 4, along, 1), 1.1)
-    top = _still_house(p, 7, 3, 16, 9, 12)
-    left, front, right, _ = top
-    for t in (0.22, 0.52):
-        _patch(p, left, front, (t - 0.11, t + 0.11), (2, 8), (54, 50, 52))
-        sx, sy = _on_wall(left, front, t, 8)
-        p.ellipse(sx - 2, sy - 4, sx + 2, sy, COPPER)
-        p.line([(sx, sy - 4), (sx, sy - 5.5)], COPPER)
-        p.point(sx - 1, sy - 3, shade(COPPER, 1.35))
-        p.line([_on_wall(left, front, t - 0.11, 1.4), _on_wall(left, front, t + 0.11, 1.4)], STONE)
-    _door(p, left, front, (0.74, 0.86), 7, 12, (60, 48, 42), shade(WHITEWASH, 0.8))
-    _windows(p, front, right, (0.25, 0.5, 0.75), (2, 6.5), 2, TAR)
-    p.gable(top, 5, STILL_SLATE, WHITEWASH)
-    _roof_rows(p, top, 5, STILL_SLATE, (0.5,))
-    _pagoda(p, *_on_roof(top, 5, 0.5, 1), 1.3)
-    _pot_still(p, 23, 6, 1.2, 4)
-    _heap(p, -24, 8, 3, 2.6, PEAT)
-    _heap(p, -19, 10, 2.2, 1.8, PEAT)
-    _casks(p, -12, 15, 3)
-    _cart(p, 8, 17, (BARREL, BARREL, BARREL))
+    """A great distillery whitewashed over tarred plinths under slate: twin malt kilns crowned
+    with pagoda ventilators over a long malt barn lettered in gold, a grand still house whose
+    amber doors stand open on a row of four onion-shaped copper stills with worm tubs at its end,
+    two bonded warehouses with numbered black doors closing the yard, a peat yard of neat stacks
+    and long pyramids of oak casks waiting on the gravel."""
+    m = METRE
+    p = Painter(72, 56, (32, 34))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 8) * m, (v - 2) * m)
+
+    p.polygon([at(-15, -9.5), at(39, -9.5), at(39, 10), at(-15, 1)], GRAVEL)
+    p.shadow(24, 7, 6)
+    for u in (-12, -5):
+        _drink_kiln(p, *at(u, 12), 6.5, 9, WHITEWASH, STILL_SLATE, WHISKY, pagoda=True)
+    _drink_malt_barn(p, *at(0, 9), 16, 8, 8)
+    _drink_still_house(p, *at(17, 8), 18, 9, 9, 4)
+    for v in (5.4, 10.4):
+        _still_worm(p, *at(27.6, v))
+    _drink_bond(p, *at(-5, -4.5), 20, 8, 6, (1, 2))
+    for u, v in ((9, -6.6), (12.4, -8.0), (9.6, -3.8)):
+        _still_peat(p, *at(u, v))
+    _cask_stack(p, *at(15.5, -1.6), (8, 7, 6))
+    _cask_stack(p, *at(17.5, -6.2), (7, 6, 5))
+    for u, v in ((28.6, -3.6), (29.4, -4.6), (27.4, -5.8)):
+        _cask(p, *at(u, v), "up")
+    _drink_bond(p, *at(35.5, 1), 7, 18, 6, (3,), shaded=True)
     return p.sprite()
 
 
 BALLAST: RGB = (138, 130, 120)
+
 RAIL: RGB = (90, 88, 92)
+
 SLEEPER: RGB = (96, 70, 50)
 
 
@@ -1274,6 +1038,7 @@ def mega_food_plant() -> Sprite:
 
 
 SUGAR_RENDER: RGB = (238, 236, 228)
+
 SUGAR_WATER: RGB = (78, 124, 150)
 
 
@@ -1679,29 +1444,18 @@ def mega_sugar_refinery() -> Sprite:
 
 
 MEAT_ROOF: RGB = (86, 80, 88)
+
 MUD: RGB = (112, 94, 66)
+
 HAM: RGB = (196, 76, 66)
+
 BONE: RGB = (244, 238, 224)
+
 COLD: RGB = (234, 236, 238)
+
 COLD_DOOR: RGB = (150, 170, 186)
+
 STEER: tuple[RGB, RGB] = ((138, 84, 50), (96, 58, 36))
-
-
-def _louvre(p: Painter, top: Top, rise: float, span: tuple[float, float]) -> None:
-    """A long louvred vent along a gable's ridge from `span[0]` to `span[1]` of the way along it."""
-    ridge_back, ridge_front = _ridge(top, rise)
-    a, b = (
-        _on_wall(ridge_back, ridge_front, span[0], 0),
-        _on_wall(ridge_back, ridge_front, span[1], 0),
-    )
-    p.polygon(
-        [(a[0], a[1] - 1.8), (b[0], b[1] - 1.8), b, a], (176, 168, 160), shade(MEAT_ROOF, 0.8)
-    )
-    p.line([(a[0] - 0.5, a[1] - 2.3), (b[0] + 0.5, b[1] - 2.3)], shade(MEAT_ROOF, 0.8))
-    steps = max(2, round((b[0] - a[0]) / 2))
-    for k in range(steps + 1):
-        x, y = _on_wall(a, b, k / steps, 0)
-        p.point(x, y - 1, shade(MEAT_ROOF, 0.9))
 
 
 def _ham(p: Painter, x: float, y: float, size: float = 1) -> None:
@@ -1716,6 +1470,7 @@ def _ham(p: Painter, x: float, y: float, size: float = 1) -> None:
 
 
 MEAT_VAN: RGB = (238, 238, 232)
+
 MEAT_STRIPE: RGB = (176, 40, 44)
 
 
@@ -2188,11 +1943,17 @@ def mega_meat_factory() -> Sprite:
 
 
 SAUSAGE_WALL: RGB = (226, 210, 180)
+
 SAUSAGE_ROOF: RGB = (150, 70, 52)
+
 FRAME: RGB = (96, 64, 44)
+
 SAUSAGE: RGB = (170, 74, 54)
+
 SIGN_BOARD: RGB = (130, 80, 50)
+
 SMOKEHOUSE: RGB = (134, 69, 48)
+
 WOOD_SMOKE: RGB = (176, 170, 164)
 
 
@@ -2340,135 +2101,1394 @@ def mega_sausage_maker() -> Sprite:
     return p.sprite()
 
 
-COOPER_ROOF: RGB = (118, 84, 54)
-STAVES: RGB = (206, 168, 116)
-SHAVINGS: RGB = (226, 200, 150)
-BLOCK: RGB = (128, 94, 62)
-FLAME: RGB = (246, 140, 40)
-FLAME_HOT: RGB = (255, 220, 110)
-LOG: RGB = (120, 86, 56)
-
-
-def _cooper_shed(p: Painter, x: float, y: float, length: float, height: float) -> Top:
-    """A timber cooper's shed over a dark plinth with planked walls, windows and a wide double
-    door under a brown gable."""
-    top = p.hall(x, y, length, 8, height, TIMBER, None)
-    left, front, right, _ = top
-    for drop in range(2, int(height), 2):
-        _band(p, front, right, drop, shade(TIMBER, 0.66))
-        _band(p, left, front, drop, shade(TIMBER, 0.85))
-    _plinth(p, top, height, TIMBER)
-    _stains(p, left, front, height, (0.05, 0.3, 0.95), shade(TIMBER, 0.6), 1.2)
-    for t in (0.1, 0.24):
-        _window(p, left, front, (t - 0.05, t + 0.05), 1.6)
-    _door(p, left, front, (0.42, 0.72), 2, height, DOORWAY, shade(TIMBER, 1.3))
-    p.line(
-        [_on_wall(left, front, 0.57, 2), _on_wall(left, front, 0.57, height)], shade(TIMBER, 0.55)
-    )
-    _windows(p, front, right, (0.3, 0.6), (1.6,), 2, shade(WINDOW, 0.8))
-    p.gable(top, 4, COOPER_ROOF, TIMBER)
-    _roof_rows(p, top, 4, COOPER_ROOF)
-    return top
-
-
-def _firing(p: Painter, x: float, y: float) -> None:
-    """A barrel being fired: an open hooped barrel standing over a ring of glowing coals with
-    flames licking up inside it and sparks rising."""
-    p.blob(x - 3, y - 1, x + 3, y + 1.4, (60, 46, 40))
-    p.blob(x - 2.4, y - 0.6, x + 2.4, y + 1, FLAME)
-    p.ellipse(x - 2, y - 6, x + 2, y, shade(BARREL, 0.85))
-    for h in (1.6, 4):
-        p.line([(x - 2, y - h), (x + 2, y - h)], (60, 56, 54))
-    p.ellipse(x - 1.8, y - 6.8, x + 1.8, y - 5.2, (40, 30, 26))
-    p.polygon(
-        [(x - 1.2, y - 6), (x - 0.4, y - 9), (x + 0.4, y - 7), (x + 1, y - 9.5), (x + 1.4, y - 6)],
-        FLAME,
-    )
-    p.point(x, y - 7, FLAME_HOT)
-    for dx, dy in ((-1, -11), (1.5, -12), (0, -13.5)):
-        p.point(x + dx, y + dy, FLAME_HOT if dy % 2 else FLAME)
-
-
-def _staves(p: Painter, x: float, y: float, rows: int) -> None:
-    """A stacked pile of pale oak staves on (x, y), their ends banded."""
-    pile = p.hall(x, y, 5, 2.4, 1.2 * rows, STAVES, shade(STAVES, 1.12))
-    for r in range(1, rows):
-        _band(p, pile[0], pile[1], 1.2 * r, shade(STAVES, 0.7))
-    _band(p, pile[1], pile[2], 0.6, shade(STAVES, 0.6))
-
-
-def _logs(p: Painter, x: float, y: float, count: int) -> None:
-    """Oak logs piled on (x, y), their pale cut ends showing."""
-    for k in range(count):
-        row = 0 if k < count - count // 3 else 1
-        lx, ly = x + 2.2 * k - (count - count // 3) * 2.2 * row + 1.1 * row, y - 1.8 * row
-        p.ellipse(lx - 1.2, ly - 2.2, lx + 1.2, ly, LOG)
-        p.point(lx, ly - 1.2, SHAVINGS)
-
-
-def _shavings(p: Painter, points: tuple[Point, ...]) -> None:
-    for x, y in points:
-        p.point(x, y, SHAVINGS)
-
-
 def big_barrel_maker() -> Sprite:
-    """A big cooperage: a long planked timber shed under a brown roof with a wide double door and
-    two stove pipes smoking, a barrel being fired over glowing coals outside, a pyramid of
-    finished casks, piles of staves and oak logs, a chopping block and shavings scattered on the
-    footpath."""
-    p = Painter(47, 40, (23, 26))
-    foot = _footing(-5, -1, 16, 8)
-    _bed(p, foot)
-    p.shadow(18, 4)
-    _track(p, foot[0], foot[1], (0.42, 0.72), 4, ruts=False)
-    top = _cooper_shed(p, -5, -1, 16, 8)
-    for along in (0.25, 0.7):
-        x, y = _on_roof(top, 4, along, 0.8)
-        _pipe(p, x, y, 3)
-        _smoke(p, x + 0.5, y - 5, puffs=2)
-    _shavings(p, ((-8, 7.5), (-5, 8.4), (-10, 6.6), (-3, 7.6), (-7, 9.4)))
-    _logs(p, 13, -2, 4)
-    _firing(p, 14, 6)
-    _staves(p, -17, 3, 2)
-    p.ellipse(-4, 8, -1, 9.6, BLOCK)
-    p.line([(-2.5, 8.6), (-1.5, 6.8)], (90, 88, 92))
-    _casks(p, 2, 11, 3)
+    """A cooperage grown into a works: a long weatherboarded oak cooper's shop under an iron-grey
+    roof with its doors open on a cask inside and hoops leant against its wall, an iron-clad steam
+    shop breathing steam with an upright boiler beside it, a stave yard of seasoning cribs, casks
+    being raised and fired in the yard, and long pyramids of finished oak casks."""
+    m = METRE
+    p = Painter(60, 42, (27, 26))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 8) * m, (v - 3) * m)
+
+    p.polygon([at(-16, -6), at(31, -6), at(31, 4), at(-6, 4), at(-6, 10), at(-16, 10)], YARD)
+    _cooper_shavings(
+        p, [at(u, v) for u, v in ((6, 2), (8.4, 0.4), (19, -1), (21.5, -3.4), (3, -0.6), (12, 2.6))]
+    )
+    p.shadow(18, 5, 5)
+    for row in range(3):
+        for k in range(5):
+            _cask_staves(p, *at(-14 + 1.8 * k, 8.6 - 2.0 * row), 16 - 5 * ((k + row) % 2))
+    shop = _drink_cooper_shed(p, *at(9, 8), 18, 8, 5)
+    _cask_hoops(p, *_on_wall(shop[0], shop[1], 0.06, 5 * m), (0.5, 0.45, 0.42, 0.5, 0.45))
+    _drink_steam_shop(p, *at(23, 8.5), 8, 6)
+    _drink_boiler(p, *at(28.6, 6))
+    for u, v in ((17.6, 1.8), (19.6, 0.4)):
+        _cask_raised(p, *at(u, v))
+    _cask_raised(p, *at(23, -0.6), fire=True)
+    _cask_raised(p, *at(25.4, -2.6), fire=True)
+    _cask_stack(p, *at(1, 1.2), (12, 11, 10))
+    _cask_stack(p, *at(2.5, -3.2), (10, 9))
+    for u, v in ((-6, -2.4), (-5.2, -3.4), (-6.8, -4.2)):
+        _cask(p, *at(u, v), "up")
     return p.sprite()
 
 
 def mega_barrel_maker() -> Sprite:
-    """A great cooperage: a long two-storey planked timber hall under a brown roof with a louvred
-    lantern along its ridge and a brick chimney smoking, an open-sided shed beside it on posts
-    stacked with barrels, three barrels being fired over glowing coals in a row, a big pyramid of
-    finished casks, piles of staves and oak logs and a cart loaded with barrels."""
-    p = Painter(61, 59, (30, 42))
-    foot = _footing(-7, -2, 22, 9)
-    _bed(p, foot)
-    p.shadow(24, 4.5)
-    _track(p, foot[0], foot[1], (0.42, 0.72), 5, ruts=False)
-    _logs(p, 18, -9, 6)
-    shed_foot = _footing(16, 0, 10, 7)
-    _bed(p, shed_foot, margin=0.8)
-    sl, sf, sr, sb = shed_foot
+    """A great cooperage works of oak and iron: a long cooper's hall under an iron-grey roof with
+    a great oak cask hooped in gilt standing on its ridge as its sign, an iron-clad steam shop
+    breathing steam beside two upright boilers, a stave yard of seasoning cribs beside a stack of
+    oak logs, casks raised and fired in the yard, long pyramids of finished casks, and a siding
+    of wagons loaded with casks along its front."""
+    m = METRE
+    p = Painter(70, 56, (32, 34))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 9) * m, (v - 2) * m)
+
+    p.polygon([at(-18, -7), at(36, -7), at(36, 4), at(-6, 4), at(-6, 11), at(-18, 11)], YARD)
+    _cooper_shavings(
+        p,
+        [
+            at(u, v)
+            for u, v in ((8, 2), (10.4, 0.4), (22, -1), (24.5, -3.4), (5, -0.6), (14, 2.6), (28, 1))
+        ],
+    )
+    p.shadow(22, 6, 6)
+    _drink_logs(p, *at(-18.5, 13), (5, 4, 3))
+    for row in range(4):
+        for k in range(5):
+            _cask_staves(p, *at(-16 + 1.8 * k, 9.4 - 2.0 * row), 18 - 5 * ((k + row) % 2))
+    hall = _drink_cooper_shed(p, *at(9, 9), 26, 9, 7)
+    _cask_hoops(p, *_on_wall(hall[0], hall[1], 0.05, 7 * m), (0.5, 0.45, 0.42, 0.5, 0.45, 0.5))
+    rise = 0.38 * 9 * m
+    sx, sy = _on_roof(hall, rise, 0.5, 1)
+    _drink_sign_cask(p, sx, sy + 0.3 * m)
+    _drink_steam_shop(p, *at(28, 9.5), 9, 7)
+    for u, v in ((34, 7), (34.4, 11)):
+        _drink_boiler(p, *at(u, v))
+    for u, v in ((20, 1.8), (22, 0.4)):
+        _cask_raised(p, *at(u, v))
+    for u, v in ((26, -0.6), (28.4, -2.6), (30.4, -0.8)):
+        _cask_raised(p, *at(u, v), fire=True)
+    _cask_stack(p, *at(-1, 1.4), (14, 13, 12))
+    _cask_stack(p, *at(0.5, -3.0), (13, 12, 11))
+    _drink_siding(p, *at(-16, -9.5), 52)
+    for u in (-12, -4.8, 2.4, 9.6, 22):
+        _drink_cask_wagon(p, *at(u, -9.5), shade(COOPER_WALL, 0.8))
+    return p.sprite()
+
+
+COWL_WHITE: RGB = (240, 236, 226)
+
+SIDING: RGB = (150, 146, 138)
+
+SLEEPERS: RGB = (92, 70, 52)
+
+STEEL: RGB = (176, 178, 184)
+
+WAGON_GREEN: RGB = (62, 98, 60)
+
+
+def _drink_up(x: float, y: float, z: float) -> Point:
+    """The point `z` metres above (x, y)."""
+    return x, y - z * METRE
+
+
+def _drink_pyramid(p: Painter, top: Top, rise: float, roof: RGB) -> Point:
+    """A pyramid roof `rise` high on a square block's top, coursed across its two sides in
+    sight; returns its apex."""
+    left, front, right, _ = top
+    apex = ((left[0] + right[0]) / 2, (left[1] + right[1]) / 2 - rise)
+    p.polygon([left, front, apex], roof, shade(roof, 0.6))
+    p.polygon([front, right, apex], shade(roof, 0.72), shade(roof, 0.5))
+    for f in (0.3, 0.6):
+        for a, b, tone in ((left, front, 0.82), (front, right, 0.62)):
+            _bar(
+                p, _on_wall(a, apex, f, 0), _on_wall(b, apex, f, 0), 0.08 * METRE, shade(roof, tone)
+            )
+    return apex
+
+
+def _drink_steam(p: Painter, x: float, y: float, puffs: int = 3) -> None:
+    """A soft white wisp of steam rising and drifting right from (x, y)."""
+    m = METRE
+    p.soft(
+        [
+            (
+                x - 0.6 * m + k * 1.0 * m,
+                y - (1.2 + 1.2 * k) * m,
+                x + (0.8 + k * 1.1) * m,
+                y - 1.2 * k * m,
+            )
+            for k in range(puffs)
+        ],
+        (248, 246, 240),
+        0.72,
+        0.3,
+    )
+
+
+def _drink_cowl(p: Painter, x: float, y: float) -> None:
+    """The white weatherboarded cowl turning on top of a malt kiln at (x, y): a round drum with a
+    hood leaning over to the right on its dark mouth, and a vane fin behind keeping it to the
+    wind."""
+    m = METRE
+    _turned(p, x, y, [(0, 0.8 * m), (1.4 * m, 0.75 * m)], COWL_WHITE)
+    for drop in (0.45, 0.9):
+        _bar(
+            p,
+            (x - 0.78 * m, y - drop * m),
+            (x + 0.78 * m, y - drop * m),
+            0.04 * m,
+            shade(COWL_WHITE, 0.8),
+        )
+    hood = [
+        (x - 0.75 * m, y - 1.4 * m),
+        (x - 0.6 * m, y - 2.3 * m),
+        (x - 0.1 * m, y - 2.7 * m),
+        (x + 0.6 * m, y - 2.55 * m),
+        (x + 1.15 * m, y - 1.95 * m),
+        (x + 0.75 * m, y - 1.4 * m),
+    ]
+    p.polygon(hood, COWL_WHITE, shade(COWL_WHITE, 0.6))
+    p.polygon(
+        [(x + 0.45 * m, y - 1.45 * m), (x + 1.1 * m, y - 1.98 * m), (x + 0.75 * m, y - 1.4 * m)],
+        (52, 46, 42),
+    )
+    p.polygon(
+        [
+            (x - 0.35 * m, y - 2.55 * m),
+            (x - 1.7 * m, y - 3.0 * m),
+            (x - 1.7 * m, y - 2.35 * m),
+            (x - 0.5 * m, y - 2.1 * m),
+        ],
+        shade(COWL_WHITE, 0.88),
+        shade(COWL_WHITE, 0.6),
+    )
+
+
+def _drink_kiln(
+    p: Painter,
+    x: float,
+    y: float,
+    side: float,
+    high: float,
+    wall: RGB,
+    roof: RGB,
+    door: RGB,
+    pagoda: bool,
+) -> None:
+    """A square malt kiln `side` metres a side and `high` to its eaves on (x, y), dressed in
+    cream when of brick and tarred at its foot when whitewashed, with a door painted `door` and a
+    window, under a steep pyramid roof crowned by a pagoda ventilator or a white cowl."""
+    m = METRE
+    top = p.hall(x, y, side * m, side * m, high * m, wall, None)
+    left, front, right, _ = top
+    if wall == WHITEWASH:
+        for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
+            _patch(p, a, b, (0, 1), (high * m - 0.8 * m, high * m), shade(TAR, tone))
+    else:
+        _plinth(p, top, high * m, wall, 0.6 * m)
+        for a, b in ((left, front), (front, right)):
+            for t in (0.03, 0.97):
+                _bar(p, _on_wall(a, b, t, 0), _on_wall(a, b, t, high * m - 0.6 * m), 0.35 * m, FOAM)
+            _bar(p, _on_wall(a, b, 0, 0.2 * m), _on_wall(a, b, 1, 0.2 * m), 0.3 * m, FOAM)
+    _patch(p, left, front, (0.32, 0.68), (high * m - 3 * m, high * m), door)
+    _bar(
+        p,
+        _on_wall(left, front, 0.5, high * m - 3 * m),
+        _on_wall(left, front, 0.5, high * m),
+        0.06 * m,
+        shade(door, 0.6),
+    )
+    _still_window(p, left, front, side * m, 0.5, 1 * m, (1.8 * m, 3.0 * m))
+    _still_window(p, front, right, side * m, 0.5, 1 * m, (1.8 * m, 3.0 * m))
+    apex = _drink_pyramid(p, top, side * 0.85 * m, roof)
+    if pagoda:
+        _still_pagoda(p, apex[0], apex[1] + 1.4 * m)
+    else:
+        _drink_cowl(p, apex[0], apex[1] + 0.8 * m)
+
+
+def _drink_brewhouse(
+    p: Painter, x: float, y: float, length: float, depth: float, high: float, kettles: int
+) -> Top:
+    """A brewhouse of honey brick `length` by `depth` metres and `high` to its eaves on (x, y),
+    under a cream cornice and a malt-brown tiled roof: a hop-green arched door, `kettles` tall
+    arched windows with copper kettles gleaming through them between pilasters, two storeys of
+    windows at its end, and a copper vapour stack trailing steam on its ridge."""
+    m = METRE
+    length, depth, high = length * m, depth * m, high * m
+    top = p.hall(x, y, length, depth, high, BREW_BRICK, None)
+    left, front, right, _ = top
+    _plinth(p, top, high, BREW_BRICK, 0.7 * m)
+    for a, b in ((left, front), (front, right)):
+        _bar(p, _on_wall(a, b, 0, 0.22 * m), _on_wall(a, b, 1, 0.22 * m), 0.45 * m, FOAM)
+        _bar(p, _on_wall(a, b, 0, 1.0 * m), _on_wall(a, b, 1, 1.0 * m), 0.15 * m, shade(FOAM, 0.9))
+    bays = kettles + 2
+    for k in range(bays + 1):
+        _bar(
+            p,
+            _on_wall(left, front, k / bays, 0.45 * m),
+            _on_wall(left, front, k / bays, high - 0.7 * m),
+            0.5 * m,
+            shade(BREW_BRICK, 0.88),
+        )
+    for k in range(1, kettles + 1):
+        _brew_window(p, left, front, length, (k + 0.5) / bays, 2.3 * m, (1.6 * m, high - 1.2 * m))
+    t = 0.5 / bays
+    p.polygon(_round_head(left, front, length, t, 2.8 * m, high - 4.7 * m, high), FOAM)
+    p.polygon(_round_head(left, front, length, t, 2.3 * m, high - 4.4 * m, high), HOP)
+    _bar(
+        p,
+        _on_wall(left, front, t, high - 4.4 * m),
+        _on_wall(left, front, t, high),
+        0.08 * m,
+        shade(HOP, 0.6),
+    )
+    ox, oy = _on_wall(left, front, t, 2.6 * m)
+    p.ellipse(ox - 0.9 * m, oy - 0.9 * m, ox + 0.9 * m, oy + 0.9 * m, FOAM)
+    p.ellipse(ox - 0.6 * m, oy - 0.6 * m, ox + 0.6 * m, oy + 0.6 * m, MILL_GLASS)
+    t = (bays - 0.5) / bays
+    for drop in ((1.6 * m, high / 2 - 1.2 * m), (high / 2 + 0.6 * m, high - 1.4 * m)):
+        _mill_window(p, left, front, length, t, 1.4 * m, drop)
+    for t in (0.3, 0.7):
+        _mill_window(
+            p,
+            front,
+            right,
+            depth,
+            t,
+            1.3 * m,
+            (1.6 * m, high / 2 - 1.2 * m),
+            shade(MILL_GLASS, 0.85),
+        )
+        _mill_window(
+            p,
+            front,
+            right,
+            depth,
+            t,
+            1.3 * m,
+            (high / 2 + 0.6 * m, high - 1.4 * m),
+            shade(MILL_GLASS, 0.85),
+        )
+    rise = 0.4 * depth
+    p.gable(top, rise, MALT_TILE, BREW_BRICK)
+    _roof_rows(p, top, rise, MALT_TILE, (0.25, 0.5, 0.75))
+    vx, vy = _on_roof(top, rise, 0.55, 1)
+    _turned(p, vx, vy + 0.5 * m, [(0, 0.45 * m), (3.2 * m, 0.4 * m)], KETTLE)
+    _turned(p, vx, vy - 3 * m, [(0, 0.95 * m), (0.7 * m, 0)], shade(KETTLE, 0.9))
+    _drink_steam(p, vx, vy - 3.4 * m)
+    return top
+
+
+def _drink_tower(
+    p: Painter, x: float, y: float, wide: float, deep: float, tall: float, sheaf: float
+) -> Point:
+    """A brew tower of honey brick `wide` by `deep` metres and `tall` to its eaves on (x, y):
+    cream quoins and string courses, a window on every floor, a louvred cooling floor at its top,
+    a hop-green cask door at its foot, and a pyramid of malt-brown tiles crowned by a gilt ball,
+    with a gilt sheaf of barley `sheaf` metres tall on it if `sheaf`. Returns the apex."""
+    m = METRE
+    wide_u, deep_u, tall_u = wide * m, deep * m, tall * m
+    top = p.hall(x, y, wide_u, deep_u, tall_u, BREW_BRICK, None)
+    left, front, right, _ = top
+    _plinth(p, top, tall_u, BREW_BRICK, 0.7 * m)
+    floors = [3.6 + 4 * k for k in range(int((tall - 4.6) // 4))]
+    for a, b in ((left, front), (front, right)):
+        for t in (0.03, 0.97):
+            _bar(p, _on_wall(a, b, t, 0), _on_wall(a, b, t, tall_u - 0.7 * m), 0.4 * m, FOAM)
+        for drop in (0.22, *floors):
+            _bar(p, _on_wall(a, b, 0, drop * m), _on_wall(a, b, 1, drop * m), 0.3 * m, FOAM)
+        _brew_louvres(p, a, b, (0.24, 0.76), (1 * m, 3 * m))
+    for drop in floors[:-1]:
+        head = (drop + 0.9) * m
+        _mill_window(p, left, front, wide_u, 0.5, 1.3 * m, (head, head + 2.3 * m))
+        if drop + 4 < tall - 5:
+            _mill_window(
+                p,
+                front,
+                right,
+                deep_u,
+                0.5,
+                1.2 * m,
+                (head, head + 2.3 * m),
+                shade(MILL_GLASS, 0.85),
+            )
+    p.polygon(_round_head(front, right, deep_u, 0.5, 3.2 * m, tall_u - 4.4 * m, tall_u), FOAM)
+    p.polygon(
+        _round_head(front, right, deep_u, 0.5, 2.7 * m, tall_u - 4.1 * m, tall_u), shade(HOP, 0.8)
+    )
+    _bar(
+        p,
+        _on_wall(front, right, 0.5, tall_u - 4.1 * m),
+        _on_wall(front, right, 0.5, tall_u),
+        0.08 * m,
+        shade(HOP, 0.5),
+    )
+    apex = _drink_pyramid(p, top, max(3.5, wide * 0.6) * m, MALT_TILE)
+    p.ellipse(apex[0] - 0.35 * m, apex[1] - 0.6 * m, apex[0] + 0.35 * m, apex[1] + 0.1 * m, GILT)
+    if sheaf:
+        _brew_sheaf(p, apex[0], apex[1] - 0.4 * m, sheaf * m)
+    return apex
+
+
+def _drink_copper_dome(p: Painter, x: float, y: float, r: float) -> None:
+    """The gleaming copper hood of a brew kettle `r` metres round standing up through a roof at
+    (x, y), with a dark seam, a light on its shoulder and a vent pipe on its crown letting off
+    steam."""
+    m = METRE
+    profile = [
+        (0, r),
+        (0.3 * r, 0.97 * r),
+        (0.6 * r, 0.82 * r),
+        (0.85 * r, 0.52 * r),
+        (r, 0.12 * r),
+    ]
+    _turned(p, x, y, [(h * m, w * m) for h, w in profile], KETTLE)
+    arc = np.linspace(0.1, math.pi - 0.1, 9)
+    for a0, a1 in itertools.pairwise(arc):
+        _bar(
+            p,
+            (x + r * m * math.cos(a0), y - 0.15 * r * m + r * m / 2 * math.sin(a0)),
+            (x + r * m * math.cos(a1), y - 0.15 * r * m + r * m / 2 * math.sin(a1)),
+            0.12 * m,
+            shade(KETTLE, 0.62),
+        )
+    p.blob(
+        x - 0.62 * r * m, y - 0.82 * r * m, x - 0.2 * r * m, y - 0.5 * r * m, shade(KETTLE, 1.35)
+    )
+    _turned(p, x, y - r * m, [(0, 0.22 * m), (1.6 * m, 0.2 * m)], shade(KETTLE, 0.95))
+    _turned(p, x, y - r * m - 1.8 * m, [(0, 0.5 * m), (0.4 * m, 0)], shade(KETTLE, 0.85))
+    _drink_steam(p, x, y - r * m - 2.2 * m, 2)
+
+
+def _drink_cupola(p: Painter, x: float, y: float, sheaf: float) -> None:
+    """A cream cupola on a tower's apex at (x, y): a round drum of arched openings on a moulded
+    base under a copper dome, carrying a great gilt sheaf of barley `sheaf` metres tall on a gilt
+    ball."""
+    m = METRE
+    _turned(p, x, y + 0.6 * m, [(0, 2.2 * m), (0.7 * m, 2.2 * m)], shade(FOAM, 0.9), FOAM)
+    _turned(p, x, y, [(0, 1.8 * m), (3 * m, 1.8 * m)], FOAM)
+    for a in np.linspace(0.4, math.pi - 0.4, 5):
+        ox, oy = x + 1.8 * m * math.cos(a), y + 0.9 * m * math.sin(a)
+        _bar(p, (ox, oy - 0.6 * m), (ox, oy - 2.4 * m), 0.45 * m, (60, 46, 36))
+    _turned(p, x, y - 3 * m, [(0, 2.1 * m), (0.35 * m, 2.05 * m)], shade(FOAM, 0.92), FOAM)
+    _turned(
+        p,
+        x,
+        y - 3.35 * m,
+        [(0, 1.85 * m), (0.8 * m, 1.65 * m), (1.5 * m, 1.15 * m), (2 * m, 0.45 * m), (2.2 * m, 0)],
+        KETTLE,
+    )
+    p.blob(x - 1.2 * m, y - 4.8 * m, x - 0.5 * m, y - 4.1 * m, shade(KETTLE, 1.35))
+    p.ellipse(x - 0.45 * m, y - 6.1 * m, x + 0.45 * m, y - 5.2 * m, GILT)
+    _brew_sheaf(p, x, y - 5.8 * m, sheaf * m)
+
+
+def _drink_clock(p: Painter, a: Point, b: Point, t: float, drop: float, r: float) -> None:
+    """A clock `r` metres round on the wall under the edge from `a` to `b`, `t` along it and
+    `drop` down it to its middle: a cream dial in a gilt ring with dark hands."""
+    m = METRE
+    cx, cy = _on_wall(a, b, t, drop)
+    p.ellipse(cx - r * m, cy - r * m, cx + r * m, cy + r * m, GILT)
+    p.ellipse(cx - 0.8 * r * m, cy - 0.8 * r * m, cx + 0.8 * r * m, cy + 0.8 * r * m, FOAM)
+    _bar(p, (cx, cy), (cx, cy - 0.65 * r * m), 0.12 * m, (40, 34, 30))
+    _bar(p, (cx, cy), (cx + 0.45 * r * m, cy + 0.15 * r * m), 0.12 * m, (40, 34, 30))
+
+
+def _drink_siding(p: Painter, x: float, y: float, length: float) -> None:
+    """A railway siding `length` metres long running along the lit walls from (x, y): grey
+    ballast, sleepers every 0.7 m and two steel rails at standard gauge."""
+    m = METRE
+    p.polygon(
+        [
+            _cask_at(x, y, 0, 1.5),
+            _cask_at(x, y, length, 1.5),
+            _cask_at(x, y, length, -1.5),
+            _cask_at(x, y, 0, -1.5),
+        ],
+        SIDING,
+    )
+    for u in np.arange(0.35, length, 0.7):
+        _bar(p, _cask_at(x, y, u, 1.15), _cask_at(x, y, u, -1.15), 0.22 * m, SLEEPERS)
+    for v in (0.72, -0.72):
+        _bar(p, _cask_at(x, y, 0, v, 0.08), _cask_at(x, y, length, v, 0.08), 0.12 * m, STEEL)
+
+
+def _drink_cask_wagon(p: Painter, x: float, y: float, body: RGB = WAGON_GREEN) -> None:
+    """A low-sided wagon 6.6 m long standing on a siding at (x, y), its sides painted `body` and
+    lined in gold, on two axles of iron wheels with buffers at its ends, loaded with two tiers of
+    oak casks."""
+    m = METRE
+    for u in (1.6, 5.0):
+        _brew_wheel(p, x, y, u, 0.8, 0.46, (64, 60, 62))
+    p.hall(*_cask_at(x, y, 3.3, 0, 0.55), 6.6 * m, 2.2 * m, 0.3 * m, (46, 44, 46), None)
+    deck = p.hall(
+        *_cask_at(x, y, 3.3, 0, 0.85), 6.6 * m, 2.5 * m, 0.5 * m, body, shade(TIMBER, 1.05)
+    )
+    left, front, _, _ = deck
+    _band(p, left, front, 0.25 * m, GILT)
+    for t in (0.25, 0.5, 0.75):
+        _bar(
+            p,
+            _on_wall(left, front, t, 0),
+            _on_wall(left, front, t, 0.5 * m),
+            0.05 * m,
+            shade(body, 0.7),
+        )
+    _cask_stack(p, *_cask_at(x, y, 0.65, 0, 1.35), (6, 5), shadow=False)
+    for u in (1.6, 5.0):
+        _brew_wheel(p, x, y, u, -0.8, 0.46, (64, 60, 62))
+    for u in (-0.15, 6.75):
+        for v in (0.6, -0.6):
+            bx, by = _cask_at(x, y, u, v, 0.75)
+            p.blob(bx - 0.18 * m, by - 0.18 * m, bx + 0.18 * m, by + 0.18 * m, (40, 38, 40))
+
+
+def _drink_cooper_shed(
+    p: Painter, x: float, y: float, length: float, depth: float, high: float
+) -> Top:
+    """A weatherboarded oak cooper's shop `length` by `depth` metres and `high` to its eaves on
+    (x, y) under an iron-grey roof: its boards lapped, a stone footing, wide doors standing open
+    on a cask in the dark inside and a row of small windows."""
+    m = METRE
+    length, depth, high = length * m, depth * m, high * m
+    top = p.hall(x, y, length, depth, high, COOPER_WALL, None)
+    left, front, right, _ = top
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
+        for k in range(1, round(high / (0.45 * m))):
+            drop = k * 0.45 * m
+            _bar(
+                p,
+                _on_wall(a, b, 0, drop),
+                _on_wall(a, b, 1, drop),
+                0.05 * m,
+                shade(COOPER_WALL, 0.78 * tone),
+            )
+        _patch(p, a, b, (0, 1), (high - 0.4 * m, high), shade(STONE, 0.8 * tone))
+        for t in (0.0, 1.0):
+            _bar(
+                p,
+                _on_wall(a, b, t, 0),
+                _on_wall(a, b, t, high),
+                0.2 * m,
+                shade(COOPER_WALL, 0.6 * tone),
+            )
+    door = 3.4 * m / length
+    t0 = 0.55 - door / 2
+    _patch(p, left, front, (t0, t0 + door), (1.0 * m, high - 0.05 * m), (36, 30, 28))
+    _cask(p, *_on_wall(left, front, 0.55, high - 0.3 * m), "up")
+    for s0 in (t0 - door / 4, t0 + door):
+        _patch(
+            p,
+            left,
+            front,
+            (s0, s0 + door / 4),
+            (1.0 * m, high - 0.05 * m),
+            shade(COOPER_WALL, 1.12),
+        )
+    windows = max(1, round(length / (4.5 * m)))
+    for k in range(windows):
+        t = (k + 0.5) / windows
+        if abs(t - 0.55) > door / 2 + 0.06:
+            half = 0.5 * m / length
+            _patch(p, left, front, (t - half, t + half), (1.4 * m, 2.6 * m), (54, 58, 70))
+            _bar(
+                p,
+                _on_wall(left, front, t, 1.4 * m),
+                _on_wall(left, front, t, 2.6 * m),
+                0.06 * m,
+                shade(COOPER_WALL, 1.25),
+            )
+    _patch(p, front, right, (0.4, 0.6), (1.4 * m, 2.6 * m), shade((54, 58, 70), 0.85))
+    p.gable(top, 0.38 * depth, COOPER_ROOF, COOPER_WALL)
+    _roof_rows(p, top, 0.38 * depth, COOPER_ROOF, (0.5,))
+    return top
+
+
+def _drink_tarred(p: Painter, top: Top, high: float) -> None:
+    """A whitewashed block's tarred black plinth 0.8 m high and the dark slate edge under its
+    eaves, on its lit and shaded walls."""
+    m = METRE
+    left, front, right, _ = top
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
+        _patch(p, a, b, (0, 1), (high - 0.8 * m, high), shade(TAR, tone))
+        _patch(p, a, b, (0, 1), (0, 0.25 * m), shade(STILL_SLATE, tone))
+
+
+def _drink_amber_door(
+    p: Painter, a: Point, b: Point, span: tuple[float, float], top: float, foot: float
+) -> None:
+    """A pair of whisky-amber doors on the wall under the edge from `a` to `b`, `span` along it
+    and from `top` to `foot` down it, in a black frame."""
+    m = METRE
+    t0, t1 = span
+    _patch(p, a, b, (t0 - 0.01, t1 + 0.01), (top - 0.2 * m, foot), TAR)
+    _patch(p, a, b, span, (top, foot), WHISKY)
+    _bar(
+        p,
+        _on_wall(a, b, (t0 + t1) / 2, top),
+        _on_wall(a, b, (t0 + t1) / 2, foot),
+        0.06 * m,
+        shade(WHISKY, 0.6),
+    )
+
+
+def _drink_malt_barn(
+    p: Painter, x: float, y: float, length: float, depth: float, high: float
+) -> Top:
+    """A whitewashed malt barn `length` by `depth` metres and `high` to its eaves on (x, y) over a
+    tarred plinth: two rows of small black-framed windows, whisky-amber doors and a black board
+    lettered in gold, under slate."""
+    m = METRE
+    length, depth, high = length * m, depth * m, high * m
+    top = p.hall(x, y, length, depth, high, WHITEWASH, None)
+    left, front, right, _ = top
+    _drink_tarred(p, top, high)
+    count = max(3, round(length / (2.4 * m)))
+    door = count - 2
+    for k in range(count):
+        t = (k + 0.5) / count
+        _still_window(p, left, front, length, t, 0.9 * m, (1.4 * m, 2.5 * m))
+        if k not in (door, door + 1):
+            _still_window(p, left, front, length, t, 0.9 * m, (high - 3.0 * m, high - 1.9 * m))
+    t0, t1 = door / count + 0.02, (door + 2) / count - 0.02
+    _drink_amber_door(p, left, front, (t0 + 0.02, t1 - 0.02), high - 3.4 * m, high - 0.05 * m)
+    _patch(p, left, front, (t0, t1), (2.9 * m, 3.8 * m), TAR)
+    for k in range(6):
+        s = t0 + (t1 - t0) * (0.08 + 0.15 * k)
+        _bar(
+            p,
+            _on_wall(left, front, s, 3.35 * m),
+            _on_wall(left, front, s + (t1 - t0) * 0.1, 3.35 * m),
+            0.3 * m,
+            GILT,
+        )
+    _still_window(p, front, right, depth, 0.5, 1 * m, (1.6 * m, 2.8 * m))
+    p.gable(top, 0.5 * depth, STILL_SLATE, WHITEWASH)
+    _roof_rows(p, top, 0.5 * depth, STILL_SLATE, (0.33, 0.66))
+    return top
+
+
+def _drink_still_house(
+    p: Painter, x: float, y: float, length: float, depth: float, high: float, stills: int
+) -> Top:
+    """A whitewashed still house `length` by `depth` metres and `high` to its eaves on (x, y) over
+    a tarred plinth, under slate with a louvred copper vent along its ridge: `stills` tall arched
+    openings in its long wall, their whisky-amber doors folded back, each on an onion-shaped
+    copper pot still gleaming over its fire, the lyne arms reaching away."""
+    m = METRE
+    length, depth, high = length * m, depth * m, high * m
+    top = p.hall(x, y, length, depth, high, WHITEWASH, None)
+    left, front, right, _ = top
+    _drink_tarred(p, top, high)
+    wide = 3.6 * m
+    for k in range(stills):
+        t = (k + 0.5) / stills
+        p.polygon(_round_head(left, front, length, t, wide, high - 6.2 * m, high), (40, 34, 32))
+        for side in (-1, 1):
+            s0 = t + side * (wide / 2 / length)
+            s1 = s0 + side * 0.8 * m / length
+            _patch(
+                p, left, front, tuple(sorted((s0, s1))), (high - 4.6 * m, high - 0.05 * m), WHISKY
+            )
+        _still_pot(p, *_on_wall(left, front, t, high - 0.15 * m), (1 if k % 2 else -1) * 1.1 * m)
+    for t in (0.3, 0.7):
+        _still_window(p, front, right, depth, t, 1 * m, (1.6 * m, 2.8 * m))
+    rise = 0.42 * depth
+    p.gable(top, rise, STILL_SLATE, WHITEWASH)
+    _roof_rows(p, top, rise, STILL_SLATE, (0.5,))
+    near, far = _ridge(top, rise)
+    a, b = _on_wall(near, far, 0.2, 0), _on_wall(near, far, 0.8, 0)
+    vent = [a, b, (b[0], b[1] - 1.1 * m), (a[0], a[1] - 1.1 * m)]
+    p.polygon(vent, KETTLE, shade(KETTLE, 0.6))
+    for k in range(1, 3):
+        _bar(
+            p,
+            _on_wall(a, b, 0, -0.37 * k * m),
+            _on_wall(a, b, 1, -0.37 * k * m),
+            0.1 * m,
+            shade(KETTLE, 0.62),
+        )
+    _bar(
+        p, (a[0] - 0.4 * m, a[1] - 1.2 * m), (b[0] + 0.4 * m, b[1] - 1.2 * m), 0.3 * m, STILL_SLATE
+    )
+    return top
+
+
+def _drink_bond(
+    p: Painter,
+    x: float,
+    y: float,
+    length: float,
+    depth: float,
+    high: float,
+    doors: tuple[int, ...],
+    shaded: bool = False,
+) -> Top:
+    """A bonded warehouse `length` by `depth` metres and `high` to its eaves on (x, y): low walls
+    of whitewashed stone over a tarred plinth under slate, small barred windows, and black doors
+    numbered in white, one for each of `doors`, on its lit wall or on its shaded wall if
+    `shaded`."""
+    m = METRE
+    length_u, depth_u, high_u = length * m, depth * m, high * m
+    top = p.hall(x, y, length_u, depth_u, high_u, WHITEWASH, None)
+    left, front, right, _ = top
+    _drink_tarred(p, top, high_u)
+    a, b, wall = (front, right, depth_u) if shaded else (left, front, length_u)
+    tone = 0.78 if shaded else 1.0
+    slots = len(doors) * 2 + 1
+    for k in range(slots):
+        t = (k + 0.5) / slots
+        if k % 2:
+            number = doors[k // 2]
+            half = 1.1 * m / wall
+            _patch(
+                p,
+                a,
+                b,
+                (t - half - 0.01, t + half + 0.01),
+                (high_u - 3.4 * m, high_u),
+                shade(STONE, tone),
+            )
+            _patch(
+                p,
+                a,
+                b,
+                (t - half, t + half),
+                (high_u - 3.2 * m, high_u - 0.05 * m),
+                shade((34, 34, 38), tone),
+            )
+            cell = 0.22 * m
+            for row, line in enumerate(DIGITS[number]):
+                for col, mark in enumerate(line):
+                    if mark == "1":
+                        s = t + (col - 1.5) * cell / wall
+                        d = high_u - 2.9 * m + row * cell
+                        _patch(p, a, b, (s, s + cell / wall), (d, d + cell), shade(WHITEWASH, tone))
+        else:
+            for s in (t - 0.25 / slots, t + 0.25 / slots):
+                _patch(
+                    p,
+                    a,
+                    b,
+                    (s - 0.35 * m / wall, s + 0.35 * m / wall),
+                    (high_u - 4.4 * m, high_u - 3.6 * m),
+                    shade(TAR, tone),
+                )
+    other = (left, front, length_u) if shaded else (front, right, depth_u)
+    _still_window(
+        p, other[0], other[1], other[2], 0.5, 0.8 * m, (high_u - 4.4 * m, high_u - 3.5 * m)
+    )
+    rise = 0.32 * depth_u
+    p.gable(top, rise, STILL_SLATE, WHITEWASH)
+    _roof_rows(p, top, rise, STILL_SLATE, (0.5,))
+    return top
+
+
+CHATEAU_STONE: RGB = (226, 210, 178)
+
+
+def _drink_cellar(p: Painter, x: float, y: float, length: float, depth: float) -> None:
+    """A wine cellar `length` by `depth` metres vaulted into a grassy bank on (x, y), its stone
+    end opened by a wine-red arched door."""
+    m = METRE
+    bank = shade(TURF, 0.86)
+    cellar = p.hall(x, y, length * m, depth * m, 2 * m, bank, None)
+    _, front, right, _ = cellar
+    _vault(p, cellar, 2 * m, TURF, STONE, (), shade(TURF, 0.95))
+    _patch(p, front, right, (0, 1), (0, 2 * m), shade(STONE, 0.86))
+    for k in range(4):
+        _band(p, front, right, (0.5 * k) * m, shade(STONE, 0.7))
+    p.polygon(
+        _round_head(front, right, depth * m, 0.5, 2.6 * m, -0.6 * m, 2 * m), shade(STONE, 1.1)
+    )
+    p.polygon(_round_head(front, right, depth * m, 0.5, 2 * m, -0.3 * m, 2 * m), WINE)
+    _bar(
+        p,
+        _on_wall(front, right, 0.5, -0.3 * m),
+        _on_wall(front, right, 0.5, 2 * m),
+        0.06 * m,
+        shade(WINE, 0.6),
+    )
+
+
+def _drink_round_tower(p: Painter, x: float, y: float, r: float, tall: float, cone: float) -> None:
+    """A round tower of cream stone `r` metres round and `tall` high on (x, y), with a band of
+    stone at each floor and shuttered windows up its front, under a tall cone of wine-red tiles
+    with a gilt vane."""
+    m = METRE
+    _turned(p, x, y, [(0, r * m), (tall * m, r * m)], CHATEAU_STONE)
+    arc = np.linspace(0.05, math.pi - 0.05, 9)
+    for h in np.arange(4.0, tall - 0.5, 4.0):
+        for a0, a1 in itertools.pairwise(arc):
+            _bar(
+                p,
+                (x + r * m * math.cos(a0), y - h * m + r * m / 2 * math.sin(a0)),
+                (x + r * m * math.cos(a1), y - h * m + r * m / 2 * math.sin(a1)),
+                0.2 * m,
+                shade(CHATEAU_STONE, 0.86),
+            )
+    wx = x - 0.25 * r * m
+    for h in np.arange(2.0, tall - 1.5, 4.0):
+        wy = y - h * m + 0.4 * r * m
+        p.rect(wx - 0.45 * m, wy - 2.0 * m, wx + 0.45 * m, wy, (54, 50, 60))
+        for side in (-1, 1):
+            p.rect(
+                wx + side * 0.5 * m - 0.3 * m, wy - 2.0 * m, wx + side * 0.5 * m + 0.3 * m, wy, WINE
+            )
+    eave = y - tall * m
+    _turned(
+        p, x, eave + 0.3 * m, [(0, (r + 0.5) * m), (0.3 * m, (r + 0.5) * m)], shade(WINE_ROOF, 0.8)
+    )
+    _turned(p, x, eave, [(0, (r + 0.5) * m), (cone * m, 0)], WINE_ROOF)
+    for f in (0.3, 0.6):
+        h = cone * f
+        w = (r + 0.5) * (1 - f)
+        for a0, a1 in itertools.pairwise(arc):
+            _bar(
+                p,
+                (x + w * m * math.cos(a0), eave - h * m + w * m / 2 * math.sin(a0)),
+                (x + w * m * math.cos(a1), eave - h * m + w * m / 2 * math.sin(a1)),
+                0.08 * m,
+                shade(WINE_ROOF, 0.8),
+            )
+    tip = (x, eave - cone * m)
+    _bar(p, tip, (tip[0], tip[1] - 1.4 * m), 0.1 * m, (60, 56, 54))
+    p.polygon(
+        [
+            (tip[0], tip[1] - 1.3 * m),
+            (tip[0] + 1.0 * m, tip[1] - 1.1 * m),
+            (tip[0], tip[1] - 0.8 * m),
+        ],
+        GILT,
+    )
+    p.ellipse(tip[0] - 0.2 * m, tip[1] - 1.75 * m, tip[0] + 0.2 * m, tip[1] - 1.35 * m, GILT)
+
+
+def _drink_dormer(p: Painter, x: float, y: float) -> None:
+    """A cream dormer standing on a roof at (x, y) with a dark window and a little wine-red
+    gable."""
+    m = METRE
+    top = p.hall(x, y, 1.4 * m, 1.0 * m, 1.5 * m, CHATEAU_STONE, None)
+    _patch(p, top[0], top[1], (0.25, 0.75), (0.3 * m, 1.3 * m), (54, 50, 60))
+    p.gable(top, 0.8 * m, WINE_ROOF, CHATEAU_STONE)
+
+
+def _drink_chateau(
+    p: Painter, x: float, y: float, length: float, depth: float, storeys: int, bays: int
+) -> Top:
+    """A château of cream stone `length` by `depth` metres on (x, y), `storeys` storeys of four
+    and a half metres: stone quoins and bands, `bays` tall windows a storey between wine-red
+    shutters, a wine-red arched door up steps under a pediment with a gilt oculus in its middle,
+    and a hipped roof of wine-red tiles with dormers and cream chimneys."""
+    m = METRE
+    high = storeys * 4.5 * m
+    length_u, depth_u = length * m, depth * m
+    top = p.hall(x, y, length_u, depth_u, high, CHATEAU_STONE, None)
+    left, front, right, _ = top
+    _plinth(p, top, high, CHATEAU_STONE, 0.6 * m)
+    for a, b in ((left, front), (front, right)):
+        for t in (0.015, 0.985):
+            _bar(
+                p,
+                _on_wall(a, b, t, 0),
+                _on_wall(a, b, t, high),
+                0.5 * m,
+                shade(CHATEAU_STONE, 1.08),
+            )
+        _bar(
+            p,
+            _on_wall(a, b, 0, 0.25 * m),
+            _on_wall(a, b, 1, 0.25 * m),
+            0.5 * m,
+            shade(CHATEAU_STONE, 1.1),
+        )
+        for k in range(1, storeys):
+            drop = k * 4.5 * m
+            _bar(
+                p,
+                _on_wall(a, b, 0, drop),
+                _on_wall(a, b, 1, drop),
+                0.3 * m,
+                shade(CHATEAU_STONE, 0.86),
+            )
+    middle = bays // 2
+    for k in range(bays):
+        t = (k + 0.5) / bays
+        for s in range(storeys):
+            if k == middle and s == storeys - 1:
+                continue
+            head = s * 4.5 * m + 1.0 * m
+            _wine_window(p, left, front, length_u, t, 1.1 * m, (head, head + 2.4 * m))
+    t = (middle + 0.5) / bays
+    p.polygon(
+        _round_head(left, front, length_u, t, 2.4 * m, high - 3.6 * m, high),
+        shade(CHATEAU_STONE, 0.82),
+    )
+    p.polygon(_round_head(left, front, length_u, t, 1.9 * m, high - 3.3 * m, high), WINE)
+    _bar(
+        p,
+        _on_wall(left, front, t, high - 3.3 * m),
+        _on_wall(left, front, t, high),
+        0.06 * m,
+        shade(WINE, 0.6),
+    )
+    p.hall(
+        *_on_wall(left, front, t, high + 0.9 * m),
+        3.2 * m,
+        1.4 * m,
+        0.5 * m,
+        shade(STONE, 1.1),
+        shade(STONE, 1.2),
+    )
     for k in range(3):
-        _keg(p, sb[0] - 1 + 2.6 * k, sb[1] + 2.2 + 1.3 * k)
-    for cx, cy in ((sl[0] + 3, sl[1] + 0.5), (sl[0] + 6, sl[1] + 2)):
-        _barrel(p, cx, cy)
-    shed_top = tuple((x, y - 7) for x, y in shed_foot)
-    for x, y in (sl, sf, sr):
-        p.line([(x, y), (x, y - 7)], shade(TIMBER, 0.7))
-    p.gable(shed_top, 3, COOPER_ROOF, TIMBER)
-    _roof_rows(p, shed_top, 3, COOPER_ROOF, (0.5,))
-    top = _cooper_shed(p, -7, -2, 22, 11)
-    left, front, _, _ = top
-    _windows(p, left, front, (0.1, 0.24, 0.84, 0.94), (6,), 2, shade(WINDOW, 1.1))
-    _louvre(p, top, 4, (0.3, 0.75))
-    _smoking_chimney(p, -18, -17, -30, close=True)
-    _shavings(p, ((-9, 8.5), (-6, 9.4), (-12, 7.6), (-4, 8.6), (-8, 10.4), (-1, 10)))
-    for x, y in ((8, 10), (13, 7.5), (18, 5)):
-        _firing(p, x, y)
-    _staves(p, -24, 2, 3)
-    _staves(p, -20, 5, 2)
-    _casks(p, -16, 14, 4)
-    _cart(p, 22, 12, (BARREL, BARREL, BARREL))
+        t = (k + 0.5) / 3
+        for s in range(storeys):
+            head = s * 4.5 * m + 1.0 * m
+            _wine_window(p, front, right, depth_u, t, 1.1 * m, (head, head + 2.4 * m))
+    rise = 0.5 * depth_u
+    _hip(p, top, rise, 0.18, WINE_ROOF, (0.35, 0.7))
+    t = (middle + 0.5) / bays
+    half = 1.6 * m / length_u
+    base_l, base_r = (
+        _on_wall(left, front, t - half * 1.6, 0),
+        _on_wall(left, front, t + half * 1.6, 0),
+    )
+    peak = _on_wall(left, front, t, -2.6 * m)
+    p.polygon([base_l, base_r, peak], CHATEAU_STONE, shade(CHATEAU_STONE, 0.6))
+    _bar(p, base_l, peak, 0.25 * m, shade(CHATEAU_STONE, 1.1))
+    _bar(p, peak, base_r, 0.25 * m, shade(CHATEAU_STONE, 1.1))
+    ox, oy = _on_wall(left, front, t, -0.9 * m)
+    p.ellipse(ox - 0.6 * m, oy - 0.6 * m, ox + 0.6 * m, oy + 0.6 * m, GILT)
+    for k in range(bays):
+        if abs(k - middle) < 1:
+            continue
+        dx, dy = _on_roof(top, rise, (k + 0.5) / bays, 0.25)
+        _drink_dormer(p, dx, dy)
+    for t in (0.2, 0.8):
+        cx, cy = _on_roof(top, rise, t, 0.95)
+        p.hall(cx, cy + 0.4 * m, 0.9 * m, 1.4 * m, 2 * m, CHATEAU_STONE, (80, 70, 66))
+    return top
+
+
+def _drink_terrace(p: Painter, x: float, y: float, length: float, high: float, rows: int) -> None:
+    """A terrace of vines `length` metres long cut into a hillside on (x, y): a stone retaining
+    wall `high` metres tall in front of a grassy step 2.6 m deep planted with `rows` rows of
+    vines along it."""
+    m = METRE
+    depth = 2.6 * rows
+    top = p.hall(x, y, length * m, depth * m, high * m, STONE, shade(TURF, 0.9))
+    left, front, right, back = top
+    for k in range(1, max(2, round(high / 0.6))):
+        _band(p, left, front, k * 0.6 * m, shade(STONE, 0.84))
+    _bar(
+        p,
+        _on_wall(left, front, 0, 0.1 * m),
+        _on_wall(left, front, 1, 0.1 * m),
+        0.25 * m,
+        shade(STONE, 1.15),
+    )
+    posts = max(2, round((length - 1) / 2))
+    for k in range(rows):
+        f = (rows - k - 0.5) / rows
+        start = _on_wall(_on_wall(left, back, f, 0), _on_wall(front, right, f, 0), 0.04, 0)
+        _wine_vines(p, *start, posts)
+
+
+def _drink_press_shed(p: Painter, x: float, y: float, length: float, depth: float) -> None:
+    """An open press shed `length` by `depth` metres on (x, y): a wine-red tiled roof on stout
+    timber posts over a back wall of cream stone, sheltering a wooden basket press and casks on
+    a rack."""
+    m = METRE
+    high = 4.2 * m
+    foot = _footing(x, y, length * m, depth * m)
+    left, front, right, back = foot
+    p.polygon([left, front, right, back], shade(STONE, 0.9))
+    p.hall(*_on_wall(back, right, 0.5, 0), length * m, 0.6 * m, high, CHATEAU_STONE, None)
+    _wine_press(p, *_on_wall(_on_wall(left, front, 0.3, 0), _on_wall(back, right, 0.3, 0), 0.45, 0))
+    _cask_rack(
+        p, *_on_wall(_on_wall(left, front, 0.58, 0), _on_wall(back, right, 0.58, 0), 0.55, 0), 4, 2
+    )
+    for t in (0.02, 0.98):
+        for corner in (_on_wall(left, front, t, 0), _on_wall(back, right, t, 0)):
+            _bar(p, corner, (corner[0], corner[1] - high), 0.3 * m, shade(TIMBER, 0.75))
+    roof = tuple((c[0], c[1] - high) for c in foot)
+    p.gable(roof, 0.45 * depth * m, WINE_ROOF, CHATEAU_STONE)
+    _roof_rows(p, roof, 0.45 * depth * m, WINE_ROOF, (0.35, 0.7))
+
+
+def _drink_fountain(p: Painter, x: float, y: float) -> None:
+    """A round stone fountain on (x, y): a basin 5 m across of water with a two-tier column in
+    its middle spilling water."""
+    m = METRE
+    _turned(p, x, y, [(0, 2.5 * m), (0.6 * m, 2.5 * m)], STONE, (110, 150, 176))
+    p.blob(x - 1.6 * m, y - 1.0 * m, x - 0.2 * m, y - 0.6 * m, (170, 204, 224))
+    _turned(p, x, y - 0.6 * m, [(0, 0.3 * m), (1.4 * m, 0.25 * m)], shade(STONE, 1.1))
+    _turned(
+        p,
+        x,
+        y - 2.0 * m,
+        [(0, 0.2 * m), (0.2 * m, 1.1 * m), (0.35 * m, 1.1 * m)],
+        shade(STONE, 1.1),
+        (110, 150, 176),
+    )
+    _turned(p, x, y - 2.35 * m, [(0, 0.15 * m), (0.9 * m, 0.1 * m)], shade(STONE, 1.1))
+    p.soft([(x - 0.5 * m, y - 3.9 * m, x + 0.5 * m, y - 3.0 * m)], (226, 240, 248), 0.8, 0.15)
+
+
+IRON_CLAD: RGB = (128, 132, 140)
+
+BOILER: RGB = (48, 48, 54)
+
+
+def _drink_steam_shop(p: Painter, x: float, y: float, length: float, depth: float) -> Top:
+    """A cooper's steam shop `length` by `depth` metres on (x, y), clad in ribbed iron sheets
+    over a timber sill: a wide door standing open on casks softening in the steam inside, a
+    louvred vent along its ridge breathing steam, and an upright iron boiler at its end with a
+    thin iron flue."""
+    m = METRE
+    high = 5 * m
+    length_u, depth_u = length * m, depth * m
+    top = p.hall(x, y, length_u, depth_u, high, IRON_CLAD, None)
+    left, front, right, _ = top
+    for a, b, wall, tone in ((left, front, length_u, 1.0), (front, right, depth_u, 0.78)):
+        for k in range(1, round(wall / (0.5 * m))):
+            t = k / round(wall / (0.5 * m))
+            _bar(
+                p,
+                _on_wall(a, b, t, 0),
+                _on_wall(a, b, t, high),
+                0.05 * m,
+                shade(IRON_CLAD, 0.82 * tone),
+            )
+        _patch(p, a, b, (0, 1), (high - 0.5 * m, high), shade(COOPER_WALL, 0.8 * tone))
+    _patch(p, left, front, (0.3, 0.7), (1.2 * m, high - 0.05 * m), (44, 40, 40))
+    for t in (0.4, 0.6):
+        _cask(p, *_on_wall(left, front, t, high - 0.3 * m), "up")
+    p.soft(
+        [(*_on_wall(left, front, 0.32, 1.4 * m), *_on_wall(left, front, 0.68, 3.4 * m))],
+        (240, 240, 236),
+        0.55,
+        0.4,
+    )
+    rise = 0.4 * depth_u
+    p.gable(top, rise, COOPER_ROOF, IRON_CLAD)
+    _roof_rows(p, top, rise, COOPER_ROOF, (0.5,))
+    near, far = _ridge(top, rise)
+    a, b = _on_wall(near, far, 0.15, 0), _on_wall(near, far, 0.85, 0)
+    p.polygon([a, b, (b[0], b[1] - 1.0 * m), (a[0], a[1] - 1.0 * m)], shade(IRON_CLAD, 1.1))
+    for k in (1, 2):
+        _bar(
+            p,
+            _on_wall(a, b, 0, -0.33 * k * m),
+            _on_wall(a, b, 1, -0.33 * k * m),
+            0.1 * m,
+            shade(IRON_CLAD, 0.6),
+        )
+    _bar(
+        p, (a[0] - 0.4 * m, a[1] - 1.1 * m), (b[0] + 0.4 * m, b[1] - 1.1 * m), 0.3 * m, COOPER_ROOF
+    )
+    mid = _on_wall(a, b, 0.5, -1.2 * m)
+    _drink_steam(p, *mid, 3)
+    return top
+
+
+def _drink_boiler(p: Painter, x: float, y: float) -> None:
+    """An upright iron boiler 3.4 m high standing on (x, y), riveted in bands, with a firedoor
+    glowing at its foot and a thin iron flue rising from its dome trailing smoke."""
+    m = METRE
+    _turned(p, x, y, [(0, 0.9 * m), (3 * m, 0.9 * m), (3.4 * m, 0.5 * m)], BOILER)
+    arc = np.linspace(0.1, math.pi - 0.1, 8)
+    for h in (0.8, 1.8, 2.7):
+        for a0, a1 in itertools.pairwise(arc):
+            _bar(
+                p,
+                (x + 0.9 * m * math.cos(a0), y - h * m + 0.45 * m * math.sin(a0)),
+                (x + 0.9 * m * math.cos(a1), y - h * m + 0.45 * m * math.sin(a1)),
+                0.06 * m,
+                shade(BOILER, 1.6),
+            )
+    p.rect(x - 0.6 * m, y - 0.6 * m, x - 0.1 * m, y - 0.15 * m, (246, 150, 54))
+    _turned(p, x, y - 3.4 * m, [(0, 0.2 * m), (4 * m, 0.18 * m)], BOILER)
+    p.soft(
+        [
+            (x - 0.4 * m, y - 9.0 * m, x + 1.0 * m, y - 7.6 * m),
+            (x + 0.4 * m, y - 10.6 * m, x + 2.2 * m, y - 9.0 * m),
+        ],
+        (176, 174, 176),
+        0.6,
+        0.3,
+    )
+
+
+def _drink_logs(p: Painter, x: float, y: float, rows: tuple[int, ...]) -> None:
+    """Oak logs 4 m long stacked on (x, y) along the lit walls, `rows[0]` side by side on the
+    ground and fewer nestled on top, their pale sawn ends ringed on the shaded side."""
+    m = METRE
+    r, long = 0.3, 4.0
+    bark, end = (104, 80, 58), (214, 182, 132)
+    for level, count in enumerate(rows):
+        for k in range(count):
+            v = -(k + 0.5 * level) * 2 * r
+            z = r + level * 1.7 * r
+            top = [_cask_at(x, y, u, v, z + r) for u in (0, long)]
+            low = [_cask_at(x, y, u, v - r, z) for u in (long, 0)]
+            p.polygon([*top, *low], bark)
+            _bar(p, *top, 0.06 * m, shade(bark, 1.3))
+            cx, cy = _cask_at(x, y, long, v - 0.15, z)
+            p.ellipse(cx - r * m * 0.8, cy - r * m, cx + r * m * 0.8, cy + r * m, end)
+            p.blob(cx - 0.08 * m, cy - 0.08 * m, cx + 0.08 * m, cy + 0.08 * m, shade(end, 0.7))
+
+
+def _drink_sign_cask(p: Painter, x: float, y: float) -> None:
+    """A great oak cask 2.6 m high stood on end on a roof's ridge at (x, y) as the cooperage's
+    sign, its staves lit on the left and bound with four gilt hoops."""
+    m = METRE
+    profile = [(0, 0.85), (0.6, 1.0), (1.3, 1.08), (2.0, 1.0), (2.6, 0.85)]
+    _turned(p, x, y, [(h * m, w * m) for h, w in profile], OAK, shade(OAK, 1.2))
+    arc = np.linspace(0.05, math.pi - 0.05, 10)
+    for h in (0.3, 0.85, 1.75, 2.3):
+        w = float(np.interp(h, [a for a, _ in profile], [b for _, b in profile]))
+        for a0, a1 in itertools.pairwise(arc):
+            _bar(
+                p,
+                (x + w * m * math.cos(a0), y - h * m + w * m / 2 * math.sin(a0)),
+                (x + w * m * math.cos(a1), y - h * m + w * m / 2 * math.sin(a1)),
+                0.14 * m,
+                GILT,
+            )
+    p.blob(x - 0.75 * m, y - 1.9 * m, x - 0.45 * m, y - 0.6 * m, shade(OAK, 1.25))
+
+
+CEDAR: RGB = (176, 120, 78)
+
+BAMBOO: RGB = (150, 146, 84)
+
+RICE_STRAW: RGB = (218, 196, 132)
+
+
+def _drink_kura(
+    p: Painter, x: float, y: float, length: float, depth: float, high: float, door: bool = True
+) -> Top:
+    """A kura storehouse `length` by `depth` metres and `high` to its eaves on (x, y): white
+    plaster over a namako base of grey tiles in a lattice of white joints with a black rail on
+    it, a black band under its eaves, rows of small barred windows behind thick white shutters,
+    a heavy plastered door if `door`, and a roof of dark kawara tiles with a thick ridge."""
+    m = METRE
+    length_u, depth_u, high_u = length * m, depth * m, high * m
+    top = p.hall(x, y, length_u, depth_u, high_u, PLASTER, None)
+    left, front, right, _ = top
+    _sake_namako(p, left, front, length_u, (high_u - 2.4 * m, high_u), 1.0)
+    _sake_namako(p, front, right, depth_u, (high_u - 2.4 * m, high_u), 0.78)
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
+        _bar(
+            p,
+            _on_wall(a, b, 0, 0.15 * m),
+            _on_wall(a, b, 1, 0.15 * m),
+            0.3 * m,
+            shade(CHARRED, tone),
+        )
+    rows = [1.2 * m] + ([4.2 * m] if high >= 9 else [])
+    count = max(2, round(length / 4))
+    for k in range(count):
+        t = (k + 0.5) / count
+        half = 0.6 * m / length_u
+        for drop in rows:
+            if door and k == count // 2 and drop > 2 * m:
+                continue
+            _patch(
+                p,
+                left,
+                front,
+                (t - half * 1.4, t + half * 1.4),
+                (drop, drop + 1.2 * m),
+                shade(PLASTER, 0.72),
+            )
+            _patch(
+                p,
+                left,
+                front,
+                (t - half, t + half),
+                (drop + 0.15 * m, drop + 1.05 * m),
+                (40, 38, 42),
+            )
+            for j in (-1, 0, 1):
+                s = t + half * 0.5 * j
+                _bar(
+                    p,
+                    _on_wall(left, front, s, drop + 0.15 * m),
+                    _on_wall(left, front, s, drop + 1.05 * m),
+                    0.06 * m,
+                    (110, 106, 100),
+                )
+    if door:
+        t = (count // 2 + 0.5) / count
+        half = 1.2 * m / length_u
+        _patch(
+            p,
+            left,
+            front,
+            (t - half * 1.3, t + half * 1.3),
+            (high_u - 3.6 * m, high_u),
+            shade(PLASTER, 0.8),
+        )
+        _patch(
+            p, left, front, (t - half, t + half), (high_u - 3.3 * m, high_u), shade(PLASTER, 0.92)
+        )
+        _bar(
+            p,
+            _on_wall(left, front, t, high_u - 3.3 * m),
+            _on_wall(left, front, t, high_u),
+            0.08 * m,
+            shade(PLASTER, 0.6),
+        )
+    _patch(p, front, right, (0.4, 0.6), (1.2 * m, 2.6 * m), shade(PLASTER, 0.6))
+    _sake_roof(p, top, 0.45 * depth_u)
+    return top
+
+
+def _drink_sake_shop(
+    p: Painter, x: float, y: float, length: float, depth: float, ball: float
+) -> Top:
+    """A sake brewer's shop `length` by `depth` metres on (x, y), 4.6 m to its eaves: walls of
+    black charred timber boards over a white plaster footing, a lattice door under an indigo
+    noren, a lattice window, a tiled roof, and a sugidama `ball` times the usual size hung under
+    its eaves."""
+    m = METRE
+    s_len, s_deep, s_high = length * m, depth * m, 4.6 * m
+    shop = p.hall(x, y, s_len, s_deep, s_high, CHARRED, None)
+    left, front, right, _ = shop
+    for a, b, wall, tone in ((left, front, s_len, 1.0), (front, right, s_deep, 0.78)):
+        _patch(p, a, b, (0, 1), (0, 0.9 * m), shade(PLASTER, tone))
+        boards = round(wall / (0.35 * m))
+        for k in range(1, boards):
+            _bar(
+                p,
+                _on_wall(a, b, k / boards, 0.9 * m),
+                _on_wall(a, b, k / boards, s_high),
+                0.04 * m,
+                shade(CHARRED, 1.5 * tone),
+            )
+        _bar(
+            p,
+            _on_wall(a, b, 0, 0.95 * m),
+            _on_wall(a, b, 1, 0.95 * m),
+            0.12 * m,
+            shade(LATTICE, 0.6 * tone + 0.2),
+        )
+    d0, d1 = 0.55 - 1.6 * m / s_len, 0.55 + 1.6 * m / s_len
+    _patch(p, left, front, (d0, d1), (1.9 * m, s_high), shade(LATTICE, 0.6))
+    for k in range(9):
+        s = d0 + (d1 - d0) * (k + 0.5) / 9
+        _bar(
+            p,
+            _on_wall(left, front, s, 1.9 * m),
+            _on_wall(left, front, s, s_high),
+            0.06 * m,
+            LATTICE,
+        )
+    _sake_noren(p, left, front, (d0 + 0.01, d1 - 0.01), 1.6 * m)
+    w0, w1 = 0.08, 0.08 + 2.4 * m / s_len
+    _patch(p, left, front, (w0, w1), (1.6 * m, 3.2 * m), (40, 34, 30))
+    for k in range(7):
+        s = w0 + (w1 - w0) * (k + 0.5) / 7
+        _bar(
+            p,
+            _on_wall(left, front, s, 1.6 * m),
+            _on_wall(left, front, s, 3.2 * m),
+            0.06 * m,
+            LATTICE,
+        )
+    _sake_roof(p, shop, 0.45 * s_deep)
+    bx, by = _on_wall(left, front, min(0.95, d1 + 1.0 * m / s_len), 0.25 * m)
+    if ball > 1:
+        _bar(p, (bx, by), (bx, by + 0.5 * (ball - 1) * m), 0.06 * m, (60, 50, 40))
+        by += 0.5 * (ball - 1) * m
+        cx, cy, r = bx, by + 1.05 * ball * m, 0.55 * ball * m
+        _bar(p, (bx, by), (bx, by + 0.5 * m), 0.06 * m, (60, 50, 40))
+        for a in np.linspace(0, 2 * math.pi, 18)[:-1]:
+            tx, ty = cx + r * 1.02 * math.cos(a), cy + r * 1.02 * math.sin(a)
+            p.blob(tx - 0.16 * m, ty - 0.16 * m, tx + 0.16 * m, ty + 0.16 * m, shade(SUGI, 0.8))
+        p.blob(cx - r, cy - r, cx + r, cy + r, SUGI)
+        p.blob(cx - 0.1 * m, cy - 0.05 * m, cx + r * 0.95, cy + r * 0.95, shade(SUGI, 0.82))
+        p.blob(cx - r * 0.75, cy - r * 0.75, cx + 0.05 * m, cy, shade(SUGI, 1.22))
+    else:
+        _sake_ball(p, bx, by)
+    return shop
+
+
+def _drink_drum(
+    p: Painter,
+    x: float,
+    y: float,
+    length: float,
+    r: float,
+    body: RGB,
+    bands: tuple[float, ...],
+    band: RGB,
+    open_end: bool,
+) -> None:
+    """A drum `length` metres long and `r` round lying on its side on (x, y) with its end to the
+    lit side, like a straw rice bale or a great cedar vat: its body lit along the top, bound with
+    `bands` (offsets along it) in `band`, and its end closed in pale straw or, if `open_end`,
+    open on its dark inside."""
+    m = METRE
+    half = length / 2
+    rim = np.linspace(0, 2 * math.pi, 25)
+
+    def at(v: float, rr: float, a: float) -> Point:
+        return _cask_at(x, y, rr * math.cos(a), v, r + rr * math.sin(a))
+
+    for v in np.linspace(half, -half, 7):
+        centre = at(v, 0, 0)
+        for a0, a1 in itertools.pairwise(rim):
+            mid = (a0 + a1) / 2
+            tone = 0.86 - 0.08 * math.cos(mid) + 0.18 * math.sin(mid)
+            p.polygon([centre, at(v, r, a0), at(v, r, a1)], shade(body, tone))
+    for v in bands:
+        for a0, a1 in itertools.pairwise(rim):
+            if math.cos(a0) + math.sin(a0) > 0 and math.cos(a1) + math.sin(a1) > 0:
+                _bar(p, at(v, r * 1.01, a0), at(v, r * 1.01, a1), 0.12 * m, band)
+    p.polygon([at(-half, r, a) for a in rim], shade(body, 0.8))
+    inside = (52, 38, 30) if open_end else shade(body, 1.15)
+    p.polygon([at(-half, r * 0.86, a) for a in rim], inside)
+    if open_end:
+        p.polygon([at(-half + 0.6, r * 0.86, a) for a in rim[6:19]], shade(body, 0.6))
+
+
+def _drink_komodaru(p: Painter, x: float, y: float, rows: tuple[int, ...]) -> None:
+    """Komodaru (_cask_straw) stood on end in a stepped pyramid from (x, y): `rows[0]` along the
+    lit walls on the ground and each row above set back over the gaps of the one below."""
+    gap = 0.82
+    p.soft(
+        [(*_cask_at(x, y, -0.6, 0.5), *_cask_at(x, y, (rows[0] - 1) * gap + 1, -0.6))],
+        (34, 30, 24),
+        0.4,
+        0.2,
+    )
+    for level, count in enumerate(rows):
+        for k in range(count):
+            _cask_straw(p, *_cask_at(x, y, (k + 0.5 * level) * gap, 0, 0.86 * level))
+
+
+def _drink_bales(p: Painter, x: float, y: float, rows: tuple[int, ...]) -> None:
+    """Straw bales of rice 0.9 m long lying with their ends to the lit side in a pile from
+    (x, y): `rows[0]` side by side on the ground and fewer nestled on top."""
+    gap, r = 0.62, 0.3
+    for level, count in enumerate(rows):
+        for k in range(count):
+            u = (k + 0.5 * level) * gap
+            bx, by = _cask_at(x, y, u, 0, level * 1.7 * r)
+            _drink_drum(p, bx, by, 0.9, r, RICE_STRAW, (0.25, -0.25), shade(RICE_STRAW, 0.6), False)
+
+
+def big_sake_brewery() -> Sprite:
+    """A sake brewery grown into a works: two kura storehouses of white plaster over namako bases
+    of grey tiles under heavy roofs of dark kawara, a shop of black charred timber with an
+    indigo noren over its door and a green sugidama under its eaves, a stepped stack of red-
+    labelled komodaru, rice bales piled by the kura door and two great cedar vats drying on their
+    sides in the yard."""
+    m = METRE
+    p = Painter(60, 40, (27, 26))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 10) * m, (v - 3) * m)
+
+    p.polygon(
+        [at(-11, -6), at(34, -6), at(34, 3), at(20, 3), at(20, 5.5), at(-11, 5.5)], (204, 196, 176)
+    )
+    p.shadow(18, 5, 4)
+    _drink_kura(p, *at(9, 9.5), 20, 7, 7)
+    _drink_kura(p, *at(27.5, 6.5), 13, 7, 6.5, door=False)
+    _drink_komodaru(p, *at(2, 4.6), (6, 5))
+    _drink_bales(p, *at(13, 4.4), (5, 4, 3))
+    _drink_sake_shop(p, *at(-5, 2.4), 8, 5, 1)
+    for u in (22.5, 26.5):
+        _drink_drum(p, *at(u, -2.4), 2.2, 1.2, CEDAR, (0.7, -0.7), BAMBOO, True)
+    for u, v in ((5, -1.6), (5.9, -2.6)):
+        _cask_straw(p, *at(u, v))
+    return p.sprite()
+
+
+def _drink_wall(p: Painter, x: float, y: float, length: float) -> None:
+    """A compound wall `length` metres long running along the lit walls from (x, y), 2.6 m high:
+    white plaster over a namako base, capped with a little roof of dark kawara tiles."""
+    m = METRE
+    top = p.hall(*_cask_at(x, y, length / 2, 0), length * m, 0.7 * m, 2.6 * m, PLASTER, None)
+    left, front, right, _ = top
+    _sake_namako(p, left, front, length * m, (1.3 * m, 2.6 * m), 1.0)
+    _patch(p, front, right, (0, 1), (1.3 * m, 2.6 * m), shade(NAMAKO, 0.78))
+    _sake_roof(p, top, 0.5 * m)
+
+
+def _drink_gate(p: Painter, x: float, y: float, ball: float) -> None:
+    """A roofed gate 5.6 m wide standing on (x, y) in a compound wall: two stout dark posts with
+    a beam across, its leaves folded back, under a heavy gabled roof of dark kawara tiles, with a
+    great sugidama `ball` times the usual size hung from the beam in its middle."""
+    m = METRE
+    post = (58, 50, 46)
+    for u in (-2.2, 2.2):
+        for v in (0.5, -0.5):
+            _bar(
+                p,
+                _cask_at(x, y, u, v),
+                _cask_at(x, y, u, v, 4.0),
+                0.32 * m,
+                shade(post, 1.0 if v < 0 else 0.8),
+            )
+    _bar(p, _cask_at(x, y, -3.0, -0.5, 4.5), _cask_at(x, y, 3.0, -0.5, 4.5), 0.45 * m, post)
+    for u0, u1 in ((-2.5, -1.3), (1.3, 2.5)):
+        p.polygon(
+            [
+                _cask_at(x, y, u0, -0.6, 0),
+                _cask_at(x, y, u1, -0.6, 0),
+                _cask_at(x, y, u1, -0.6, 3.4),
+                _cask_at(x, y, u0, -0.6, 3.4),
+            ],
+            shade(CHARRED, 1.6),
+        )
+    roof = p.hall(*_cask_at(x, y, 0, 0, 4.9), 7.6 * m, 3.4 * m, 0.6 * m, shade(post, 0.9), None)
+    _sake_roof(p, roof, 1.8 * m)
+    bx, by = _cask_at(x, y, 0.3, -0.5, 4.5)
+    cx, cy, r = bx, by + (0.5 + 0.55 * ball) * m, 0.55 * ball * m
+    _bar(p, (bx, by), (bx, by + 0.5 * m), 0.06 * m, (60, 50, 40))
+    for a in np.linspace(0, 2 * math.pi, 18)[:-1]:
+        tx, ty = cx + r * 1.02 * math.cos(a), cy + r * 1.02 * math.sin(a)
+        p.blob(tx - 0.16 * m, ty - 0.16 * m, tx + 0.16 * m, ty + 0.16 * m, shade(SUGI, 0.8))
+    p.blob(cx - r, cy - r, cx + r, cy + r, SUGI)
+    p.blob(cx - 0.1 * m, cy - 0.05 * m, cx + r * 0.95, cy + r * 0.95, shade(SUGI, 0.82))
+    p.blob(cx - r * 0.75, cy - r * 0.75, cx + 0.05 * m, cy, shade(SUGI, 1.22))
+
+
+def mega_sake_brewery() -> Sprite:
+    """A great sake brewery behind its own wall: a tall kura storehouse two rows of windows high
+    of white plaster over a namako base under a heavy roof of dark kawara, a second kura beside
+    it, a long shop of black charred timber with an indigo noren over its door and a sugidama
+    under its eaves, stepped pyramids of red-labelled komodaru, piles of rice bales and a row of
+    great cedar vats drying on their sides in the yard, all closed by a white wall capped with
+    tiles and entered through a roofed gate hung with a great green sugidama."""
+    m = METRE
+    p = Painter(70, 50, (32, 32))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 10) * m, (v - 3) * m)
+
+    p.polygon([at(-15, -9), at(36, -9), at(36, 6), at(-15, 6)], (204, 196, 176))
+    p.shadow(22, 6, 5)
+    _drink_kura(p, *at(10, 11), 24, 8, 9.5)
+    _drink_kura(p, *at(30, 8), 11, 7, 7, door=False)
+    _drink_komodaru(p, *at(13, 5.2), (8, 7, 6, 5))
+    _drink_bales(p, *at(1, 5.2), (6, 5, 4, 3))
+    _drink_sake_shop(p, *at(-8, 1.6), 12, 6, 1)
+    for u in (22, 26, 30):
+        _drink_drum(p, *at(u, 0.6), 2.2, 1.2, CEDAR, (0.7, -0.7), BAMBOO, True)
+    _drink_komodaru(p, *at(16, -3.4), (6, 5, 4))
+    _drink_wall(p, *at(-14, -9), 22)
+    _drink_wall(p, *at(14, -9), 22)
+    _drink_gate(p, *at(11, -9), 2.2)
     return p.sprite()

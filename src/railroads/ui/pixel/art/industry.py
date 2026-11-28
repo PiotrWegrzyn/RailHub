@@ -880,12 +880,6 @@ def _skylight(
     )
 
 
-def _pipe(p: Painter, x: float, y: float, tall: float, colour: RGB = (70, 66, 64)) -> None:
-    """A thin stove pipe standing on (x, y) with a dark cap."""
-    p.rect(x - 0.5, y - tall, x + 0.5, y, colour)
-    p.line([(x - 1, y - tall), (x + 1, y - tall)], shade(colour, 0.6))
-
-
 def _stack(p: Painter, x: float, foot: float, top: float, colour: RGB) -> float:
     """A square stack two wide from `foot` up to `top`, with a light band under a dark cap,
     lowered (chimney_top); returns where its cap is."""
@@ -3118,25 +3112,6 @@ def _forge_stack(p: Painter, x: float, foot: float, top: float) -> float:
     p.rect(x - 1.5, top - 1, x + 1.5, top, (50, 40, 36))
     p.point(x, top - 1, (255, 170, 60))
     return top
-
-
-def _pagoda(p: Painter, x: float, y: float, size: float = 1) -> None:
-    """A whitewashed kiln vent on a roof at (x, y) under a flared slate pagoda cap."""
-    s = size
-    p.rect(x - 1.5 * s, y - 2 * s, x + 1.5 * s, y + 0.5, WHITEWASH)
-    p.line([(x - s, y - s), (x + s, y - s)], shade(WHITEWASH, 0.6))
-    p.polygon(
-        [
-            (x - 3 * s, y - 1.5 * s),
-            (x - s, y - 3 * s),
-            (x, y - 5 * s),
-            (x + s, y - 3 * s),
-            (x + 3 * s, y - 1.5 * s),
-        ],
-        STILL_SLATE,
-        shade(STILL_SLATE, 0.6),
-    )
-    p.point(x, y - 6 * s, (60, 60, 64))
 
 
 def _bundle(p: Painter, x: float, y: float) -> None:
