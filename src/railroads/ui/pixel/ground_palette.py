@@ -413,9 +413,7 @@ YARD_COLOURS = {
 # (railroads.ui.pixel.town_roads): setts ROAD_HALF cells either side of the road's line, a kerb
 # ROAD_KERB of it at its sides, cobbles an art pixel each way laid half a cobble along each row,
 # each its own shade, joints ROAD_JOINT of an art pixel wide once cobbles are big enough; its edge
-# wavers by ROAD_WAVER cells with noise of ROAD_WAVER_SIZE cells and softens over ROAD_SOFT. A lone
-# building's square frays into the grass by SQUARE_FRAY of its radius with noise of
-# SQUARE_FRAY_SIZE cells, softening over 1 / SQUARE_SOFT of it.
+# wavers by ROAD_WAVER cells with noise of ROAD_WAVER_SIZE cells and softens over ROAD_SOFT.
 GROWN_FROM_LAND = frozenset(kind for kind in MAKES if kind not in RECIPES)
 ROAD_SETTS = np.array((158, 150, 134), dtype=np.float32)
 ROAD_KERB_COLOUR = np.array((116, 108, 94), dtype=np.float32)
@@ -425,10 +423,7 @@ ROAD_SOFT = 0.008
 ROAD_JOINT = 0.16
 ROAD_WAVER = 0.02
 ROAD_WAVER_SIZE = 0.08
-SQUARE_FRAY = 0.25
-SQUARE_FRAY_SIZE = 0.06
-SQUARE_SOFT = 8.0
-# How far past the line of a road or the rim of a square its cobbles may reach in the picture, in
+# How far past the line of a road its cobbles may reach in the picture, in
 # art pixels.
 ROAD_REACH = 4.0
 GARDEN_LEAVES = np.array((84, 132, 52), dtype=np.float32)

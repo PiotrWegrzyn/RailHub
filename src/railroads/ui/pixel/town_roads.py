@@ -4,9 +4,7 @@ Everything that does not grow from the land (GROWN_FROM_LAND: homes, works, shop
 gets a road along the edges of its cell that the slots it stands on face
 (railroads.ui.building_spots), and two such cells side by side share a road along their common
 edge. A loose piece of road joins the nearest other piece by the shortest way round the cells, at
-most JOIN_STEPS edges, along edges with land on both sides. A building standing alone, with no
-other such building in its cell or the cells beside it, gets a small square round it instead.
-Corners of hexes are kept as whole numbers (corner_key), so the corner two cells share is the
+most JOIN_STEPS edges, along edges with land on both sides. Corners of hexes are kept as whole numbers (corner_key), so the corner two cells share is the
 same corner whichever cell it is worked out from."""
 
 import math
@@ -20,15 +18,10 @@ import numpy.typing as npt
 from railroads.sim.constructions import CELL_SPACE, Building, Constructions
 from railroads.sim.grids import HEX_RADIUS, Cell, HexGrid
 from railroads.sim.tilemap import Terrain
-from railroads.ui.building_spots import SLOT_RADIUS, first_edge
+from railroads.ui.building_spots import first_edge
 from railroads.ui.pixel.ground_palette import GROWN_FROM_LAND
 
 JOIN_STEPS = 4
-# A lone building's square: its radius in cells, and how much more for every slot it takes; its
-# middle lies SQUARE_OUT of the way from the cell's middle to the building's.
-SQUARE_RADIUS = 0.24
-SQUARE_PER_SLOT = 0.05
-SQUARE_OUT = 0.6
 
 Corner = tuple[int, int]
 Edge = tuple[Corner, Corner]
@@ -49,19 +42,17 @@ def corner_point(corner: Corner) -> tuple[float, float]:
 
 @dataclass(frozen=True)
 class Roads:
-    """Each road as a row of where it starts and ends on the plane (x0, y0, x1, y1), and each
-    square as a row of its middle on the plane and its radius."""
+    """Each road as a row of where it starts and ends on the plane (x0, y0, x1, y1)."""
 
     segments: npt.NDArray[np.float64]
-    squares: npt.NDArray[np.float64]
 
     @classmethod
     def none(cls) -> Roads:
-        return cls(np.zeros((0, 4)), np.zeros((0, 3)))
+        return cls(np.zeros((0, 4)))
 
 
 def town_roads(constructions: Constructions) -> Roads:
-    """The roads and squares of every town on the map."""
+    """The roads of every town on the map."""
     tile_map = constructions.tile_map
     grid = tile_map.grid
     if not isinstance(grid, HexGrid):
@@ -70,26 +61,18 @@ def town_roads(constructions: Constructions) -> Roads:
     for building in _roaded(constructions):
         count[building.cell] += 1
     edges: set[Edge] = set()
-    squares: list[tuple[float, float, float]] = []
     for row, col in np.argwhere(count > 0).tolist():
         cell = (row, col)
         corners = [corner_key(x, y) for x, y in grid.corners(row, col)]
-        around = grid.neighbours(row, col)
-        alone = count[cell] == 1 and not any(count[n] for n in around)
         first = 0
         for built in constructions.at(cell):
             start, first = first, first + built.space
             if not isinstance(built, Building) or built.kind in GROWN_FROM_LAND:
                 continue
-            if alone:
-                squares.append(_square(grid, cell, start, built.space))
-                continue
             for slot in range(start, start + built.space):
                 side = (slot + first_edge(row, col)) % CELL_SPACE
                 edges.add(_edge(corners[side], corners[(side + 1) % CELL_SPACE]))
-        if alone:
-            continue
-        for other in around:
+        for other in grid.neighbours(row, col):
             if count[other] and cell < other:
                 shared = set(corners) & {corner_key(x, y) for x, y in grid.corners(*other)}
                 if len(shared) == 2:
@@ -99,7 +82,7 @@ def town_roads(constructions: Constructions) -> Roads:
     segments = np.array(
         [(*corner_point(a), *corner_point(b)) for a, b in sorted(edges)], dtype=np.float64
     ).reshape(-1, 4)
-    return Roads(segments, np.array(squares, dtype=np.float64).reshape(-1, 3))
+    return Roads(segments)
 
 
 def _roaded(constructions: Constructions) -> Iterator[Building]:
@@ -110,18 +93,6 @@ def _roaded(constructions: Constructions) -> Iterator[Building]:
 
 def _edge(a: Corner, b: Corner) -> Edge:
     return (a, b) if a < b else (b, a)
-
-
-def _square(grid: HexGrid, cell: Cell, start: int, space: int) -> tuple[float, float, float]:
-    """The square round a lone building taking `space` slots from `start` in `cell`."""
-    x, y = grid.center(*cell)
-    turn = 2 * math.pi * (first_edge(*cell) - 0.5) / CELL_SPACE
-    angles = turn + 2 * math.pi * (np.arange(start, start + space) + 0.5) / CELL_SPACE
-    out = SLOT_RADIUS * SQUARE_OUT
-    if space < CELL_SPACE:
-        x += out * float(np.cos(angles).mean())
-        y += out * float(np.sin(angles).mean())
-    return float(x), float(y), SQUARE_RADIUS + SQUARE_PER_SLOT * space
 
 
 def _cells_beside(a: Corner, b: Corner, grid: HexGrid) -> tuple[Cell, Cell] | None:

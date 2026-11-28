@@ -258,8 +258,7 @@ The ideas every change to the game should follow.
 - Everything that does not grow from the land (homes, works, shops, churches, ports) gets a cobbled
   road along the edges of the sixths it stands on; such cells side by side share a road along
   their common edge, and a loose piece of road joins the rest by the shortest way round the cells.
-  A building standing alone, with no other such building in its cell or the cells beside it, gets
-  a small cobbled square round it instead of roads. Fields, farms, mines, quarries and logging camps keep their own ground and no road. Track and
+  Fields, farms, mines, quarries and logging camps keep their own ground and no road. Track and
   stations never lay a road.
 - Every kind of building is recognisable at a glance from a middle zoom and never looks like a
   house or like another kind: it shows what it is by its shape and by one subtle sign, such as a

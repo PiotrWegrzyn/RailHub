@@ -46,7 +46,6 @@ def test_two_homes_side_by_side_share_a_road_along_their_common_edge() -> None:
 
     shared = edges_of_cell(constructions, (4, 4)) & edges_of_cell(constructions, (4, 5))
     assert shared <= edges_of(roads)
-    assert len(roads.squares) == 0
 
 
 def test_a_works_gets_a_road_along_every_edge_its_slots_face() -> None:
@@ -57,22 +56,20 @@ def test_a_works_gets_a_road_along_every_edge_its_slots_face() -> None:
     assert len(edges_of_cell(constructions, (4, 4)) & edges_of(roads)) >= 3
 
 
-def test_a_building_standing_alone_gets_a_square_and_no_road() -> None:
+def test_a_building_standing_alone_gets_a_road_along_the_edges_its_slots_face() -> None:
     constructions = built(((4, 4), BuildingKind.FACTORY))
 
     roads = town_roads(constructions)
 
-    assert len(roads.segments) == 0
-    assert len(roads.squares) == 1
+    assert len(edges_of_cell(constructions, (4, 4)) & edges_of(roads)) >= 3
 
 
-def test_what_grows_from_the_land_gets_no_road_and_no_square() -> None:
+def test_what_grows_from_the_land_gets_no_road() -> None:
     constructions = built(((4, 4), BuildingKind.MINE), ((4, 5), BuildingKind.MINE))
 
     roads = town_roads(constructions)
 
     assert len(roads.segments) == 0
-    assert len(roads.squares) == 0
 
 
 def test_loose_pieces_of_road_join_round_the_cells(monkeypatch: pytest.MonkeyPatch) -> None:

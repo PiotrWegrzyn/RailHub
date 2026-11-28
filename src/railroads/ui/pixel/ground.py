@@ -143,9 +143,6 @@ from railroads.ui.pixel.ground_palette import (
     SPARKLE_FACING,
     SPARKLE_MIX,
     SPARKLE_SHARE,
-    SQUARE_FRAY,
-    SQUARE_FRAY_SIZE,
-    SQUARE_SOFT,
     STAND_SPAN,
     THIN_SPAN,
     THINNED,
@@ -509,9 +506,9 @@ class Ground:
         return np.stack([self._woods, self._land.astype(np.float32)], axis=-1)
 
     @property
-    def road_boxes(self) -> tuple[FloatArray, FloatArray]:
-        """The box each road and each square of the town roads covers in the picture, as rows
-        of left, top, right and bottom in art pixels."""
+    def road_boxes(self) -> FloatArray:
+        """The box each of the town roads covers in the picture, as rows of left, top, right
+        and bottom in art pixels."""
         return self._road_boxes
 
     @property
@@ -736,15 +733,14 @@ class Ground:
     def _lay_roads(
         self, canvas: FloatArray, left: int, top: int, k: int, shown: BoolArray | None
     ) -> None:
-        """Lays the cobbled roads of towns and the squares round lone buildings
-        (railroads.ui.pixel.town_roads) over a picture of the ground from (`left`, `top`), `k`
+        """Lays the cobbled roads of towns (railroads.ui.pixel.town_roads) over a picture of the ground from (`left`, `top`), `k`
         pixels to an art pixel, off the minor rivers, on land."""
         rows, cols = canvas.shape[0] // k, canvas.shape[1] // k
-        segments, squares = near_roads(self.roads, self._road_boxes, (left, top), (cols, rows))
-        if not len(segments) and not len(squares):
+        segments = near_roads(self.roads, self._road_boxes, (left, top), (cols, rows))
+        if not len(segments):
             return
         x, y, flat, ix, iy = self._patch_points((0, rows * k, 0, cols * k), left, top, k, None)
-        cover, kerb = road_cover(x, y, segments, squares)
+        cover, kerb = road_cover(x, y, segments)
         if not (cover > 0).any():
             return
         cover *= _on_map(canvas, shown)
@@ -1363,12 +1359,12 @@ def _shrunk(inside: BoolArray) -> BoolArray:
     return both
 
 
-def _road_boxes(roads: Roads, projection: PixelProjection) -> tuple[FloatArray, FloatArray]:
-    """The box each road and square covers in the picture (Ground.road_boxes)."""
+def _road_boxes(roads: Roads, projection: PixelProjection) -> FloatArray:
+    """The box each road covers in the picture (Ground.road_boxes)."""
     ax, ay = projection.to_pixels(roads.segments[:, 0], roads.segments[:, 1])
     bx, by = projection.to_pixels(roads.segments[:, 2], roads.segments[:, 3])
     reach = ROAD_REACH
-    lines = np.stack(
+    return np.stack(
         [
             np.minimum(ax, bx) - reach,
             np.minimum(ay, by) - reach,
@@ -1377,41 +1373,28 @@ def _road_boxes(roads: Roads, projection: PixelProjection) -> tuple[FloatArray, 
         ],
         axis=-1,
     ).reshape(-1, 4)
-    x, y, radius = roads.squares[:, 0], roads.squares[:, 1], roads.squares[:, 2]
-    corners = [projection.to_pixels(x + dx * radius, y + dy * radius) for dx, dy in _SQUARE_RIM]
-    xs = np.stack([cx for cx, _ in corners])
-    ys = np.stack([cy for _, cy in corners])
-    squares = np.stack(
-        [xs.min(0) - reach, ys.min(0) - reach, xs.max(0) + reach, ys.max(0) + reach], axis=-1
-    ).reshape(-1, 4)
-    return lines, squares
-
-
-_SQUARE_RIM = ((-1, -1), (1, -1), (-1, 1), (1, 1))
 
 
 def near_roads(
     roads: Roads,
-    boxes: tuple[FloatArray, FloatArray],
+    boxes: FloatArray,
     origin: tuple[int, int],
     size: tuple[int, int],
-) -> tuple[FloatArray, FloatArray]:
-    """The roads and squares whose boxes (Ground.road_boxes) reach the art pixels `size` across
+) -> FloatArray:
+    """The roads whose boxes (Ground.road_boxes) reach the art pixels `size` across
     and down from `origin`."""
     left, top = origin
     right, bottom = left + size[0], top + size[1]
 
-    def overlapping(box: FloatArray) -> npt.NDArray[np.bool_]:
-        return (box[:, 0] < right) & (box[:, 2] > left) & (box[:, 1] < bottom) & (box[:, 3] > top)
-
-    lines, squares = boxes
-    return roads.segments[overlapping(lines)], roads.squares[overlapping(squares)]
+    near = (boxes[:, 0] < right) & (boxes[:, 2] > left)
+    near &= (boxes[:, 1] < bottom) & (boxes[:, 3] > top)
+    return roads.segments[near]
 
 
 def road_cover(
-    x: FloatArray, y: FloatArray, segments: FloatArray, squares: FloatArray
+    x: FloatArray, y: FloatArray, segments: FloatArray
 ) -> tuple[FloatArray, npt.NDArray[np.bool_]]:
-    """How fully the roads and squares cover each plane point, and where their kerb lies."""
+    """How fully the roads cover each plane point, and where their kerb lies."""
     distance = np.full(x.shape, np.inf)
     for x0, y0, x1, y1 in segments.tolist():
         dx, dy = x1 - x0, y1 - y0
@@ -1421,14 +1404,6 @@ def road_cover(
     waver = (noise(fx, fy, ROAD_WAVER_SIZE, 95) - 0.5) * ROAD_WAVER
     cover = np.clip((ROAD_HALF + waver - distance) / ROAD_SOFT, 0, 1)
     kerb = distance > ROAD_HALF + waver - ROAD_KERB
-    if len(squares):
-        reach = np.full(x.shape, np.inf)
-        for sx, sy, radius in squares.tolist():
-            np.minimum(reach, np.hypot(x - sx, y - sy) / radius, out=reach)
-        fray = (noise(fx, fy, SQUARE_FRAY_SIZE, 96) - 0.5) * SQUARE_FRAY
-        square = np.clip((1 - reach + fray) * SQUARE_SOFT, 0, 1)
-        kerb &= square < 0.5
-        cover = np.maximum(cover, square)
     return cover.astype(np.float32), kerb
 
 

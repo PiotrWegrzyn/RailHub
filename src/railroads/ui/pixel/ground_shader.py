@@ -235,7 +235,7 @@ class GroundShader:
         self._trees = np.zeros((0, 2), dtype=np.float32)
         self._clearings = np.zeros((0, 4), dtype=np.float32)
         self._roads = cpu.Roads.none()
-        self._road_boxes = (np.zeros((0, 4)), np.zeros((0, 4)))
+        self._road_boxes = np.zeros((0, 4))
         self._plots = np.zeros((0, 10), dtype=np.float32)
         self._yards = np.zeros((0, 4), dtype=np.float32)
         self.surfaces_version: object = None
@@ -506,7 +506,7 @@ class GroundShader:
         plots = _near(self._plots, (left, top), chunk_size, PLOT_REACH)[:, 2:]
         yards = self._yards
         yards = _near(yards, (left, top), chunk_size, float(yards[:, 2].max(initial=0.0)) + 1)
-        roads, squares = cpu.near_roads(self._roads, self._road_boxes, (left, top), chunk_size)
+        roads = cpu.near_roads(self._roads, self._road_boxes, (left, top), chunk_size)
         uniforms = self._ground_uniforms(View(left, top, CHUNK, rows)) | {
             "chunk_origin": ("2i", (left, top)),
             "k": ("1i", (drawn,)),
@@ -519,30 +519,26 @@ class GroundShader:
             "plots": ("1i", (6,)),
             "yards": ("1i", (7,)),
             "road_count": ("1i", (len(roads),)),
-            "square_count": ("1i", (len(squares),)),
             "roads": ("1i", (8,)),
-            "squares": ("1i", (9,)),
-            "woodland": ("1i", (10,)),
+            "woodland": ("1i", (9,)),
         }
         if self._chunk_plots:
             GL.glDeleteTextures(1, [self._chunk_plots])
         self._chunk_plots = _floats(_columns(plots))
         listed = _floats(_row(yards))
         lines = _floats(_row(roads.astype(np.float32)))
-        rims = _floats(_row(np.pad(squares, ((0, 0), (0, 1))).astype(np.float32)))
         textures = (
             self._wooded.texture,
             self._edges.texture,
             self._chunk_plots,
             listed,
             lines,
-            rims,
             self._woodland,
         )
         inputs = (self._cells, self._light, self._table, self._chunk_relief.texture, *textures)
         self._run(self._canopy, self._programs.canopy, uniforms | {"mode": ("1i", (0,))}, inputs)
         self._run(self._groves, self._programs.canopy, uniforms | {"mode": ("1i", (1,))}, inputs)
-        GL.glDeleteTextures(3, [listed, lines, rims])
+        GL.glDeleteTextures(2, [listed, lines])
 
     def dress_onto(self, target: RenderTarget, chunk: tuple[int, int], k: int, times: int) -> None:
         """Draws what `lay_surfaces` worked out for a chunk into `target`, premultiplied by its

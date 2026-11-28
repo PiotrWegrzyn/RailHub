@@ -1139,10 +1139,10 @@ vec3 road_colour(ivec2 pixel) {
     return colour * (0.95 + 0.08 * table_hash(pixel.x, pixel.y, 94));
 }
 
-// Lays the cobbled roads near the chunk and the squares round lone buildings at picture point
-// `q`, off the minor rivers, on land (Ground._lay_roads, road_cover).
+// Lays the cobbled roads near the chunk at picture point `q`, off the minor rivers, on land
+// (Ground._lay_roads, road_cover).
 void lay_roads(vec2 q, ivec2 texel, inout vec4 layer) {
-    if (road_count == 0 && square_count == 0) return;
+    if (road_count == 0) return;
     vec2 p = to_plane * (q + projection_origin);
     float distance = 1e9;
     for (int i = 0; i < road_count; i++) {
@@ -1154,17 +1154,6 @@ void lay_roads(vec2 q, ivec2 texel, inout vec4 layer) {
     float waver = (@N_WAVER@ - 0.5) * @ROAD_WAVER@;
     float cover = clamp((@ROAD_HALF@ + waver - distance) / @ROAD_SOFT@, 0.0, 1.0);
     bool kerb = distance > @ROAD_HALF@ + waver - @ROAD_KERB@;
-    if (square_count > 0) {
-        float reach = 1e9;
-        for (int i = 0; i < square_count; i++) {
-            vec4 square = texelFetch(squares, ivec2(i, 0), 0);
-            reach = min(reach, length(p - square.xy) / square.z);
-        }
-        float fray = (@N_SQUARE_FRAY@ - 0.5) * @SQUARE_FRAY@;
-        float paved = clamp((1.0 - reach + fray) * @SQUARE_SOFT@, 0.0, 1.0);
-        kerb = kerb && paved < 0.5;
-        cover = max(cover, paved);
-    }
     if (cover <= 0.0 || on_stream(p)) return;
     ivec2 cell = clamp(cell_at(p), ivec2(0), cells_size - 1);
     if (texelFetch(woodland, cell, 0).g < 0.5) return;
@@ -1241,8 +1230,6 @@ uniform highp sampler2D yards;
 uniform int yard_count;
 uniform highp sampler2D roads;
 uniform int road_count;
-uniform highp sampler2D squares;
-uniform int square_count;
 uniform highp sampler2D woodland;
 uniform ivec2 relief_origin;
 uniform vec4 slope;
@@ -1920,9 +1907,6 @@ def _fields_names() -> dict[str, str]:
         "ROAD_SOFT": glsl_number(cpu.ROAD_SOFT),
         "ROAD_WAVER": glsl_number(cpu.ROAD_WAVER),
         "N_WAVER": _noise(cpu.ROAD_WAVER_SIZE, 95),
-        "SQUARE_FRAY": glsl_number(cpu.SQUARE_FRAY),
-        "SQUARE_SOFT": glsl_number(cpu.SQUARE_SOFT),
-        "N_SQUARE_FRAY": _noise(cpu.SQUARE_FRAY_SIZE, 96),
     }
 
 
