@@ -1217,9 +1217,9 @@ void lay_yards(ivec2 texel, inout vec4 layer) {
 
 
 # The woods over a chunk, unraised, as Ground.canopy paints them over the shade of trees, `k`
-# pixels to an art pixel (one or FINE): a roof of lit crowns, the dark side of the trees along its
-# lower edge and their shadow on the ground beside them; finer than an art pixel to a pixel,
-# crowns show their clumps of leaves and reach past the woods' edge, and the front row its
+# pixels to an art pixel (one, FINE or FINEST): a roof of lit crowns, the dark side of the trees
+# along its lower edge and their shadow on the ground beside them; finer than an art pixel to a
+# pixel, crowns show their clumps of leaves and reach past the woods' edge, and the front row its
 # trunks. RGBA multiplied by alpha.
 CANOPY = """out vec4 colour;
 uniform ivec2 chunk_origin;
