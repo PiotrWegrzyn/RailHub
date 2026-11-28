@@ -262,3 +262,18 @@ def test_zooming_in_shows_a_chunks_last_picture_until_it_is_drawn_for_the_new_zo
     imgui.destroy_context(gui)
     assert not complete
     assert layer._shown_before(mountains) is not None
+
+
+def test_textures_shown_on_this_frame_are_kept_even_beyond_the_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world, mountains, plains = world_over_mountains()
+    layer = PixelLayer(world, threads=False)
+    shown, old = FakeTexture(), FakeTexture()
+    layer._textures[(*plains, 2)] = old
+    layer._textures[(*mountains, 2)] = shown
+    monkeypatch.setattr(layer_module, "TEXTURE_BUDGET", 1)
+
+    layer._let_go({id(shown)})
+
+    assert list(layer._textures) == [(*mountains, 2)]

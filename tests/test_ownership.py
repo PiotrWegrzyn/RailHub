@@ -275,6 +275,17 @@ def test_the_flags_mark_every_cell_owned_and_whether_the_player_controls_it() ->
     assert flags == [((5, 5), True), ((7, 7), False)]
 
 
+def test_the_flags_follow_shares_bought_after_they_were_last_asked_for() -> None:
+    growth = grown(((5, 5), BuildingKind.FARM), ((7, 7), BuildingKind.FARM))
+    growth.owners.own((5, 5), BuildingKind.FARM, 100)
+    growth.owners.flags()
+
+    growth.owners.own((5, 5), BuildingKind.FARM, 500)
+    growth.owners.own((7, 7), BuildingKind.FARM, 100)
+
+    assert growth.owners.flags() == [((5, 5), True), ((7, 7), False)]
+
+
 @pytest.mark.parametrize(("shares", "taking"), [(500, 0.0), (600, 1.0)])
 def test_limestone_is_taken_only_by_a_farm_the_player_controls_and_then_by_all_of_it(
     shares: int, taking: float

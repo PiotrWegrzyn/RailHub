@@ -206,6 +206,7 @@ class PixelLayer:
         waiting = ground_below and self._moved(camera, now, pointer)
         uploaded = False
         complete = True
+        shown: set[int] = set()
         for chunk in middle_out(placement, center):
             key = (*chunk, scale)
             fine = self._resolution_of(chunk, resolution)
@@ -231,11 +232,23 @@ class PixelLayer:
                 self._textures.move_to_end(key)
             top_left, bottom_right = placement.screen_rect(chunk)
             draw_list.add_image(imgui.ImTextureRef(texture.texture_id()), top_left, bottom_right)
-        while len(self._textures) > 1 and self._texture_bytes() > TEXTURE_BUDGET:
-            self._stale.discard(self._textures.popitem(last=False)[0])
+            shown.add(id(texture))
+        self._let_go(shown)
         if not self._painter.threaded and not waiting:
             self._painter.work_once(now)
         return complete and not self._painter.waiting()
+
+    def _let_go(self, shown: set[int]) -> None:
+        """Lets go of the textures shown longest ago while they take more than TEXTURE_BUDGET,
+        but never one shown on this frame (`shown`, by id): up close a chunk's texture is so big
+        that those on screen alone can take more than the budget, and letting one go would only
+        make it again on the next frame, and the next."""
+        for key in list(self._textures):
+            if len(self._textures) <= 1 or self._texture_bytes() <= TEXTURE_BUDGET:
+                return
+            if id(self._textures[key]) not in shown:
+                del self._textures[key]
+                self._stale.discard(key)
 
     def prepare(
         self,
