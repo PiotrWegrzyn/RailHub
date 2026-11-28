@@ -320,9 +320,9 @@ UNLOCKS: Mapping[tuple[BuildingKind, Need], tuple[Tile, int]] = MappingProxyType
     }
 )
 # The demand level of a tile from which a kind of works comes up: cola bottling plants once homes
-# start to want cola.
+# start to want cola, saddlers once homes want more of what is made of textiles and leather.
 KIND_OPENED_BY: Mapping[BuildingKind, tuple[Tile, int]] = MappingProxyType(
-    {K.COLA_BOTTLER: UNLOCKS[(K.HOUSE, Need.COLA)]}
+    {K.COLA_BOTTLER: UNLOCKS[(K.HOUSE, Need.COLA)], K.SADDLER: (T.HOUSEHOLD, 7)}
 )
 
 

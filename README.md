@@ -690,6 +690,7 @@ window (H) lists the same.
 | Carpet weaver (1700) | 3 luxury goods | 12 fibre |  |
 | Clock maker (1880) | 3 luxury goods | 6 copper (from era 4), 3 glass |  |
 | Mirror maker (1700) | 3 luxury goods | 6 glass, 0.3 gold |  |
+| Saddler | 3 luxury goods | 12 leather |  |
 | Manor |  | 60 food, 6 heating, 6 wine, 2 luxury goods (from 1700) | 3 furniture, 3 cola (from food and drink demand 13) |
 | Theatre |  | 6 clothes (from 1780), 3 glass, 3 paper (from 1150) | 3 wax, 1 luxury goods (from 1700) |
 | Hospital (1850) |  | 30 food, 3 heating, 6 chemicals (from era 3), 3 glass | 6 wax |
@@ -714,6 +715,8 @@ window (H) lists the same.
 | Mega clock maker (1880) | 18.75 luxury goods | 37.5 copper (from era 4), 18.75 glass |  |
 | Big mirror maker (1700) | 7.5 luxury goods | 15 glass, 0.75 gold |  |
 | Mega mirror maker (1700) | 18.75 luxury goods | 37.5 glass, 1.875 gold |  |
+| Big saddler | 7.5 luxury goods | 30 leather |  |
+| Mega saddler | 18.75 luxury goods | 75 leather |  |
 | Military outpost (1800) |  | 35 guns (from era 3), 20 cars (from era 4), 12 clothes (from 1780), 12 shoes (from 1850) |  |
 | Military base (1800) |  | 110 guns (from era 3), 60 cars (from era 4), 20 planes (from era 5), 36 clothes (from 1780), 36 shoes (from 1850) |  |
 | Headquarters (1800) |  | 300 guns (from era 3), 110 cars (from era 4), 60 planes (from era 5), 60 tanks (from era 5), 100 clothes (from 1780), 100 shoes (from 1850) |  |
@@ -761,7 +764,7 @@ Steel mills, canneries, factories, shipyards and every works are processors: eac
 months of every input it uses at most for every building, takes in what reaches it even while it
 waits for another input, and works from it. A processor dies out only once nothing has reached it
 for thirty years (brickworks, breweries, distilleries, potters, glassworks, textile mills,
-coopers, gasworks, tile works and carpet weavers 250, the other rare crafts 50) and its stockpile is empty, so a steel mill with
+coopers, gasworks, tile works, carpet weavers and saddlers 250, the other rare crafts 50) and its stockpile is empty, so a steel mill with
 coal but no iron stands on. Nothing is made that has nowhere to go: a building makes only what a
 buyer takes, and a processor uses up only the inputs for what it made, so a steel mill with no
 one to take its steel keeps its iron ore and coal waiting. Needs are handed out in the order of

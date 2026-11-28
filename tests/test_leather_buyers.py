@@ -2,6 +2,8 @@ import pytest
 
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.goods import Need
+from railroads.sim.growth import ladder_open
+from railroads.sim.ladders import LADDERS
 from railroads.sim.tiles import Tile, Tiles, activate, of_year
 from railroads.sim.yearly import boosts_of, needs_of
 
@@ -51,3 +53,13 @@ def test_soldiers_wear_clothes_and_shoes_beside_their_arms(kind: BuildingKind) -
     needs = needs_of(kind, 1900)
 
     assert {Need.CLOTHES, Need.SHOES} <= set(needs)
+
+
+def test_saddlers_come_up_only_once_textiles_and_household_demand_reaches_level_7() -> None:
+    activate(Tiles.until(2050))
+    opened = first_year_at(Tile.HOUSEHOLD, 7)
+    ladder = next(ladder for ladder in LADDERS if ladder.kinds[0] == BuildingKind.SADDLER)
+
+    states = [ladder_open(ladder, year) for year in (opened - 1, opened)]
+
+    assert states == [False, True]

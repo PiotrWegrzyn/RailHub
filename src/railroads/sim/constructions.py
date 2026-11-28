@@ -117,6 +117,7 @@ class BuildingKind(Keyed):
     CARPET_WEAVER = "carpet weaver"
     CLOCK_MAKER = "clock maker"
     MIRROR_MAKER = "mirror maker"
+    SADDLER = "saddler"
     MANOR = "manor"
     THEATRE = "theatre"
     HOSPITAL = "hospital"
@@ -181,6 +182,8 @@ class BuildingKind(Keyed):
     MEGA_CLOCK_MAKER = "mega clock maker"
     BIG_MIRROR_MAKER = "big mirror maker"
     MEGA_MIRROR_MAKER = "mega mirror maker"
+    BIG_SADDLER = "big saddler"
+    MEGA_SADDLER = "mega saddler"
     BIG_GUN_FACTORY = "big gun factory"
     MEGA_GUN_FACTORY = "mega gun factory"
     BIG_TANK_FACTORY = "big tank factory"
@@ -317,6 +320,7 @@ BUILDING_RULES: dict[BuildingKind, BuildingRules] = {
             BuildingKind.CARPET_WEAVER,
             BuildingKind.CLOCK_MAKER,
             BuildingKind.MIRROR_MAKER,
+            BuildingKind.SADDLER,
         )
     },
     # Ports fill their cell with their yard and quay (railroads.ui.pixel.art.ports).
