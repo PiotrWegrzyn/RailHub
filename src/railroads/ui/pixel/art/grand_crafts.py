@@ -6,20 +6,49 @@ works and great engine halls of machine works under gantry cranes."""
 
 import math
 
+from railroads.ui.pixel.art.commerce import _lamp_post
 from railroads.ui.pixel.art.crafts import (
     BUCKLE,
-    HARNESS,
+    GILT,
     SADDLE,
     SADDLE_TAN,
+    SADDLER_BAY,
+    SADDLER_BRICK,
+    SADDLER_COBBLES,
+    SADDLER_GLASS,
+    SADDLER_GREEN,
+    SADDLER_IRON,
+    SADDLER_LACQUER,
+    SADDLER_LAMPLIT,
+    SADDLER_PAVING,
     SADDLER_SIGN,
-    _collar,
-    _saddle,
+    SADDLER_SLATE,
+    SADDLER_STONE,
+    SADDLER_STUCCO,
+    SADDLER_TILE,
+    _broken_roof,
+    _saddle_arcade,
+    _saddle_balconette,
+    _saddle_bench_window,
+    _saddle_bridles,
+    _saddle_carriage,
+    _saddle_collar,
+    _saddle_cupola,
+    _saddle_display,
+    _saddle_head,
+    _saddle_horse,
+    _saddle_sash,
+    _saddle_stable_door,
+    _saddle_stack,
+    _saddle_trestle,
+    _saddle_trough,
 )
 from railroads.ui.pixel.art.industry import (
     BUNDLE,
     FRAME,
     GLAZING,
     JOINER_WALL,
+    OXBLOOD,
     SMOKE,
     SOIL,
     _anvil,
@@ -42,11 +71,13 @@ from railroads.ui.pixel.art.industry import (
     _puddle,
     _ring,
     _roof_rows,
+    _round_head,
     _sawtooth,
     _skylight,
     _smoke,
     _smoking_chimney,
     _spill,
+    _spoked_wheel,
     _spool,
     _stack,
     _stains,
@@ -66,15 +97,22 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    METRE,
     _band,
     _bands,
+    _bar,
     _barrel,
     _flag,
+    _gable_across,
     _heap,
+    _iso,
     _on_wall,
     _patch,
     _plinth,
+    _ridge,
+    _tiles,
     _turned,
+    _vault,
     _windows,
 )
 
@@ -1455,131 +1493,498 @@ def mega_machine_works() -> Sprite:
     return p.sprite()
 
 
-SADDLER_WALL: RGB = (222, 206, 178)
-SADDLER_ROOF: RGB = (92, 60, 48)
-CARRIAGE: RGB = (34, 32, 36)
-HORSE: RGB = (112, 72, 44)
-
-
-def _leather_house(
-    p: Painter, x: float, y: float, length: float, depth: float, height: float
-) -> Top:
-    """A cream saddlery with a saddle-brown sign studded with brass along under its eaves."""
-    top = p.hall(x, y, length, depth, height, SADDLER_WALL, None)
-    left, front, right, _ = top
-    _patch(p, left, front, (0, 1), (0.4, 1.8), SADDLER_SIGN)
-    _patch(p, front, right, (0, 1), (0.4, 1.8), shade(SADDLER_SIGN, 0.78))
-    for t in (0.2, 0.4, 0.6, 0.8):
-        p.point(*_on_wall(left, front, t, 1.1), BUCKLE)
-    return top
-
-
 def big_saddler() -> Sprite:
-    """A long two-storey saddlery of cream walls under a brown roof and a saddle-brown sign with
-    brass studs, a shop window of saddles and bags, collars hung by its doors, a workshop shed
-    behind, saddles on trestles out in the yard and rolled hides by the door."""
-    p = Painter(50, 44, (24, 32))
-    foot = _footing(4, -1, 18, 8)
-    _bed(p, foot, SOIL, 1)
-    p.shadow(14, 4)
-    shed = p.hall(12, -8, 10, 6, 5, shade(SADDLER_WALL, 0.9), None)
-    _sawtooth(p, shed, 3, 3, SADDLER_ROOF, GLAZING, shade(SADDLER_WALL, 0.9))
-    _track(p, foot[0], foot[1], (0.8, 0.94), 3, (190, 172, 136), ruts=False)
-    top = _leather_house(p, 4, -1, 18, 8, 11)
+    """A whole saddlery round a cobbled stable yard. At its back a saddle-tan stucco house of
+    two storeys and an attic, 22 by 10 m, under a tiled roof between brick gable stacks: an
+    oxblood shopfront with brass rails and lamplit windows of saddles at one end, big windows
+    over the benches of the stitching and cutting rooms along the rest, and a black horse collar
+    with brass hames hung over the yard on an iron bracket. Along the yard's side a brick stable
+    block under slate with a louvred ventilator on its ridge, horses looking out over its
+    oxblood half doors, and at its end the harness room, its gable to the street, with bridles
+    and collars hung on pegs under a little pent roof. In the yard a bay is being saddled at a
+    post, saddles stand on trestles, a stone trough and pump, and sides of leather are stacked
+    at the workshop door."""
+    m = METRE
+    p = Painter(54, 32, (27, 21))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 17) * m, (v - 4.5) * m)
+
+    def up(u: float, v: float, z: float) -> Point:
+        x, y = at(u, v)
+        return x, y - z * m
+
+    p.polygon([at(8, -7.5), at(31, -7.5), at(31, 10), at(8, 10)], SADDLER_COBBLES)
+    for k in range(1, 9):
+        v = -7.5 + 17.5 * k / 9
+        _bar(p, at(8, v), at(31, v), 0.05 * m, shade(SADDLER_COBBLES, 0.86))
+    _bar(p, at(19, -7.5), at(19, 10), 0.6 * m, shade(SADDLER_COBBLES, 0.8))
+    p.shadow(19, 6, 3)
+    wall, high, rise = SADDLER_STUCCO, 8.4 * m, 4.4 * m
+    _saddle_stack(p, *up(8.6, 15, 8.4 + 2.6), 1.4 * m, 4.4 * m, SADDLER_BRICK)
+    foot = _footing(*at(19.5, 15), 23 * m, 10 * m)
+    _bed(p, foot, margin=0.6)
+    top = p.hall(*at(19.5, 15), 23 * m, 10 * m, high, wall, None)
     left, front, right, _ = top
-    for t in (0.12, 0.32, 0.52):
-        _window(p, left, front, (t - 0.06, t + 0.06), 3, shade(WINDOW, 0.95), 2.4)
-    _patch(p, left, front, (0.05, 0.7), (7.4, 9.6), shade(WINDOW, 0.9))
-    for k, t in enumerate((0.15, 0.3, 0.45, 0.6)):
-        p.point(*_on_wall(left, front, t, 8.6), (SADDLE, SADDLE_TAN)[k % 2])
-    _door(p, left, front, (0.8, 0.94), 6.5, 11, SADDLER_SIGN)
-    _window(p, front, right, (0.3, 0.7), 3, shade(WINDOW, 0.8))
-    _window(p, front, right, (0.3, 0.7), 7, shade(WINDOW, 0.8))
-    p.gable(top, 5, SADDLER_ROOF, SADDLER_WALL)
-    _roof_rows(p, top, 5, SADDLER_ROOF)
-    x, y = _on_roof(top, 5, 0.3, 0.9)
-    p.rect(x - 1, y - 3, x, y, BRICK)
-    cx, cy = _on_wall(left, front, 0.74, 7)
-    _collar(p, cx, cy)
-    for k, (x, y) in enumerate(((-19, 1), (-14.5, 3.5), (-10, 6), (-15, 7.5))):
-        _saddle(p, x, y, (SADDLE, SADDLE_TAN)[k % 2])
-    for k, (x, y) in enumerate(((10, 9), (12, 8), (11, 6.8))):
-        _rolled(p, x, y, (SADDLE, SADDLE_TAN, shade(SADDLE, 0.8))[k])
+    length = 23 * m
+    _plinth(p, top, high, wall, 0.6 * m)
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
+        _patch(p, a, b, (0, 1), (0, 0.35 * m), shade(SADDLER_STONE, tone))
+        _patch(p, a, b, (0, 1), (high - 4.3 * m, high - 4.05 * m), shade(SADDLER_STONE, tone))
+    for k, u in enumerate((2.0, 5.6, 9.2)):
+        _saddle_bench_window(
+            p,
+            left,
+            front,
+            length,
+            u / 23,
+            2.6 * m,
+            (high - 3.4 * m, high - 0.8 * m),
+            (SADDLE, SADDLE_TAN)[k % 2],
+        )
+        _saddle_bench_window(
+            p,
+            left,
+            front,
+            length,
+            u / 23,
+            2.6 * m,
+            (0.9 * m, high - 5.0 * m),
+            (SADDLE_TAN, SADDLE)[k % 2],
+        )
+    t0, t1 = 12.2 / 23, 22.4 / 23
+    _patch(p, left, front, (t0, t1), (high - 4.0 * m, high), OXBLOOD)
+    _patch(p, left, front, (t0, t1), (high - 4.0 * m, high - 3.3 * m), shade(OXBLOOD, 1.15))
+    for k in range(12):
+        t = t0 + 0.02 + 0.033 * k
+        _patch(p, left, front, (t, t + 0.018), (high - 3.8 * m, high - 3.5 * m), BUCKLE)
+    _bar(
+        p,
+        _on_wall(left, front, t0, high - 4.0 * m),
+        _on_wall(left, front, t1, high - 4.0 * m),
+        0.1 * m,
+        BUCKLE,
+    )
+    _saddle_display(
+        p, left, front, length, (t0 + 0.02, t0 + 0.17), (high - 3.1 * m, high - 0.75 * m), 0
+    )
+    _saddle_display(
+        p, left, front, length, (t1 - 0.17, t1 - 0.02), (high - 3.1 * m, high - 0.75 * m), 1
+    )
+    tm = (t0 + t1) / 2
+    _patch(p, left, front, (tm - 0.04, tm + 0.04), (high - 3.1 * m, high), shade(OXBLOOD, 0.8))
+    _patch(
+        p, left, front, (tm - 0.03, tm + 0.03), (high - 2.9 * m, high - 1.7 * m), SADDLER_LAMPLIT
+    )
+    for u in (13.4, 16.0, 19.8, 22.0):
+        _saddle_sash(p, left, front, length, u / 23, (0.8 * m, 3.4 * m), 1.0)
+    for t in (0.3, 0.7):
+        _saddle_sash(p, front, right, 10 * m, t, (0.8 * m, 3.4 * m), 0.78)
+        _saddle_sash(p, front, right, 10 * m, t, (high - 3.2 * m, high - 0.9 * m), 0.78)
+    p.gable(top, rise, SADDLER_TILE, wall)
+    _tiles(p, top, rise, SADDLER_TILE, (0.2, 0.4, 0.6, 0.8))
+    for along in (0.22, 0.5, 0.78):
+        dx, dy = _on_roof(top, rise, along, 0.35)
+        dormer = p.hall(dx, dy + 0.4 * m, 1.8 * m, 1.6 * m, 1.6 * m, wall, None)
+        _patch(p, dormer[0], dormer[1], (0.22, 0.78), (0.3 * m, 1.4 * m), shade(WINDOW, 1.05))
+        _gable_across(p, dormer, 0.9 * m, SADDLER_TILE, wall)
+    _saddle_stack(p, *up(30.6, 15, 8.4 + 2.2), 1.4 * m, 4.4 * m, SADDLER_BRICK)
+    bx, by = _on_wall(left, front, 11.3 / 23, 1.0 * m)
+    tip = _iso(bx, by, 0, -1.8 * m)
+    _bar(p, (bx, by), tip, 0.12 * m, SADDLER_IRON)
+    _bar(p, (bx, by + 0.6 * m), _iso(bx, by, 0, -0.9 * m), 0.08 * m, SADDLER_IRON)
+    _saddle_collar(p, tip[0], tip[1] + 0.1 * m, wall, 2.0)
+    stable_wall = SADDLER_BRICK
+    stable = p.hall(*at(4, 2), 8 * m, 18 * m, 4.6 * m, stable_wall, None)
+    st_left, st_front, st_right, _ = stable
+    _plinth(p, stable, 4.6 * m, stable_wall, 0.5 * m)
+    for a, b, tone in ((st_left, st_front, 1.0), (st_front, st_right, 0.78)):
+        _patch(p, a, b, (0, 1), (0, 0.3 * m), shade(SADDLER_STONE, tone))
+    for t, coat in (
+        (0.38, (70, 46, 34)),
+        (0.56, None),
+        (0.74, (196, 168, 126)),
+        (0.92, (40, 34, 32)),
+    ):
+        _saddle_stable_door(p, st_front, st_right, 18 * m, t, 4.6 * m, coat, 0.78)
+    _patch(p, st_front, st_right, (0.06, 0.16), (1.6 * m, 4.6 * m), (34, 28, 26))
+    _saddle_bridles(p, st_front, st_right, (0.17, 0.25), 1.2 * m, 3)
+    for t in (0.275, 0.315):
+        _saddle_collar(
+            p, *_on_wall(st_front, st_right, t, 1.1 * m), shade(SADDLER_BRICK, 0.78), 1.3
+        )
+    eave = [_on_wall(st_front, st_right, t, 0.7 * m) for t in (0.16, 0.34)]
+    p.polygon(
+        [eave[0], eave[1], _iso(*eave[1], 1.0 * m, 0), _iso(*eave[0], 1.0 * m, 0)],
+        shade(SADDLER_SLATE, 1.1),
+        shade(SADDLER_SLATE, 0.6),
+    )
+    for e in eave:
+        _bar(
+            p,
+            (e[0] + 1.0 * m, e[1] + 0.5 * m),
+            (e[0] + 1.0 * m, e[1] + 3.9 * m),
+            0.1 * m,
+            SADDLER_SIGN,
+        )
+    _saddle_sash(p, st_left, st_front, 8 * m, 0.5, (1.0 * m, 3.0 * m), 1.0)
+    _gable_across(p, stable, 3.4 * m, SADDLER_SLATE, stable_wall)
+    _patch(p, st_left, st_front, (0.4, 0.6), (-2.0 * m, -0.4 * m), shade(OXBLOOD, 0.9))
+    cx, cy = _on_wall(
+        _on_wall(st_left, st_front, 0.5, -3.4 * m),
+        _on_wall(stable[3], st_right, 0.5, -3.4 * m),
+        0.55,
+        0,
+    )
+    _saddle_cupola(p, cx, cy, SADDLER_STONE, SADDLER_SLATE)
+    hx, hy = at(14.5, 3.0)
+    _bar(p, at(12.2, 3.6), up(12.2, 3.6, 1.6), 0.16 * m, SADDLER_SIGN)
+    _saddle_horse(p, hx, hy, SADDLER_BAY, -1, None)
+    _saddle_trestle(p, *at(16.8, 1.0), SADDLE)
+    _saddle_trestle(p, *at(25.2, 5.4), SADDLE_TAN)
+    _saddle_trestle(p, *at(27.6, 4.2), SADDLE)
+    _saddle_trough(p, *at(24.5, -3.2))
+    for k, leather in enumerate((SADDLE_TAN, SADDLE, shade(SADDLE, 0.8))):
+        p.hall(*up(10.2, 8.4, 0.25 * k), 2.2 * m, 1.4 * m, 0.25 * m, leather, shade(leather, 1.15))
+    for u0, u1 in ((8.2, 17.6), (20.4, 30.8)):
+        coping = p.hall(
+            *up((u0 + u1) / 2, -7.6, 0),
+            (u1 - u0) * m,
+            0.45 * m,
+            1.2 * m,
+            SADDLER_BRICK,
+            SADDLER_STONE,
+        )
+        _patch(p, coping[0], coping[1], (0, 1), (0, 0.15 * m), SADDLER_STONE)
+    for u in (17.6, 20.4):
+        p.hall(*at(u, -7.6), 0.8 * m, 0.8 * m, 2.4 * m, SADDLER_STONE, shade(SADDLER_STONE, 1.05))
+        bx, by = up(u, -7.6, 2.4)
+        p.blob(
+            bx - 0.32 * m, by - 0.6 * m, bx + 0.32 * m, by + 0.02 * m, shade(SADDLER_STONE, 1.04)
+        )
+        p.blob(
+            bx - 0.18 * m, by - 0.52 * m, bx + 0.02 * m, by - 0.3 * m, shade(SADDLER_STONE, 1.12)
+        )
     return p.sprite()
 
 
 def mega_saddler() -> Sprite:
-    """A great leather goods house of three storeys under a brown roof, a saddle-brown and gilt
-    sign along its eaves and a gilt horse's head on its roof, shop windows of saddles and bags
-    along its whole front, a long workshop shed behind, rows of saddles on trestles in the yard,
-    rolled hides piled by the door and a black carriage with a horse in polished harness waiting
-    at the kerb."""
-    p = Painter(64, 58, (32, 40))
-    foot = _footing(4, -3, 26, 10)
-    _bed(p, foot, SOIL, 1)
-    p.shadow(20, 5)
-    shed = p.hall(16, -12, 14, 8, 6, shade(SADDLER_WALL, 0.9), None)
-    _sawtooth(p, shed, 4, 3, SADDLER_ROOF, GLAZING, shade(SADDLER_WALL, 0.9))
-    _track(p, foot[0], foot[1], (0.86, 0.96), 4, (190, 172, 136), ruts=False)
-    top = _leather_house(p, 4, -3, 26, 10, 16)
-    left, front, right, _ = top
-    for row in (3, 7.5):
-        for k in range(6):
-            t = 0.08 + k * 0.13
-            _window(p, left, front, (t - 0.04, t + 0.04), row, shade(WINDOW, 0.95), 2.2)
-    _patch(p, left, front, (0.04, 0.84), (12.4, 15), shade(WINDOW, 0.9))
-    for k in range(9):
-        p.point(*_on_wall(left, front, 0.08 + k * 0.09, 13.8), (SADDLE, SADDLE_TAN, BUCKLE)[k % 3])
-    _door(p, left, front, (0.88, 0.97), 10.5, 16, SADDLER_SIGN, BUCKLE)
-    for row in (3, 7.5, 12):
-        _window(p, front, right, (0.2, 0.4), row, shade(WINDOW, 0.8))
-        _window(p, front, right, (0.6, 0.8), row, shade(WINDOW, 0.8))
-    p.gable(top, 6, SADDLER_ROOF, SADDLER_WALL)
-    _roof_rows(p, top, 6, SADDLER_ROOF, (0.25, 0.5, 0.75))
-    for along in (0.25, 0.7):
-        x, y = _on_roof(top, 6, along, 0.9)
-        p.rect(x - 1, y - 3, x, y, BRICK)
-    rx, ry = _on_roof(top, 6, 0.5, 1)
+    """A great leather goods house with its carriage works. The house is a palace of trade in
+    pale limestone, 22 by 13 m, every storey different: a rusticated ground floor of round-headed
+    shop windows framed in oxblood and brass showing saddles, trunks and bridles in the
+    lamplight under a glass marquise over its doors; a piano nobile of tall arched windows on
+    wrought-iron balconies; a floor of square workroom windows; a cornice and balustrade, and
+    over them a slate mansard of round dormers, its middle rising to a pediment that carries a
+    great gilt horse's head. Beside it a carriage showroom of iron and glass under a glazed
+    vault, broughams standing in it; behind, a brick carriage works under a lantern roof with
+    its smithy's iron stack smoking, and wheels leaning in the wheelwright's yard. On the paved
+    forecourt between lamp posts a black brougham waits with a horse in polished harness."""
+    m = METRE
+    p = Painter(66, 44, (33, 29))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 25.75) * m, (v - 4.25) * m)
+
+    def up(u: float, v: float, z: float) -> Point:
+        x, y = at(u, v)
+        return x, y - z * m
+
+    stone, glass = SADDLER_STONE, SADDLER_GLASS
     p.polygon(
         [
-            (rx - 1.5, ry - 1),
-            (rx - 1, ry - 5),
-            (rx + 1, ry - 7),
-            (rx + 2.6, ry - 6),
-            (rx + 1.2, ry - 4.6),
-            (rx + 1, ry - 1),
+            at(-1, -8.5),
+            at(23.5, -8.5),
+            at(23.5, -3),
+            at(49.5, -3),
+            at(49.5, 15),
+            at(44.5, 15),
+            at(44.5, 0),
+            at(-1, 0),
         ],
-        BUCKLE,
-        shade(BUCKLE, 0.6),
+        SADDLER_PAVING,
     )
-    p.point(rx + 1.2, ry - 6, shade(BUCKLE, 0.5))
-    for k, (x, y) in enumerate(((-27, -2), (-23, 0), (-19, 2), (-24, 5), (-20, 7), (-16, 9))):
-        _saddle(p, x, y, (SADDLE, SADDLE_TAN)[k % 2])
-    for k, (x, y) in enumerate(((13, 11), (15, 10), (14, 8.8), (16.5, 8.5))):
-        _rolled(p, x, y, (SADDLE, SADDLE_TAN, shade(SADDLE, 0.8), SADDLE_TAN)[k])
-    _carriage(p, -4, 14)
-    return p.sprite()
-
-
-def _carriage(p: Painter, x: float, y: float) -> None:
-    """A black carriage with yellow wheels and a brown horse in harness before it, seen side on,
-    standing on (x, y)."""
-    body = CARRIAGE
-    p.blob(x - 4, y - 5, x + 2, y - 1.6, body)
-    p.rect(x - 3.6, y - 7, x + 1, y - 5, shade(body, 1.3))
-    p.rect(x - 3, y - 6.6, x - 1, y - 5.2, (150, 180, 200))
-    for wx, r in ((x - 3, 1.5), (x + 1.4, 1.1)):
-        p.ellipse(wx - r, y - 2 * r, wx + r, y, (200, 160, 60))
-        p.ellipse(wx - r + 0.5, y - 2 * r + 0.5, wx + r - 0.5, y - 0.5, body)
-    p.line([(x + 2, y - 2.6), (x + 6, y - 3)], HARNESS)
-    hx = x + 7
-    horse = HORSE
-    p.blob(hx - 2, y - 4.6, hx + 2, y - 2.4, horse)
-    for dx in (-1.6, -0.9, 1.0, 1.7):
-        p.line([(hx + dx, y - 2.6), (hx + dx, y)], shade(horse, 0.6))
+    for k in range(1, 7):
+        v = -8.5 + 8.5 * k / 7
+        _bar(p, at(-1, v), at(23.5 if v < -3 else 44.5, v), 0.05 * m, shade(SADDLER_PAVING, 0.88))
+    p.polygon([at(44.5, 0), at(49.5, 0), at(49.5, 15), at(44.5, 15)], SADDLER_COBBLES)
+    p.shadow(25, 7, 3)
+    works = p.hall(*at(35.5, 19.5), 19 * m, 9 * m, 6 * m, SADDLER_BRICK, None)
+    _, w_front, w_right, _ = works
+    _plinth(p, works, 6 * m, SADDLER_BRICK, 0.5 * m)
     p.polygon(
-        [(hx + 1.4, y - 4.2), (hx + 2.4, y - 6.6), (hx + 3.6, y - 6), (hx + 2.6, y - 3.8)], horse
+        _round_head(w_front, w_right, 9 * m, 0.5, 4.2 * m, 0.9 * m, 6 * m), shade(stone, 0.78)
     )
-    p.line([(hx - 1.5, y - 4.4), (hx + 1.6, y - 4.4)], HARNESS)
-    p.point(hx, y - 4.4, BUCKLE)
-    p.line([(hx - 2, y - 4.2), (hx - 2.6, y - 2.2)], shade(horse, 0.5))
+    p.polygon(_round_head(w_front, w_right, 9 * m, 0.5, 3.6 * m, 1.2 * m, 6 * m), (40, 32, 30))
+    p.gable(works, 2.8 * m, SADDLER_SLATE, SADDLER_BRICK)
+    rb, rf = _ridge(works, 2.8 * m)
+    lantern = p.hall(
+        *_on_wall(rb, rf, 0.5, 0.5 * m), 14 * m, 2.4 * m, 1.6 * m, shade(stone, 0.9), None
+    )
+    for a, b, tone in ((lantern[0], lantern[1], 1.0), (lantern[1], lantern[2], 0.78)):
+        _patch(p, a, b, (0.03, 0.97), (0.3 * m, 1.2 * m), shade(glass, 0.8 * tone))
+    p.gable(lantern, 0.9 * m, SADDLER_SLATE, shade(stone, 0.9))
+    sx, sy = up(41.5, 22.5, 0)
+    _turned(p, sx, sy, [(0, 0.45 * m), (13 * m, 0.38 * m)], SADDLER_IRON)
+    for k in (0.35, 0.7):
+        _bar(
+            p,
+            (sx - 0.4 * m, sy - 13 * m * k),
+            (sx + 0.4 * m, sy - 13 * m * k + 0.2 * m),
+            0.1 * m,
+            (70, 66, 66),
+        )
+    p.polygon(
+        [(sx - 0.7 * m, sy - 13 * m), (sx + 0.7 * m, sy - 13 * m), (sx, sy - 13.8 * m)],
+        SADDLER_IRON,
+    )
+    p.soft(
+        [
+            (sx - 0.6 * m, sy - 16 * m, sx + 1.4 * m, sy - 14 * m),
+            (sx + 0.4 * m, sy - 18.4 * m, sx + 3.2 * m, sy - 15.8 * m),
+        ],
+        (200, 198, 202),
+        0.75,
+        0.4,
+    )
+    length, depth, high = 22 * m, 13 * m, 14 * m
+    foot = _footing(*at(11, 6.5), length, depth)
+    _bed(p, foot, margin=0.6)
+    top = p.hall(*at(11, 6.5), length, depth, high, stone, None)
+    left, front, right, _ = top
+    for a, b, size, tone, bays in ((left, front, length, 1.0, 6), (front, right, depth, 0.78, 3)):
+        for k in range(8):
+            d = high - 0.65 * m * (k + 1)
+            _bar(p, _on_wall(a, b, 0, d), _on_wall(a, b, 1, d), 0.06 * m, shade(stone, 0.78 * tone))
+        _patch(p, a, b, (0, 1), (high - 5.8 * m, high - 5.1 * m), shade(OXBLOOD, tone))
+        _patch(p, a, b, (0, 1), (high - 5.1 * m, high - 4.9 * m), shade(BUCKLE, tone))
+        for k in range(bays * 4):
+            t = (k + 0.5) / (bays * 4)
+            if k % 4 in (1, 2):
+                _patch(
+                    p,
+                    a,
+                    b,
+                    (t - 0.25 / (bays * 4), t + 0.25 / (bays * 4)),
+                    (high - 5.6 * m, high - 5.3 * m),
+                    shade(GILT, tone),
+                )
+        for d0, d1, tone2 in (
+            (0, 0.9 * m, 1.06),
+            (4.3 * m, 4.6 * m, 1.04),
+            (high - 8.6 * m, high - 8.3 * m, 1.04),
+        ):
+            _patch(p, a, b, (0, 1), (d0, d1), shade(stone, tone * tone2))
+        for k in range(bays):
+            t = (k + 0.5) / bays
+            entrance = a is left and k == 3
+            if not entrance:
+                _saddle_arcade(
+                    p, a, b, size, t, 2.4 * m, (high - 4.4 * m, high - 0.2 * m), k % 3, tone
+                )
+            p.polygon(
+                _round_head(a, b, size, t, 1.7 * m, high - 8.4 * m, high - 5.9 * m),
+                shade(stone, 0.86 * tone),
+            )
+            p.polygon(
+                _round_head(a, b, size, t, 1.4 * m, high - 8.2 * m, high - 6.0 * m),
+                shade(WINDOW, tone),
+            )
+            _bar(
+                p,
+                _on_wall(a, b, t, high - 7.6 * m),
+                _on_wall(a, b, t, high - 6.0 * m),
+                0.06 * m,
+                shade(stone, tone),
+            )
+            _saddle_balconette(p, a, b, size, t, 1.9 * m, high - 6.0 * m, tone)
+            _patch(
+                p,
+                a,
+                b,
+                (t - 0.65 * m / size, t + 0.65 * m / size),
+                (1.4 * m, 3.0 * m),
+                shade(stone, 0.86 * tone),
+            )
+            _patch(
+                p,
+                a,
+                b,
+                (t - 0.5 * m / size, t + 0.5 * m / size),
+                (1.55 * m, 2.9 * m),
+                shade(WINDOW, tone),
+            )
+    t = 3.5 / 6
+    p.polygon(
+        _round_head(left, front, length, t, 2.8 * m, high - 4.6 * m, high), shade(OXBLOOD, 0.9)
+    )
+    p.polygon(_round_head(left, front, length, t, 2.2 * m, high - 4.2 * m, high), SADDLER_LAMPLIT)
+    _patch(p, left, front, (t - 0.045, t + 0.045), (high - 2.6 * m, high), shade(OXBLOOD, 0.7))
+    _bar(
+        p,
+        _on_wall(left, front, t, high - 2.6 * m),
+        _on_wall(left, front, t, high),
+        0.06 * m,
+        BUCKLE,
+    )
+    marquise = [
+        _on_wall(left, front, t - 0.09, high - 4.8 * m),
+        _on_wall(left, front, t + 0.09, high - 4.8 * m),
+    ]
+    outer = [_iso(px, py, 0, -2.4 * m) for px, py in marquise]
+    p.polygon(
+        [
+            marquise[0],
+            marquise[1],
+            (outer[1][0], outer[1][1] + 0.4 * m),
+            (outer[0][0], outer[0][1] + 0.4 * m),
+        ],
+        shade(glass, 1.05),
+        SADDLER_IRON,
+    )
+    _bar(
+        p,
+        (outer[0][0], outer[0][1] + 0.4 * m),
+        (outer[1][0], outer[1][1] + 0.4 * m),
+        0.14 * m,
+        SADDLER_IRON,
+    )
+    for px, py in outer:
+        _bar(p, (px, py + 0.4 * m), (px, py + 0.4 * m + 0.6 * m), 0.06 * m, SADDLER_IRON)
+    _patch(p, left, front, (0, 1), (0, 0.5 * m), shade(stone, 1.05))
+    _patch(p, front, right, (0, 1), (0, 0.5 * m), shade(stone, 0.8))
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
+        _patch(p, a, b, (0, 1), (-0.6 * m, 0), shade(stone, 0.62 * tone))
+        _bar(
+            p,
+            _on_wall(a, b, 0, -0.6 * m),
+            _on_wall(a, b, 1, -0.6 * m),
+            0.22 * m,
+            shade(stone, 1.05 * tone),
+        )
+        for k in range(45):
+            s = (k + 0.5) / 45
+            _bar(
+                p,
+                _on_wall(a, b, s, -0.6 * m),
+                _on_wall(a, b, s, 0),
+                0.12 * m,
+                shade(stone, 0.9 * tone),
+            )
+    roof_top = tuple((px, py - 0.6 * m) for px, py in (left, front, right, top[3]))
+    inner = _broken_roof(p, roof_top, 3.4 * m, 1.3 * m, 1.2 * m, 0.2, SADDLER_SLATE)
+    cx = (inner[0][0] + inner[2][0]) / 2
+    cy = (inner[0][1] + inner[2][1]) / 2
+    for along in (-6.5, 6.5):
+        fx, fy = _iso(cx, cy, along * m, 0.6 * m)
+        p.hall(fx, fy, 1.1 * m, 0.8 * m, 2.6 * m, stone, None)
+        p.hall(fx, fy - 2.6 * m, 1.5 * m, 1.2 * m, 0.35 * m, shade(stone, 1.06), shade(stone, 1.1))
+        p.hall(fx, fy - 2.95 * m, 0.9 * m, 0.6 * m, 0.3 * m, shade(stone, 0.9), (44, 38, 38))
+    for k in range(6):
+        if k == 3:
+            continue
+        s = (k + 0.5) / 6
+        dx, dy = _on_wall(
+            _on_wall(roof_top[0], inner[0], 0.5, 0), _on_wall(roof_top[1], inner[1], 0.5, 0), s, 0
+        )
+        dormer = p.hall(dx, dy + 0.5 * m, 1.6 * m, 1.2 * m, 1.8 * m, stone, None)
+        d_left, d_front, d_right, d_back = dormer
+        p.polygon(
+            _round_head(d_left, d_front, 1.6 * m, 0.5, 0.9 * m, 0.25 * m, 1.6 * m),
+            shade(WINDOW, 1.05),
+        )
+        crown = _on_wall(d_left, d_front, 0.5, -0.55 * m)
+        p.polygon(
+            [d_left, crown, d_front, d_right, (crown[0] + 1.2 * m, crown[1] - 0.6 * m), d_back],
+            shade(SADDLER_SLATE, 1.15),
+            shade(SADDLER_SLATE, 0.6),
+        )
+        _bar(p, d_left, crown, 0.12 * m, shade(stone, 1.04))
+        _bar(p, crown, d_front, 0.12 * m, shade(stone, 1.04))
+    pa, pb = _on_wall(left, front, 3.0 / 6, -0.6 * m), _on_wall(left, front, 4.0 / 6, -0.6 * m)
+    apex = ((pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2 - 2.4 * m)
+    p.polygon(
+        [
+            (pa[0], pa[1] + 0.6 * m),
+            (pb[0], pb[1] + 0.6 * m),
+            (pb[0], pb[1] - 0.6 * m),
+            apex,
+            (pa[0], pa[1] - 0.6 * m),
+        ],
+        stone,
+        shade(stone, 0.6),
+    )
+    p.polygon(
+        [
+            (pa[0] + 0.5 * m, pa[1] - 0.3 * m),
+            (pb[0] - 0.5 * m, pb[1] - 0.3 * m),
+            (apex[0], apex[1] + 0.6 * m),
+        ],
+        shade(stone, 0.86),
+    )
+    _patch(p, left, front, (3.15 / 6, 3.85 / 6), (-0.4 * m, 0.4 * m), OXBLOOD)
+    for k in range(5):
+        s = 3.2 / 6 + k * 0.12 / 6
+        _patch(p, left, front, (s + 0.01 / 6, s + 0.07 / 6), (-0.25 * m, 0.25 * m), GILT)
+    p.hall(apex[0], apex[1] + 0.2 * m, 1.6 * m, 1.6 * m, 0.8 * m, stone, shade(stone, 1.05))
+    _saddle_head(p, apex[0], apex[1] - 0.55 * m, 4.0 * m)
+    show = p.hall(*at(34.5, 7.5), 20 * m, 11 * m, 7 * m, SADDLER_GREEN, None)
+    h_left, h_front, h_right, _ = show
+    for a, b, tone in ((h_left, h_front, 1.0), (h_front, h_right, 0.78)):
+        _patch(p, a, b, (0, 1), (0.6 * m, 6.4 * m), shade((156, 128, 96), tone))
+        _patch(p, a, b, (0, 1), (0.6 * m, 2.4 * m), shade(glass, 0.9 * tone))
+        _patch(p, a, b, (0, 1), (5.2 * m, 6.4 * m), shade(SADDLER_LAMPLIT, 0.85 * tone))
+    for s, coat in ((4.5, OXBLOOD), (12.5, SADDLER_LACQUER)):
+        cx, cy = _on_wall(h_left, h_front, s / 20, 6.6 * m)
+        body = shade(coat, 1.0)
+        p.polygon(
+            [
+                (cx - 1.6 * m, cy - 1.2 * m),
+                (cx - 1.7 * m, cy - 3.6 * m),
+                (cx + 1.4 * m, cy - 3.6 * m),
+                (cx + 1.8 * m, cy - 2.0 * m),
+                (cx + 1.6 * m, cy - 1.2 * m),
+            ],
+            body,
+        )
+        p.polygon(
+            [
+                (cx - 1.2 * m, cy - 3.3 * m),
+                (cx - 0.2 * m, cy - 3.3 * m),
+                (cx - 0.2 * m, cy - 2.5 * m),
+                (cx - 1.2 * m, cy - 2.5 * m),
+            ],
+            (120, 140, 150),
+        )
+        _spoked_wheel(p, cx - 1.2 * m, cy - 1.0 * m, 1.0 * m)
+        _spoked_wheel(p, cx + 1.4 * m, cy - 0.8 * m, 0.8 * m)
+    for a, b, panes, tone in ((h_left, h_front, 14, 1.0), (h_front, h_right, 7, 0.78)):
+        for k in range(panes + 1):
+            t = k / panes
+            _bar(
+                p,
+                _on_wall(a, b, t, 0),
+                _on_wall(a, b, t, 7 * m),
+                0.18 * m,
+                shade(SADDLER_GREEN, tone),
+            )
+        for d in (0.6, 2.4, 5.2):
+            _bar(
+                p,
+                _on_wall(a, b, 0, d * m),
+                _on_wall(a, b, 1, d * m),
+                0.12 * m,
+                shade(SADDLER_GREEN, tone),
+            )
+        _patch(p, a, b, (0, 1), (6.4 * m, 7 * m), shade(SADDLER_GREEN, 0.9 * tone))
+        _patch(p, a, b, (0, 1), (0, 0.4 * m), shade(stone, 0.8 * tone))
+    _vault(
+        p, show, 3.2 * m, glass, SADDLER_GREEN, tuple(k / 10 for k in range(1, 10)), SADDLER_GREEN
+    )
+    for u in (1.0, 21.0):
+        _lamp_post(p, *at(u, -2.2), 4.5, 2)
+    _saddle_carriage(p, *at(8.0, -4.8), (62, 40, 32))
+    for u, v in ((46.0, 4.0), (46.6, 6.2), (47.2, 8.4)):
+        wx, wy = up(u, v, 1.1)
+        _spoked_wheel(p, wx, wy, 1.1 * m)
+    _saddle_trestle(p, *at(47.5, 11.5), SADDLE_TAN)
+    return p.sprite()
