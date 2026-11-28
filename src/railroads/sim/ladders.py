@@ -383,7 +383,7 @@ IRON_MINES = Ladder(
 # logs and near towns to buy them. They clear the forest around them (railroads.sim.forests) as
 # fast as they sell, and close once it is gone, another coming up in the nearest cell that suits
 # one. A camp that sells nothing clears nothing, so few come up on their own; the ones that sell
-# breed beside them, as fast as satisfied homes do.
+# breed beside them, by the homes' pull for every satisfied point.
 LOGGING_CAMPS = Ladder(
     kinds=(BuildingKind.LOGGING_CAMP,),
     land=Land(

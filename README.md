@@ -437,7 +437,7 @@ than dry land unless a row names it:
 | Orange farms | as date palms | fewer than 5 population | hot grassland, not desert or jungle; hills x0.7; river or lake x2 |
 | Sugar fields | 0.0000000168 + 0.000000042 per doubling of population + 0.000000168 per doubling of food | fewer than 5 population | open flat land, not cold; mild x0.6; river x3 |
 | Mines | 0.000001 + 0.0000014 per doubling of ore | | mountains; hills x0.4, flat x0.01; beside mountains x3 |
-| Logging camps | 0.000075 + 0.0000015 per doubling of population | | forest with at least 4 forest cells in its neighbourhood and flat open land next to it; river x1.5 |
+| Logging camps | 0.0000024 + (0.0000024 + 0.00085 times the satisfaction of the camp in the cell) per doubling of logging camps x10, population and industry x0.1 nearby | | forest with at least 4 forest cells in its neighbourhood and flat open land next to it, by the share of the neighbourhood that is forest; hills x0.8, hot x0.6, none in mountains; river x1.5, lake x1.2 |
 | Fisheries | 0.000005 + 0.00015 per doubling of population x2 and of food x0.5 | | next to the sea; a lake x0.15, a river x0.1; none inland or in mountains |
 | Ports | 0.0000008 + 0.000002 per doubling of population | 2 population | next to the sea; a lake or a river x0.3; hills x0.5; none in mountains |
 | Factories | 0.00000004 + 0.000000006 per doubling of population + 0.000065 of industry + 0.0000008 of timber, each only from 5 points nearby | | flat; hills x0.5, forest x0.2; river x1.5 |
@@ -486,10 +486,12 @@ orchards and every other field fill the whole hex and colour all of it.
 ### Forests
 
 Forests come and go as the map grows. Each month a forest cell may be cleared: 0.00002 for every
-industry point or 4 population points in its neighbourhood, and 0.0015, seventy-five times as much, for every
-logging camp there. Open grassland with nothing built on it turns to forest by 0.00004 for every
-forest cell next to it. A logging camp left with fewer than 3 forest cells in its neighbourhood
-closes, so camps clear their patch of forest and move on. Wherever a forest comes or goes, the
+industry point or 4 population points in its neighbourhood, and for every logging camp there
+0.001, fifty times as much, times how satisfied the camp is: nothing for a camp that sells
+nothing, up to 0.002 at 200%. Open grassland with nothing built on it turns to forest by 0.00004
+for every forest cell next to it. A logging camp left with fewer than 3 forest cells in its
+neighbourhood closes and another comes up in the nearest cell that suits one, so camps clear their
+patch of forest and move on. Wherever a forest comes or goes, the
 land weighs again for every ladder.
 
 ### Goods and satisfaction
