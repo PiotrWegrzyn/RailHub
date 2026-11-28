@@ -70,7 +70,12 @@ from railroads.ui.pixel.ground_glsl import (
 from railroads.ui.pixel.noise import NOISE_TABLE
 from railroads.ui.pixel.projection import CHUNK, PixelProjection
 from railroads.ui.pixel.relief import Heights
-from railroads.ui.pixel.sheet import FINE
+from railroads.ui.pixel.sheet import FINEST
+
+# The finest the woods, fields and yards are worked out, in pixels to an art pixel: as fine as
+# close views draw their chunks (railroads.ui.pixel.world.CLOSE), so up close crowns keep their
+# clumps of leaves and branches rather than blur as they are blown up to the screen.
+SURFACES_FINEST = FINEST
 
 
 def cell_info(
@@ -451,11 +456,11 @@ class GroundShader:
 
     def lay_surfaces(self, chunk: tuple[int, int], k: int) -> None:
         """Works out what lies on a chunk's ground, `k` pixels to an art pixel (no finer than
-        FINE): its raised ground (RELIEF), where woods cover it (WOODS) and how far round them
-        their crowns reach (EDGES), the woods, the shade of trees, fields and yards over it
-        (CANOPY), and where its groves and herds lie and how they are lit (CANOPY's second
-        mode), for `dress_onto` to lay and for what stands on it to read (`chunk_inputs`)."""
-        drawn = min(k, FINE)
+        SURFACES_FINEST): its raised ground (RELIEF), where woods cover it (WOODS) and how far
+        round them their crowns reach (EDGES), the woods, the shade of trees, fields and yards
+        over it (CANOPY), and where its groves and herds lie and how they are lit (CANOPY's
+        second mode), for `dress_onto` to lay and for what stands on it to read (`chunk_inputs`)."""
+        drawn = min(k, SURFACES_FINEST)
         left, top = chunk[0] * CHUNK, chunk[1] * CHUNK
         rows = CHUNK + relief.MOST_LIFT + 2
         relief_origin = (left - 1, top - 1)
@@ -548,7 +553,7 @@ class GroundShader:
         uniforms = {
             "chunk_origin": ("2i", (left, top)),
             "k": ("1i", (k,)),
-            "drawn": ("1i", (min(k, FINE),)),
+            "drawn": ("1i", (min(k, SURFACES_FINEST),)),
             "times": ("1i", (times,)),
             "relief_origin": ("2i", (left - 1, top - 1)),
             "metres_per_pixel": ("1f", (self._heights.metres_per_pixel,)),
