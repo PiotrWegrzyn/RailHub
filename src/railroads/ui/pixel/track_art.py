@@ -33,18 +33,14 @@ from railroads.ui.pixel.art.painter import PLATFORM, PLATFORM_EDGE
 from railroads.ui.pixel.projection import RGB, Path, PixelProjection, Point
 from railroads.ui.pixel.relief import MOST_LIFT, Elevation
 
-# Track, in cells of the picture's width, the same whichever way it runs: how wide the dark bank
-# and the gravel bed on it are, the gap between the rails, how long and wide a sleeper is and how
-# far apart sleepers lie, a bridge deck's and a tunnel portal's width, and how far beyond the
-# bank its shadow reaches. The two tracks of double track lie DOUBLE_SPACING apart, and every
+# Track, in cells of the picture's width, the same whichever way it runs: how wide the ballast's
+# shoulders and the bed on it are, the gap between the rails, a bridge deck's and a tunnel
+# portal's width, and how far beyond the bank its shadow reaches (TrackLook holds the rest). The two tracks of double track lie DOUBLE_SPACING apart, and every
 # piece turns in one curve from BEND before the middle of its cell to BEND after it: from edge
 # to edge of the cell, so curves run on smoothly from cell to cell.
-BANK = 0.058
-TRACK_BED = 0.05
+BANK = 0.07
+TRACK_BED = 0.052
 GAUGE = 0.024
-SLEEPER_LENGTH = 0.047
-SLEEPER_WIDTH = 0.009
-SLEEPER_GAP = 0.017
 BRIDGE_WIDTH = 0.08
 PORTAL = 0.08
 # How tall a tunnel portal stands, in cells; how narrow it looks from the side, as a share of its
@@ -64,17 +60,18 @@ BEND = 0.5
 # running straight across or down it, to be kept to one row or column of pixels (_crisp).
 STRAIGHT_WITHIN = 0.25
 # How dark the shadow round the track is, from 0 to 1.
-SHADOW = 0.35
+SHADOW = 0.18
 # How far apart track is followed over the ground to lift it, in cells.
 STEP = 1 / 12
 # How many times finer than shown, each way, track is drawn before it is averaged down, by the
 # resolution it is shown at: enough to smooth it, without drawing a huge picture up close.
 SMOOTHING = {1: 4, 2: 2}
-# How wide a rail's head is, in cells, and its dark side seen beside it as a share of that: the
-# rails as thin beside the sleepers as a model railway's, so the track reads as two rails on
-# sleepers rather than a band of metal.
-RAIL_HEAD = 0.1 * GAUGE
+# How wide a rail's foot shows beside its head, as a share of the head's width.
 RAIL_SIDE = 0.6
+# How far the shadows of the rails and sleepers fall from them, in cells: as high as a rail
+# stands, cast down and to the right, away from the light at the top left of the screen.
+SHADE_SHIFT = 0.12 * GAUGE
+SHADE_WAY = (0.85, 0.53)
 # How many pixels shown a track's bank takes across at the least: far out, where the track at its
 # true size would show as a hairline, it is drawn wider, as a map draws a railway wider than it is.
 LEAST_BANK = 5.0
@@ -108,11 +105,62 @@ WIRE_HEIGHT = 2
 GUIDEWAY_WIDTH = 0.055
 GUIDEWAY_RIM = 0.008
 
-BANK_EDGE: RGB = (58, 52, 44)
-GRAVEL: RGB = (98, 90, 80)
-SLEEPER: RGB = (46, 30, 20)
-RAIL: RGB = (238, 236, 230)
-RAIL_UNDER: RGB = (24, 22, 20)
+
+@dataclass(frozen=True)
+class TrackLook:
+    """How track looks, like a model railway's and Railroad Tycoon 2's: the colours of its
+    ballast's shoulders and bed, its timber sleepers, and its rails' feet and bright heads; how
+    long and wide its sleepers are and how far apart they lie, in cells; how wide a rail's head
+    is, as a share of GAUGE; how dark, from 0 to 255, the shadows of its rails and sleepers are;
+    and how the graphics card draws its ballast (railroads.ui.pixel.stand_shader): how many
+    stones lie along an art pixel, how much they differ in brightness and how dark the gaps
+    between them are, the colour some of them take and the share of them rusty, how much darker
+    the ballast is between the sleepers, the share of the shoulders weeds grow on and how much
+    brighter and darker the sloping shoulders are facing the light and away from it."""
+
+    shoulder: RGB
+    ballast: RGB
+    sleeper: RGB
+    rail_foot: RGB
+    rail_head: RGB
+    sleeper_length: float
+    sleeper_width: float
+    sleeper_gap: float
+    rail: float
+    rail_shadow: int
+    sleeper_shadow: int
+    stones: float
+    stone_contrast: float
+    stone_gaps: float
+    stone_tint: tuple[float, float, float]
+    rusty_stones: float
+    crib: float
+    weeds: float
+    slope_light: float
+
+
+# A ladder of dark sleepers close together under cream rails on a bed of brown earth and gravel.
+LOOK = TrackLook(
+    shoulder=(88, 68, 50),
+    ballast=(120, 96, 70),
+    sleeper=(44, 30, 22),
+    rail_foot=(26, 22, 20),
+    rail_head=(236, 232, 218),
+    sleeper_length=0.046,
+    sleeper_width=0.0105,
+    sleeper_gap=0.018,
+    rail=0.15,
+    rail_shadow=70,
+    sleeper_shadow=70,
+    stones=8.0,
+    stone_contrast=0.14,
+    stone_gaps=0.06,
+    stone_tint=(1.08, 0.97, 0.86),
+    rusty_stones=0.0,
+    crib=0.12,
+    weeds=0.1,
+    slope_light=0.26,
+)
 # Each kind of bridge's deck, the darker edge round it, its sides and how many art pixels wide
 # they are.
 BRIDGE_LOOKS: dict[Bridge, tuple[RGB, RGB, RGB, int]] = {
@@ -289,14 +337,20 @@ def _point_at(path: Path, lengths: list[float], along: float) -> tuple[Point, Po
 
 
 def _sleepers(
-    lane: Path, lifts: list[float], cell: float, kept: tuple[float, float] | None = None
+    lane: Path,
+    lifts: list[float],
+    cell: float,
+    kept: tuple[float, float] | None = None,
 ) -> list[Path]:
     """The sleepers under one track on the screen, evenly along it as it lies flat, each lying
     square to the way it runs there and lifted with it, only those `kept` between these two
-    distances along it if given; `cell` is a cell's width in the picture's pixels."""
+    distances along it if given; `cell` is a cell's width in the picture's pixels. Each is a
+    strip (_Strip) between its two long sides, so the graphics card knows how far across it
+    each of its pixels lies."""
     lengths = _lengths(lane)
-    count = max(1, round(lengths[-1] / (SLEEPER_GAP * cell)))
-    half_width, half_length = SLEEPER_WIDTH * cell / 2, SLEEPER_LENGTH * cell / 2
+    count = max(1, round(lengths[-1] / (LOOK.sleeper_gap * cell)))
+    half_width = LOOK.sleeper_width * cell / 2
+    half_length = LOOK.sleeper_length * cell / 2
     sleepers = []
     for k in range(count):
         middle = (k + 0.5) * lengths[-1] / count
@@ -306,14 +360,21 @@ def _sleepers(
         y -= float(np.interp(middle, lengths, lifts))
         along, across = (ux * half_width, uy * half_width), (-uy * half_length, ux * half_length)
         sleepers.append(
-            [
-                (x - along[0] + across[0], y - along[1] + across[1]),
-                (x + along[0] + across[0], y + along[1] + across[1]),
-                (x + along[0] - across[0], y + along[1] - across[1]),
-                (x - along[0] - across[0], y - along[1] - across[1]),
-            ]
+            _Strip(
+                [
+                    (x + along[0] + across[0], y + along[1] + across[1]),
+                    (x + along[0] - across[0], y + along[1] - across[1]),
+                    (x - along[0] - across[0], y - along[1] - across[1]),
+                    (x - along[0] + across[0], y - along[1] + across[1]),
+                ]
+            )
         )
     return sleepers
+
+
+def _shifted(path: Sequence[Point], by: tuple[float, float]) -> Path:
+    """The path moved `by` across the picture."""
+    return [(x + by[0], y + by[1]) for x, y in path]
 
 
 def station_side(projection: PixelProjection, steps: FloatArray, run: tuple[int, int]) -> Point:
@@ -637,7 +698,11 @@ class TrackArt:
         of built track between the same two points of its cell, so planned double track widens
         and narrows by the planned track round it rather than by what is built there now."""
         return TrackArt(
-            self.tile_map, self.constructions, self.projection, self.elevation, tuple(pieces)
+            self.tile_map,
+            self.constructions,
+            self.projection,
+            self.elevation,
+            tuple(pieces),
         )
 
     def _track_at(self, cell: Cell) -> list[Track]:
@@ -729,8 +794,8 @@ class TrackArt:
         laid = self._laid_near(pieces, left, top, width, height, stations, lifted)
         if not laid:
             return None
-        shapes = _Recorder()
         s = scale * quality
+        shapes = _Recorder(s)
         self._lay_out(
             shapes, shapes.shadow, shapes.heights, laid, left, top, s, quality, lifted, True
         )
@@ -767,14 +832,15 @@ class TrackArt:
         s: int,
         smoothing: int,
         lifted: bool,
-        thin_rails: bool = False,
+        card: bool = False,
     ) -> None:
         """Draws the laid pieces `s` pixels to an art pixel from (`left`, `top`): the track with
         `paint`, its shadow with `shade` and, raised, how far each stretch is lifted with
-        `measure`; `smoothing` pixels make one shown. Rails are RAIL_HEAD wide, but never
-        narrower than a pixel shown unless `thin_rails`, which leaves a rail narrower than a
-        pixel far off to show only as faint as its share of the pixel, as everything else
-        drawn finely and shrunk does."""
+        `measure`; `smoothing` pixels make one shown. Rails are as wide as the look says, but
+        never narrower than a pixel shown unless drawn for the graphics card (`card`), which
+        leaves a rail narrower than a pixel far off to show only as faint as its share of the
+        pixel, as everything else drawn finely and shrunk does, and lays the see-through
+        shadows of rails and sleepers, which it blends."""
         cell = PIXEL_CELL_WIDTH * s
         wide = cell * widened(s / smoothing)
         raise_up = lifted and self.elevation is not None
@@ -797,13 +863,13 @@ class TrackArt:
         is_flyover = self.constructions.is_flyover
         under = [item for item in drawn if not is_flyover(item[0].piece)]
         over = [item for item in drawn if is_flyover(item[0].piece)]
-        self._lay_level(paint, shade, under, cell, wide, s, smoothing, thin_rails)
+        self._lay_level(paint, shade, under, cell, wide, s, smoothing, card)
         for _, _, lanes, lifts in over:
             spread = (_lane_spread(lanes, cell) + BRIDGE_WIDTH / 2) * cell
             middle = lanes[0] if len(lanes) == 1 else _middle(lanes)
             cast = [(x + FLYOVER_SHADOW * cell, y + FLYOVER_SHADOW * cell) for x, y in middle]
             paint.polygon(_raised_strip(cast, lifts, spread), fill=(0, 0, 0, FLYOVER_SHADE))
-        self._lay_level(paint, shade, over, cell, wide, s, smoothing, thin_rails)
+        self._lay_level(paint, shade, over, cell, wide, s, smoothing, card)
 
     def _lay_level(
         self,
@@ -814,17 +880,22 @@ class TrackArt:
         wide: float,
         s: int,
         smoothing: int,
-        thin_rails: bool,
+        card: bool,
     ) -> None:
         """Draws pieces laid out flat on the picture with how far each point is lifted: their
         shadow, the bridges under them, the earth of the ramps up to flyovers, banks, beds,
         sleepers, rails, tunnel portals and wires. Track on the ground and its flyovers are each
         drawn so, the flyovers after, over the track they cross."""
+        look = LOOK
         ground = [item for item in drawn if item[0].piece.bed != TrackBed.TUNNEL]
+        # Only a bridge stands clear of the ground to cast a shadow round it: track on the ground
+        # lies on its ballast, which runs out into the grass.
         for each, _, lanes, lifts in ground:
-            half = (BRIDGE_WIDTH if each.piece.bed == TrackBed.BRIDGE else BANK) / 2
+            if each.piece.bed != TrackBed.BRIDGE:
+                continue
             for lane in lanes:
-                shade.polygon(_raised_strip(lane, lifts, (half + SHADOW_REACH) * wide), fill=255)
+                strip = _raised_strip(lane, lifts, (BRIDGE_WIDTH / 2 + SHADOW_REACH) * wide)
+                shade.polygon(strip, fill=255)
         for each, _, lanes, lifts in drawn:
             if each.piece.bed == TrackBed.BRIDGE:
                 self._lay_deck(paint, lanes, lifts, cell, s, each.piece.bridge)
@@ -837,7 +908,7 @@ class TrackArt:
             if each.piece.bed == TrackBed.GROUND:
                 for lane in lanes:
                     bank = _raised_strip(lane, lifts, BANK / 2 * wide)
-                    paint.polygon(bank, fill=(*BANK_EDGE, 255))
+                    paint.polygon(bank, fill=(*look.shoulder, 255))
         for each, line, lanes, lifts in ground:
             if each.platform is not None:
                 self._lay_platform(paint, line, lanes, lifts, each.platform, (cell, wide), s)
@@ -846,26 +917,48 @@ class TrackArt:
             if each.piece.bed == TrackBed.GROUND:
                 for lane in lanes:
                     bed = _raised_strip(lane, lifts, TRACK_BED / 2 * wide)
-                    paint.polygon(bed, fill=(*GRAVEL, 255))
-        rail = max(1 if thin_rails else smoothing, round(RAIL_HEAD * wide))
+                    paint.polygon(bed, fill=(*look.ballast, 255))
+        rail = max(1 if card else smoothing, round(look.rail * GAUGE * wide))
         side = max(1, round(RAIL_SIDE * rail))
+        shift = (SHADE_WAY[0] * SHADE_SHIFT * wide, SHADE_WAY[1] * SHADE_SHIFT * wide)
         for each, _, lanes, lifts in ground:
             if each.piece.maglev:
                 _lay_guideway(paint, lanes, lifts, wide, rail)
-        for each, _, lanes, lifts in railed:
-            for lane in lanes:
-                for sleeper in _sleepers(lane, lifts, wide, self._bare(each, lanes, lane, cell)):
-                    paint.polygon(sleeper, fill=(*SLEEPER, 255))
+        sleepers = [
+            sleeper
+            for each, _, lanes, lifts in railed
+            for lane in lanes
+            for sleeper in _sleepers(lane, lifts, wide, self._bare(each, lanes, lane, cell))
+        ]
+        if card and look.sleeper_shadow:
+            for sleeper in sleepers:
+                paint.polygon(_shifted(sleeper, shift), fill=(0, 0, 0, look.sleeper_shadow))
+        for sleeper in sleepers:
+            paint.polygon(sleeper, fill=(*look.sleeper, 255))
+        # A rail a pixel wide or less is kept to one row or column of pixels where it runs
+        # straight, to show as a bright line; a wider one is left where it lies, which moved would
+        # step aside where a straight piece meets a curve.
+        crisp = rail <= smoothing
         rails = [
             _crisp(_raised(_offset(lane, side), lifts), smoothing, max(rail, smoothing))
+            if crisp
+            else _raised(_offset(lane, side), lifts)
             for _, _, lanes, lifts in railed
             for lane in lanes
             for side in (-GAUGE / 2 * wide, GAUGE / 2 * wide)
         ]
+        if card and look.rail_shadow:
+            for rail_line in rails:
+                paint.line(
+                    _shifted(rail_line, shift),
+                    fill=(0, 0, 0, look.rail_shadow),
+                    width=rail + side,
+                    joint="curve",
+                )
         for rail_line in rails:
-            paint.line(rail_line, fill=(*RAIL_UNDER, 255), width=rail + side, joint="curve")
+            paint.line(rail_line, fill=(*look.rail_foot, 255), width=rail + side, joint="curve")
         for rail_line in rails:
-            paint.line(rail_line, fill=(*RAIL, 255), width=rail, joint="curve")
+            paint.line(rail_line, fill=(*look.rail_head, 255), width=rail, joint="curve")
         for each, line, lanes, lifts in drawn:
             if each.piece.bed == TrackBed.TUNNEL:
                 for portal in self._portals(each, line, lanes, lifts, cell):
@@ -1604,8 +1697,23 @@ class Canvas(Protocol):
     ) -> None: ...
 
 
-# How many floats each vertex of the track's triangles holds: where it lies, then its colour.
-TRIANGLE_FLOATS = 6
+# How many floats each vertex of the track's triangles holds: where it lies, its colour, how far
+# across the strip it belongs to it lies, from -1 at one side to 1 at the other (0 off a strip),
+# a number from 0 to 1 the same for all of its shape, and what the shape is made of (MATERIALS).
+TRIANGLE_FLOATS = 9
+# What each colour track art paints is made of, which the graphics card gives its look: the
+# ballast of the bed, its sloping shoulders, the timber of the sleepers, the dark feet of the
+# rails and their bright steel heads; anything else is plain paint.
+PLAIN, BALLAST, SHOULDER, TIMBER, RUST, STEEL = range(6)
+MATERIALS: dict[tuple[int, ...], int] = {
+    LOOK.shoulder: SHOULDER,
+    LOOK.ballast: BALLAST,
+    LOOK.sleeper: TIMBER,
+    LOOK.rail_foot: RUST,
+    LOOK.rail_head: STEEL,
+}
+
+
 # How many floats each vertex of the triangles marking how far track is lifted holds: where it
 # lies, then the lift.
 LIFT_FLOATS = 3
@@ -1655,7 +1763,10 @@ class _Recorder:
     """A canvas recording what track art draws as triangles (TrackShapes): its own drawing,
     `shadow`'s and `heights`'."""
 
-    def __init__(self) -> None:
+    def __init__(self, s: float) -> None:
+        # How many of the picture's pixels make an art pixel, so each shape's number is the
+        # same at every zoom.
+        self._s = s
         self._shadow: list[float] = []
         self._track: list[float] = []
         self._lifts: list[float] = []
@@ -1670,10 +1781,10 @@ class _Recorder:
         width: int = 1,
     ) -> None:
         if outline is not None:
-            _coloured(self._track, _triangles(xy), outline)
+            self._coloured(_sided_triangles(xy), outline)
             xy = _inset(xy, width)
         assert isinstance(fill, tuple)
-        _coloured(self._track, _triangles(xy), fill)
+        self._coloured(_sided_triangles(xy), fill)
 
     def line(
         self,
@@ -1683,11 +1794,21 @@ class _Recorder:
         joint: str | None = None,
     ) -> None:
         assert fill is not None
-        _coloured(self._track, _wide_line(xy, width, joint == "curve"), fill)
+        self._coloured(_wide_line(xy, width, joint == "curve"), fill)
+
+    def _coloured(self, corners: list[tuple[float, float, float]], fill: tuple[int, ...]) -> None:
+        if not corners:
+            return
+        r, g, b, a = (v / 255 for v in fill)
+        material = float(MATERIALS.get(tuple(fill[:3]), PLAIN))
+        x0, y0, _ = corners[0]
+        seed = _seed(x0 / self._s, y0 / self._s)
+        for x, y, across in corners:
+            self._track.extend((x, y, r, g, b, a, across, seed, material))
 
     def shapes(self, scale: int, quality: int) -> TrackShapes:
         shadow = np.array(self._shadow, dtype=np.float32).reshape(-1, 2)
-        dark = np.zeros((len(shadow), 4), dtype=np.float32)
+        dark = np.zeros((len(shadow), TRIANGLE_FLOATS - 2), dtype=np.float32)
         dark[:, 3] = SHADOW
         track = np.array(self._track, dtype=np.float32).reshape(-1, TRIANGLE_FLOATS)
         triangles = np.concatenate([np.hstack([shadow, dark]), track])
@@ -1724,10 +1845,21 @@ class _Marks:
         raise NotImplementedError
 
 
-def _coloured(into: list[float], points: list[Point], fill: tuple[int, ...]) -> None:
-    r, g, b, a = (v / 255 for v in fill)
-    for x, y in points:
-        into += (x, y, r, g, b, a)
+def _seed(x: float, y: float) -> float:
+    """A number from 0 to 1 for a shape whose first corner lies at (`x`, `y`) in art pixels,
+    the same at every zoom."""
+    key = (round(x * 8) * 73856093) ^ (round(y * 8) * 19349663)
+    return (key & 0xFFFF) / 0xFFFF
+
+
+def _sided_triangles(xy: Sequence[Point]) -> list[tuple[float, float, float]]:
+    """The corners of triangles filling a polygon (_triangles), each with how far across its
+    strip it lies: 1 on the strip's first side, -1 on its other, 0 off a strip."""
+    corners = _triangles(xy)
+    if not isinstance(xy, _Strip):
+        return [(x, y, 0.0) for x, y in corners]
+    sides = (1.0, 1.0, -1.0, 1.0, -1.0, -1.0)
+    return [(x, y, sides[k % 6]) for k, (x, y) in enumerate(corners)]
 
 
 def _triangles(xy: Sequence[Point]) -> list[Point]:
@@ -1747,19 +1879,20 @@ def _triangles(xy: Sequence[Point]) -> list[Point]:
     return triangles
 
 
-def _wide_line(xy: Sequence[Point], width: float, joined: bool) -> list[Point]:
+def _wide_line(xy: Sequence[Point], width: float, joined: bool) -> list[tuple[float, float, float]]:
     """The corners of triangles drawing a line `width` wide along the points, its stretches
-    joined across the outside of each bend where `joined`."""
+    joined across the outside of each bend where `joined`, each with how far across the line it
+    lies, from -1 to 1."""
     half = width / 2
-    triangles: list[Point] = []
+    triangles: list[tuple[float, float, float]] = []
     normals: list[tuple[Point, Point] | None] = []
     for (x0, y0), (x1, y1) in itertools.pairwise(xy):
         length = math.hypot(x1 - x0, y1 - y0)
         if length == 0:
             continue
         nx, ny = -(y1 - y0) / length * half, (x1 - x0) / length * half
-        a, b = (x0 + nx, y0 + ny), (x1 + nx, y1 + ny)
-        c, d = (x1 - nx, y1 - ny), (x0 - nx, y0 - ny)
+        a, b = (x0 + nx, y0 + ny, 1.0), (x1 + nx, y1 + ny, 1.0)
+        c, d = (x1 - nx, y1 - ny, -1.0), (x0 - nx, y0 - ny, -1.0)
         triangles += (a, b, c, a, c, d)
         normals.append(((x1, y1), (nx, ny)))
     if joined:
@@ -1767,8 +1900,8 @@ def _wide_line(xy: Sequence[Point], width: float, joined: bool) -> list[Point]:
             assert before is not None and after is not None
             (x, y), (n0x, n0y) = before
             n1x, n1y = after[1]
-            triangles += ((x, y), (x + n0x, y + n0y), (x + n1x, y + n1y))
-            triangles += ((x, y), (x - n0x, y - n0y), (x - n1x, y - n1y))
+            triangles += ((x, y, 0.0), (x + n0x, y + n0y, 1.0), (x + n1x, y + n1y, 1.0))
+            triangles += ((x, y, 0.0), (x - n0x, y - n0y, -1.0), (x - n1x, y - n1y, -1.0))
     return triangles
 
 

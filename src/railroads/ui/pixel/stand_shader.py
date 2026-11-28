@@ -47,7 +47,15 @@ from railroads.ui.pixel.ground_shader import ChunkInputs, GroundShader
 from railroads.ui.pixel.projection import CHUNK
 from railroads.ui.pixel.scenery import Scenery
 from railroads.ui.pixel.sheet import DENSITIES, ByteSheet
-from railroads.ui.pixel.track_art import TrackShapes
+from railroads.ui.pixel.track_art import (
+    BALLAST,
+    LOOK,
+    RUST,
+    SHOULDER,
+    STEEL,
+    TIMBER,
+    TrackShapes,
+)
 from railroads.ui.pixel.world import HIDDEN_BEYOND
 
 # How big a page of sprites on the graphics card is each way, and the picture the track is drawn
@@ -89,22 +97,127 @@ void main() {
 
 SHAPE_VERTEX = """layout(location = 0) in vec2 corner;
 layout(location = 1) in vec4 paint;
+layout(location = 2) in vec3 made;
 uniform vec2 origin;
 uniform vec2 size;
 out vec4 painted;
+out vec2 at;
+out float across;
+out float seed;
+flat out float material;
 void main() {
     painted = paint;
+    at = corner;
+    across = made.x;
+    seed = made.y;
+    material = made.z;
     gl_Position = vec4((corner - origin) / size * 2.0 - 1.0, 0.0, 1.0);
 }
 """
 
-# The track's own colour, premultiplied by its alpha: the shadow is see-through.
+# The track as a model railway's: its colour premultiplied by its alpha (shadows are see-through),
+# with the look of what it is made of (railroads.ui.pixel.track_art.materials), worked out from
+# where each pixel lies on the map, so it is the same at every zoom, and from how far across its
+# strip or line it lies, which gives each its edges lit on the side facing the light from the top
+# left of the screen and shaded on the other (`toward`). Ballast is round stones, lit on the side
+# facing the light, some tinted and some rusty, with dark gaps between them, darker and browner
+# between the sleepers; the bed and its shoulders fall away at their edges, and the shoulders fray
+# into the grass with weeds growing on them. Each sleeper's timber is its own shade with a grain
+# along it and bevelled edges; the rails' feet are rusty, and their heads catch the light on the
+# side facing it.
 SHAPE = """in vec4 painted;
+in vec2 at;
+in float across;
+in float seed;
+flat in float material;
+uniform vec2 chunk_art;
+uniform float fine_per_art;
 out vec4 colour;
+
+float hash(ivec2 p, uint salt) {
+    uvec2 q = uvec2(p) * uvec2(1597334673u, 3812015801u);
+    uint n = (q.x ^ q.y ^ salt) * 1597334673u;
+    n ^= n >> 16;
+    n *= 2246822519u;
+    n ^= n >> 13;
+    return float(n) / 4294967295.0;
+}
+
 void main() {
-    colour = vec4(painted.rgb * painted.a, painted.a);
+    vec3 rgb = painted.rgb;
+    float alpha = painted.a;
+    int made = int(material + 0.5);
+    vec2 art = chunk_art + at / fine_per_art;
+    float side = abs(across);
+    vec2 slope = vec2(dFdx(across), dFdy(across));
+    float facing = 0.0;
+    if (dot(slope, slope) > 0.0) facing = dot(normalize(slope), @LIGHT@);
+    float toward = across * facing;
+    if (made == @BALLAST@ || made == @SHOULDER@) {
+        vec2 grain = art * @STONES@;
+        ivec2 home = ivec2(floor(grain));
+        ivec2 stone = home;
+        float nearest = 9.0;
+        float next = 9.0;
+        vec2 from_middle = vec2(0.0);
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                ivec2 cell = home + ivec2(dx, dy);
+                vec2 middle = vec2(cell) + 0.5
+                    + 0.8 * (vec2(hash(cell, 7u), hash(cell, 8u)) - 0.5);
+                float d = distance(grain, middle);
+                if (d < nearest) {
+                    next = nearest;
+                    nearest = d;
+                    stone = cell;
+                    from_middle = grain - middle;
+                } else if (d < next) {
+                    next = d;
+                }
+            }
+        }
+        float shade = hash(stone, 1u);
+        float gap = 1.0 - smoothstep(0.04, 0.16, next - nearest);
+        float lit = dot(from_middle, @LIGHT@) * 1.2;
+        rgb *= (1.0 - 0.5 * @CONTRAST@ + @CONTRAST@ * shade) * (1.0 + 0.5 * @CONTRAST@ * lit);
+        rgb *= 1.0 - @GAPS@ * gap;
+        if (hash(stone, 9u) > 0.5) rgb *= @STONE_TINT@;
+        if (hash(stone, 2u) > 1.0 - @RUSTY@) {
+            rgb = mix(rgb, @RUSTY_STONE@ * (0.8 + 0.4 * shade), 0.5);
+        }
+        if (made == @BALLAST@) {
+            float inner = 1.0 - smoothstep(0.5, 0.85, side);
+            rgb *= (1.0 - @CRIB@ * inner) * mix(vec3(1.0), vec3(1.03, 0.96, 0.89), inner);
+        }
+        float falling = smoothstep(made == @SHOULDER@ ? 0.2 : 0.75, 1.0, side);
+        rgb *= 1.0 + @SLOPE_LIGHT@ * facing * sign(across) * falling;
+        if (made == @SHOULDER@) {
+            ivec2 tuft = ivec2(floor(art * @WEED_GRAIN@));
+            if (side > 0.5 && hash(tuft, 3u) > @WEEDS_FROM@) {
+                rgb = @WEED@ * (0.7 + 0.6 * hash(stone, 4u));
+            }
+            alpha *= 1.0 - smoothstep(0.8, 1.0, side + (shade - 0.5) * 0.3);
+        }
+    } else if (made == @TIMBER@) {
+        float bevel = toward * smoothstep(0.45, 1.0, side);
+        float stripe = hash(ivec2(int(floor((across + 1.0) * 2.5)), int(seed * 997.0)), 10u);
+        float speck = hash(ivec2(floor(art * 40.0)), 5u);
+        rgb *= (0.8 + 0.4 * seed) * (0.9 + 0.18 * stripe) * (0.94 + 0.1 * speck);
+        rgb *= 1.0 + 0.3 * bevel;
+    } else if (made == @RUST@) {
+        rgb *= (0.85 + 0.3 * hash(ivec2(floor(art * 16.0)), 6u)) * (1.0 + 0.25 * toward);
+    } else if (made == @STEEL@) {
+        rgb *= 0.78 + 0.32 * smoothstep(-0.6, 0.8, toward);
+    }
+    colour = vec4(rgb * alpha, alpha);
 }
 """
+# How many patches of the shoulders weeds may grow in along an art pixel, and their colour; the
+# colour rusty stones take; and where the light comes from, as a way across the screen.
+WEED_GRAIN = 3.0
+WEED = (0.31, 0.44, 0.2)
+RUSTY_STONE = (0.47, 0.36, 0.27)
+LIGHT = (-0.7071, -0.7071)
 
 LIFT_VERTEX = """layout(location = 0) in vec2 corner;
 layout(location = 1) in float lift;
@@ -188,6 +301,36 @@ def fill_names(source: str) -> str:
         "MOST_LIFT_ROWS": str(relief.MOST_LIFT),
         "HIDDEN_BEYOND": glsl_number(HIDDEN_BEYOND),
     }
+    for name, value in names.items():
+        source = source.replace(f"@{name}@", value)
+    assert "@" not in source
+    return source
+
+
+def shape_source() -> str:
+    """The shader drawing the track's triangles with the look of what they are made of
+    (SHAPE), as the track's LOOK has them."""
+    look = LOOK
+    names = {
+        "BALLAST": str(BALLAST),
+        "SHOULDER": str(SHOULDER),
+        "TIMBER": str(TIMBER),
+        "RUST": str(RUST),
+        "STEEL": str(STEEL),
+        "STONES": glsl_number(look.stones),
+        "CONTRAST": glsl_number(look.stone_contrast),
+        "GAPS": glsl_number(look.stone_gaps),
+        "STONE_TINT": "vec3({}, {}, {})".format(*map(glsl_number, look.stone_tint)),
+        "RUSTY": glsl_number(look.rusty_stones),
+        "CRIB": glsl_number(look.crib),
+        "WEED_GRAIN": glsl_number(WEED_GRAIN),
+        "WEEDS_FROM": glsl_number(1.0 - look.weeds),
+        "WEED": "vec3({}, {}, {})".format(*map(glsl_number, WEED)),
+        "RUSTY_STONE": "vec3({}, {}, {})".format(*map(glsl_number, RUSTY_STONE)),
+        "SLOPE_LIGHT": glsl_number(look.slope_light),
+        "LIGHT": "vec2({}, {})".format(*map(glsl_number, LIGHT)),
+    }
+    source = SHAPE
     for name, value in names.items():
         source = source.replace(f"@{name}@", value)
     assert "@" not in source
@@ -359,7 +502,7 @@ class StandShader:
         self._heights = RenderTarget()
         self._out = GL.glGenFramebuffers(1)
         self._sprites = _Geometry((2, 2))
-        self._shapes = _Geometry((2, 4))
+        self._shapes = _Geometry((2, 4, 3))
         self._lifts = _Geometry((2, 1))
 
     @classmethod
@@ -373,7 +516,7 @@ class StandShader:
         try:
             programs = _Programs(
                 gl_program(HEADER + SPRITE_VERTEX, HEADER + SPRITE),
-                gl_program(HEADER + SHAPE_VERTEX, HEADER + SHAPE),
+                gl_program(HEADER + SHAPE_VERTEX, HEADER + shape_source()),
                 gl_program(HEADER + LIFT_VERTEX, HEADER + lift_source()),
                 gl_program(HEADER + VERTEX, HEADER + track_source()),
                 gl_program(HEADER + VERTEX, HEADER + FINISH),
@@ -459,16 +602,20 @@ class StandShader:
                 "origin": ("2f", (float(left * q), float(top * q))),
                 "size": ("2f", (float(width * q), float(height * q))),
             }
+            looks = place | {
+                "chunk_art": ("2f", tuple(float(v) for v in inputs.chunk_origin)),
+                "fine_per_art": ("1f", (float(shapes.scale * q),)),
+            }
             self._clear(self._fine)
             self._draw(
                 self._fine,
                 fine,
                 self._programs.shape,
-                place,
+                looks,
                 (),
                 self._shapes,
                 (0, self._shapes.count),
-                None,
+                (GL_FUNC_ADD, GL_ONE, GL_ONE_MINUS_SRC_ALPHA),
             )
             self._clear(self._heights)
             if self._lifts.count:
