@@ -19,16 +19,20 @@ from railroads.ui.pixel.art.farms import (
     _track,
     _worn,
 )
+from railroads.ui.pixel.art.nature import leafy, pine
 from railroads.ui.pixel.art.painter import (
     BARREL,
     DOORWAY,
+    LEAVES,
     METAL,
+    PINES,
     RGB,
     TIMBER,
     TRUNK,
     WINDOW,
     Painter,
     Sprite,
+    fineness,
     shade,
 )
 from railroads.ui.pixel.art.parts import (
@@ -185,14 +189,74 @@ def sawmill() -> Sprite:
     return p.sprite()
 
 
+# A logging camp stands in the woods it fells: trees as big as those standing alone on the
+# meadows (railroads.ui.pixel.art.registry.TREE_SCALES), drawn at the buildings' scale, round a
+# clearing of trodden forest floor. Each is (across, down, kind, seed, size), back to front.
+CAMP_TREES_BEHIND = (
+    (-18, -3, "pine", 1, 0.9),
+    (-12, -9, "pine", 2, 1.0),
+    (-3, -12, "leafy", 3, 0.95),
+    (5, -11, "pine", 4, 1.05),
+    (12, -8, "pine", 5, 0.95),
+    (17, -3, "leafy", 6, 0.85),
+)
+CAMP_TREES_BESIDE = ((-19, 4, "pine", 7, 0.85), (19, 5, "pine", 8, 0.9))
+CAMP_TREES_FRONT = ((-14, 11, "pine", 9, 0.8), (14, 11.5, "leafy", 10, 0.8))
+PINE_HEIGHT = 13 * 0.66 / 0.413
+LEAFY_HEIGHT = 9 * 0.55 / 0.413
+FOREST_FLOOR: RGB = (88, 82, 54)
+LITTER: RGB = (74, 72, 46)
+SAWDUST: RGB = (212, 186, 136)
+
+
+def _tree(p: Painter, x: float, y: float, kind: str, seed: int, size: float) -> None:
+    """A model tree like those standing alone on the meadows, its foot at (x, y)."""
+    if kind == "pine":
+        tree = pine(PINES[seed % len(PINES)], seed, PINE_HEIGHT * size)
+    else:
+        tree = leafy(LEAVES[seed % len(LEAVES)], seed, LEAFY_HEIGHT * size)
+    k = fineness()
+    at = (p.anchor[0] + round(x * k) - tree.anchor[0], p.anchor[1] + round(y * k) - tree.anchor[1])
+    p.image.alpha_composite(tree.image, at)
+
+
+def _stump(p: Painter, x: float, y: float, wide: float = 1.2) -> None:
+    """A freshly cut stump at (x, y), its pale top ringed with bark."""
+    p.rect(x - wide, y - 1.2, x + wide, y, shade(TRUNK, 0.9))
+    p.ellipse(x - wide - 0.2, y - 2, x + wide + 0.2, y - 0.4, (204, 168, 112))
+    p.point(x - 0.2, y - 1.4, (168, 132, 84))
+
+
+def _trunk(p: Painter, x0: float, y0: float, x1: float, y1: float, thick: float = 1.6) -> None:
+    """A felled trunk lying on the ground from its sawn butt at (x0, y0) to its top at (x1, y1),
+    trimmed of its branches but for a stub or two."""
+    log = (104, 76, 50)
+    half = thick / 2
+    p.polygon(
+        [(x0, y0 - half), (x1, y1 - half * 0.6), (x1, y1 + half * 0.6), (x0, y0 + half)],
+        log,
+        shade(log, 0.6),
+    )
+    p.line([(x0, y0 - half * 0.4), (x1, y1 - half * 0.3)], shade(log, 1.25))
+    p.line([(x0 + (x1 - x0) * 0.55, y0 + (y1 - y0) * 0.55 - half)] * 2, shade(log, 0.7))
+    p.ellipse(x0 - half, y0 - half - 0.2, x0 + half * 0.6, y0 + half + 0.2, (214, 176, 122))
+    p.point(x0 - 0.2, y0, (176, 136, 88))
+
+
 def logging_camp() -> Sprite:
-    """A log cabin with a stone chimney in a clearing of fresh stumps, one with an axe in it,
-    and the felled trunks stacked beside it waiting for the cart."""
-    p = Painter(28, 24, (13, 19))
-    _ruts(p, [(5, 3.2), (9, 4.4), (13, 5.4)])
-    _worn(p, -1.4, 2.6, 3.4)
+    """A log cabin with a stone chimney in a clearing it has felled in the woods: spruces and
+    oaks all round it and in front, the forest floor trodden bare between fresh stumps, one with
+    an axe in it, sawdust round the stack of trunks waiting for the cart, felled trunks lying
+    where they fell and a skid track dragged out between the trees."""
+    p = Painter(56, 52, (28, 36))
+    p.soft([(-19, -8, 19, 10), (-12, -10, 14, 4)], FOREST_FLOOR, 0.75, 2.0)
+    p.soft([(-17, -2, -9, 4), (8, 4, 16, 9), (-4, 6, 4, 10)], LITTER, 0.6, 1.0)
+    for args in CAMP_TREES_BEHIND:
+        _tree(p, *args)
+    p.soft([(-1, 1, 14, 7), (0, 4, 9, 8)], SAWDUST, 0.6, 1.0)
+    _ruts(p, [(6, 5), (8, 9), (9, 13.5)], shade(FOREST_FLOOR, 0.95))
+    _worn(p, -1.4, 2.6, 3.4, shade(FOREST_FLOOR, 1.15))
     p.blob(-11.4, -0.6, -1.4, 5, FOOTING)
-    p.blob(1.4, -1.6, 13.4, 3.6, FOOTING)
     p.shadow(10, 3)
     cabin = shade(TRUNK, 1.18)
     top = p.box(-6, 0, 5, 5, cabin, None)
@@ -211,12 +275,17 @@ def logging_camp() -> Sprite:
         p.line([(x + 0.5, y - 1), (x + 7, y - 1)], shade(log, 0.78))
         p.ellipse(x + 7, y - 2.2, x + 9.2, y + 0.2, end)
         p.point(x + 8, y - 1, shade(end, 0.7))
-    for x, y in ((-12, 3.4), (-2, 5.6), (11, -3.4), (-11, -2)):
-        p.rect(x - 1, y - 1.4, x + 1, y, shade(log, 0.9))
-        p.ellipse(x - 1.2, y - 2.2, x + 1.2, y - 0.8, end)
-        p.point(x, y - 1.5, shade(end, 0.72))
-    p.line([(-1.8, 3.6), (-0.6, 2.2)], (112, 84, 54))
-    p.rect(-2.6, 3.2, -1.4, 3.8, METAL)
+    _strewn(p, 6, 5.4, 4, shade(SAWDUST, 0.9), 4)
+    for args in CAMP_TREES_BESIDE:
+        _tree(p, *args)
+    for x, y in ((-14, -3), (14, -1), (-10, 7.4), (-3, 8.6), (10, 8.4), (16, 2.6)):
+        _stump(p, x, y)
+    _trunk(p, -12, 3.4, -4, 7.4, 1.9)
+    _trunk(p, 12, 4.6, 17, 8, 1.5)
+    p.line([(-2.6, 7.4), (-0.8, 5.6)], (112, 84, 54))
+    p.rect(-3.6, 7, -2.6, 7.8, METAL)
+    for args in CAMP_TREES_FRONT:
+        _tree(p, *args)
     return p.sprite()
 
 
