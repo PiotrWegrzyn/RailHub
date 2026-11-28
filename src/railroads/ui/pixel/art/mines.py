@@ -18,6 +18,7 @@ from railroads.ui.pixel.art.collieries import (
     _swell,
     _yard,
 )
+from railroads.ui.pixel.art.commerce import _planks
 from railroads.ui.pixel.art.farms import (
     FOOTING,
     WORN,
@@ -31,6 +32,7 @@ from railroads.ui.pixel.art.farms import (
     _track,
     _worn,
 )
+from railroads.ui.pixel.art.industry import _food_cart, _food_horse
 from railroads.ui.pixel.art.painter import (
     BARREL,
     BRICK,
@@ -599,7 +601,6 @@ def _on_roof(top: Top, rise: float, along: float, up: float) -> Point:
 
 
 CLAY: RGB = (192, 102, 60)
-CLAY_BENCH: RGB = (208, 140, 88)
 CLAY_GROUND: RGB = (150, 108, 74)
 GREEN_BRICK: RGB = (182, 150, 116)
 PIT_WATER: RGB = (124, 134, 134)
@@ -696,58 +697,408 @@ def _ground(p: Painter, spots: list[tuple[Point, float]], colour: RGB) -> None:
     )
 
 
-def clay_pit() -> Sprite:
-    """A clay digging on a brickfield: an uneven pit cut in three steps into terracotta clay,
-    its faces banded with layers, rain water standing grey on its floor, a plank barrow run up
-    its side and a loaded wheelbarrow on a bench, a narrow-gauge track out of it with two tipping
-    wagons heaped with clay, rounded heaps of dug clay weathering, an open drying shed of
-    unfired bricks and the digger's boarded hut."""
+CLAY_WET: RGB = (164, 84, 52)
+CLAY_OCHRE: RGB = (196, 138, 74)
+CLAY_SKIN: RGB = (222, 178, 144)
+CLAY_SHIRTS: tuple[RGB, ...] = ((236, 232, 222), (96, 122, 170), (176, 72, 58), (214, 204, 170))
+
+
+def _clay_hand(p: Painter, x: float, y: float, shirt: RGB, pose: str, facing: int = 1) -> None:
+    """A brickfield hand standing on (x, y), drawn a fifth over his true size so he reads among
+    the works: cord trousers, a shirt of `shirt` with its sleeves rolled, a flat cap; bent over
+    a spade cutting clay if `pose` is "dig", leaning on the handles of a barrow ahead of him if
+    "push", or upright working at a table if "stand", facing right or with `facing` -1 left."""
+    s = 1.2 * METRE
+    f = facing
+    trousers, cap = (78, 66, 58), (54, 50, 48)
+    lean = {"dig": 0.38, "push": 0.42, "stand": 0.06}[pose]
+    hip = (x, y - 0.9 * s)
+    shoulder = (x + f * lean * s, y - (1.4 if pose != "stand" else 1.5) * s)
+    for d in (-0.12, 0.12):
+        foot = (x + d * s + (f * 0.12 * s if pose == "push" and d * f < 0 else 0), y)
+        _bar(p, (hip[0] + d * 0.5 * s, hip[1]), foot, 0.17 * s, trousers)
+        p.blob(
+            foot[0] - 0.1 * s,
+            foot[1] - 0.06 * s,
+            foot[0] + 0.1 * s + f * 0.06 * s,
+            foot[1] + 0.03 * s,
+            (40, 34, 30),
+        )
+    p.polygon(
+        [
+            (hip[0] - 0.17 * s, hip[1]),
+            (hip[0] + 0.17 * s, hip[1]),
+            (shoulder[0] + 0.2 * s, shoulder[1]),
+            (shoulder[0] - 0.2 * s, shoulder[1]),
+        ],
+        shirt,
+    )
+    p.polygon(
+        [
+            (hip[0] + 0.02 * s, hip[1]),
+            (hip[0] + 0.17 * s, hip[1]),
+            (shoulder[0] + 0.2 * s, shoulder[1]),
+            (shoulder[0] + 0.04 * s, shoulder[1]),
+        ],
+        shade(shirt, 0.84),
+    )
+    _bar(
+        p,
+        (hip[0] - 0.17 * s, hip[1] + 0.03 * s),
+        (hip[0] + 0.17 * s, hip[1] + 0.03 * s),
+        0.06 * s,
+        (60, 46, 38),
+    )
+    hand = {
+        "dig": (x + f * 0.62 * s, y - 0.95 * s),
+        "push": (x + f * 0.62 * s, y - 0.72 * s),
+        "stand": (x + f * 0.38 * s, y - 0.98 * s),
+    }[pose]
+    for d in (-0.12, 0.12):
+        elbow = ((shoulder[0] + hand[0]) / 2 + d * 0.3 * s, (shoulder[1] + hand[1]) / 2 + 0.05 * s)
+        _bar(p, (shoulder[0] + d * s, shoulder[1] + 0.04 * s), elbow, 0.11 * s, shirt)
+        _bar(p, elbow, hand, 0.09 * s, CLAY_SKIN)
+    if pose == "dig":
+        blade = (x + f * 0.9 * s, y - 0.02 * s)
+        _bar(p, (x + f * 0.45 * s, y - 1.25 * s), blade, 0.06 * s, TIMBER)
+        p.polygon(
+            [
+                (blade[0] - 0.1 * s, blade[1] - 0.22 * s),
+                (blade[0] + 0.1 * s, blade[1] - 0.22 * s),
+                (blade[0] + 0.08 * s, blade[1] + 0.04 * s),
+                (blade[0] - 0.08 * s, blade[1] + 0.04 * s),
+            ],
+            METAL,
+        )
+        p.blob(
+            blade[0] - 0.14 * s,
+            blade[1] - 0.3 * s,
+            blade[0] + 0.12 * s,
+            blade[1] - 0.12 * s,
+            CLAY_WET,
+        )
+    hx, hy = shoulder[0] + f * 0.07 * s, shoulder[1] - 0.19 * s
+    p.blob(hx - 0.12 * s, hy - 0.12 * s, hx + 0.12 * s, hy + 0.13 * s, CLAY_SKIN)
+    p.blob(hx - 0.14 * s, hy - 0.17 * s, hx + 0.13 * s, hy - 0.03 * s, cap)
+    _bar(p, (hx, hy - 0.06 * s), (hx + f * 0.2 * s, hy - 0.04 * s), 0.06 * s, cap)
+
+
+def _clay_pug_mill(p: Painter, x: float, y: float) -> None:
+    """A horse-driven pug mill on (x, y): a tub of iron-hooped staves 1.8 m across with its
+    upright shaft, worked clay squeezing out at its foot, and a long sweep from the shaft's
+    head over the back of a draught horse plodding round a ring trodden into the ground."""
     m = METRE
-    p = Painter(40, 31, (19, 18))
+    r = 3.2 * m
+    p.soft(
+        [(x - r - 0.8 * m, y - r / 2 - 0.4 * m, x + r + 0.8 * m, y + r / 2 + 0.4 * m)],
+        shade(CLAY_GROUND, 0.82),
+        0.9,
+        0.5,
+    )
+    p.blob(x - r + 0.8 * m, y - r / 2 + 0.4 * m, x + r - 0.8 * m, y + r / 2 - 0.4 * m, CLAY_GROUND)
+    horse = _iso(x, y, 0, -r)
+    p.blob(x - 1.4 * m, y + 0.4 * m, x - 0.2 * m, y + 1 * m, CLAY_WET)
+    tub, tall = 1.0 * m, 2 * m
+    p.polygon(
+        [(x - tub, y - tall), (x + tub / 3, y - tall), (x + tub / 3, y + tub * 0.47), (x - tub, y)],
+        TIMBER,
+    )
+    p.polygon(
+        [(x + tub / 3, y - tall), (x + tub, y - tall), (x + tub, y), (x + tub / 3, y + tub * 0.47)],
+        shade(TIMBER, 0.72),
+    )
+    for f in (0.2, 0.55, 0.85):
+        _bar(p, (x - tub, y - tall * f), (x + tub, y - tall * f), 0.08 * m, (52, 48, 48))
+    p.blob(x - tub, y - tall - tub / 2, x + tub, y - tall + tub / 2, CLAY_WET)
+    head = (x, y - tall - 0.9 * m)
+    _bar(p, (x, y - tall), head, 0.16 * m, shade(TIMBER, 0.7))
+    _food_horse(p, *horse, 1)
+    _bar(p, head, (horse[0] - 0.2 * m, horse[1] - 1.5 * m), 0.26 * m, shade(TIMBER, 1.1))
+    _bar(
+        p,
+        (horse[0] - 0.2 * m, horse[1] - 1.5 * m),
+        (horse[0] + 0.4 * m, horse[1] - 1.2 * m),
+        0.08 * m,
+        (40, 34, 32),
+    )
+
+
+def _clay_lean_to(p: Painter, x: float, y: float, moulder: RGB) -> None:
+    """A moulding lean-to on (x, y): a boarded roof 5 by 3 m sloping back on four posts over a
+    bench where a moulder strikes bricks in wooden moulds from a lump of clay, a row of new
+    bricks set out on a board beside him and a pallet of them on the ground."""
+    m = METRE
+    ground = _corners(x, y, 5 * m, 3 * m)
+    high = _corners(x, y, 5 * m, 3 * m, 3.3 * m)
+    low = _corners(x, y, 5 * m, 3 * m, 2.5 * m)
+    for k, corner in ((3, high[3]), (2, high[2])):
+        _bar(
+            p,
+            ground[k],
+            (ground[k][0], low[k][1] if k in (2, 3) else corner[1]),
+            0.18 * m,
+            shade(TIMBER, 0.7),
+        )
+    _clay_hand(p, *_iso(x, y, -0.6 * m, 0.4 * m), moulder, "stand", 1)
+    table = p.hall(
+        *_iso(x, y, 0, -0.3 * m),
+        2.6 * m,
+        0.9 * m,
+        0.9 * m,
+        shade(TIMBER, 0.95),
+        shade(TIMBER, 1.15),
+    )
+    t_left, t_front, t_right, t_back = table
+    p.blob(
+        t_left[0] + 0.3 * m,
+        t_back[1] - 0.35 * m,
+        t_left[0] + 1.2 * m,
+        t_front[1] - 0.6 * m,
+        CLAY_WET,
+    )
+    for k in range(3):
+        mx, my = _on_wall(
+            _on_wall(t_left, t_back, 0.5, 0), _on_wall(t_front, t_right, 0.5, 0), 0.45 + 0.17 * k, 0
+        )
+        p.hall(
+            mx,
+            my,
+            0.4 * m,
+            0.25 * m,
+            0.12 * m,
+            GREEN_BRICK if k else shade(TIMBER, 0.75),
+            shade(GREEN_BRICK, 1.1) if k else CLAY_WET,
+        )
+    for k in range(4):
+        bx, by = _iso(*_iso(x, y, 1.9 * m, -1.9 * m), k * 0.4 * m, 0)
+        p.hall(bx, by, 0.35 * m, 0.6 * m, 0.25 * m, GREEN_BRICK, shade(GREEN_BRICK, 1.1))
+    for k in (0, 1):
+        _bar(p, ground[k], (ground[k][0], high[k][1]), 0.18 * m, shade(TIMBER, 0.85))
+    roof = [high[0], high[1], low[2], low[3]]
+    p.polygon(roof, (110, 96, 82), (80, 70, 60))
+    for t in (0.25, 0.5, 0.75):
+        _bar(
+            p,
+            _on_wall(high[0], high[1], t, 0),
+            _on_wall(low[3], low[2], t, 0),
+            0.05 * m,
+            (90, 78, 66),
+        )
+
+
+def _clay_hacks(p: Painter, x: float, y: float, rows: int, long: float) -> None:
+    """Long hacks of green bricks drying in the open on (x, y): `rows` rows `long` metres long
+    running along the lit walls, the bricks set crosswise with gaps for the air, each row capped
+    with boards on edge to keep off the rain."""
+    m = METRE
+    for k in reversed(range(rows)):
+        hx, hy = _iso(x, y, 0, k * 1.6 * m)
+        hack = p.hall(hx, hy, long * m, 0.7 * m, 1.1 * m, GREEN_BRICK, shade(GREEN_BRICK, 1.08))
+        h_left, h_front, h_right, h_back = hack
+        for drop in (0.28 * m, 0.55 * m, 0.82 * m):
+            _bar(
+                p,
+                _on_wall(h_left, h_front, 0, drop),
+                _on_wall(h_left, h_front, 1, drop),
+                0.04 * m,
+                shade(GREEN_BRICK, 0.72),
+            )
+        for j in range(1, round(long * 2.4)):
+            t = j / round(long * 2.4)
+            _bar(
+                p,
+                _on_wall(h_left, h_front, t, 0.08 * m),
+                _on_wall(h_left, h_front, t, 1.02 * m),
+                0.04 * m,
+                shade(GREEN_BRICK, 0.62),
+            )
+        ridge = [_on_wall(h_left, h_back, 0.5, -0.4 * m), _on_wall(h_front, h_right, 0.5, -0.4 * m)]
+        board = (128, 112, 96)
+        p.polygon([h_left, h_front, ridge[1], ridge[0]], board, shade(board, 0.6))
+        p.polygon([h_front, h_right, ridge[1]], shade(board, 0.72))
+        _bar(p, ridge[0], ridge[1], 0.06 * m, shade(board, 1.25))
+
+
+def _clay_tipped(p: Painter, x: float, y: float) -> None:
+    """A narrow-gauge tipping wagon at the end of its rails at (x, y), its V-shaped tub rolled
+    over on its cradle to the lit side and clay sliding out of it onto a heap."""
+    m = METRE
+    iron = (96, 92, 92)
+    _mound(p, *_iso(x, y, 0, -1.4 * m), 1.4 * m, 0.8 * m, CLAY)
+    for t in (0.2, 0.8):
+        wx, wy = _iso(x, y, (t - 0.5) * 1.4 * m, -0.3 * m)
+        p.ellipse(wx - 0.22 * m, wy - 0.4 * m, wx + 0.22 * m, wy, (40, 38, 40))
+    p.hall(x, y - 0.3 * m, 1.4 * m, 0.8 * m, 0.2 * m, shade(iron, 0.7), None)
+    lip = [_iso(x, y - 0.8 * m, u * m, -0.9 * m) for u in (-0.8, 0.8)]
+    back = [_iso(x, y - 1.4 * m, u * m, 0.2 * m) for u in (-0.8, 0.8)]
+    keel = [_iso(x, y - 0.5 * m, u * m, 0.3 * m) for u in (-0.6, 0.6)]
+    p.polygon([back[0], back[1], keel[1], keel[0]], shade(iron, 0.75))
+    p.polygon([keel[0], keel[1], lip[1], lip[0]], iron)
+    p.polygon([lip[0], lip[1], back[1], back[0]], shade(CLAY_WET, 0.8))
+    p.polygon([lip[0], lip[1], _iso(*lip[1], 0, -0.7 * m), _iso(*lip[0], 0, -0.7 * m)], CLAY_WET)
+
+
+def _clay_butt(p: Painter, x: float, y: float) -> None:
+    """A water butt on (x, y): a hooped barrel a metre high brimming with rain water."""
+    m = METRE
+    r, tall = 0.42 * m, 1 * m
+    p.polygon(
+        [(x - r, y - tall), (x + r / 3, y - tall), (x + r / 3, y + r * 0.47), (x - r, y)], BARREL
+    )
+    p.polygon(
+        [(x + r / 3, y - tall), (x + r, y - tall), (x + r, y), (x + r / 3, y + r * 0.47)],
+        shade(BARREL, 0.72),
+    )
+    for f in (0.2, 0.8):
+        _bar(p, (x - r, y - tall * f), (x + r, y - tall * f), 0.06 * m, (52, 48, 48))
+    p.blob(x - r, y - tall - r / 2, x + r, y - tall + r / 2, shade(BARREL, 0.6))
+    p.blob(x - r * 0.8, y - tall - r * 0.38, x + r * 0.8, y - tall + r * 0.38, PIT_WATER)
+
+
+def _clay_tools(p: Painter, x: float, y: float) -> None:
+    """Two spades and a pick leant against a wall whose foot is at (x, y)."""
+    m = METRE
+    for k, (dx, kind) in enumerate(((0, "spade"), (0.4, "pick"), (0.8, "spade"))):
+        foot = (x + dx * m, y + 0.1 * m * k)
+        top = (foot[0] + 0.35 * m, foot[1] - 1.5 * m)
+        _bar(p, foot, top, 0.07 * m, TIMBER)
+        if kind == "spade":
+            p.polygon(
+                [
+                    (foot[0] - 0.12 * m, foot[1]),
+                    (foot[0] + 0.1 * m, foot[1]),
+                    (foot[0] + 0.12 * m, foot[1] - 0.3 * m),
+                    (foot[0] - 0.08 * m, foot[1] - 0.3 * m),
+                ],
+                METAL,
+            )
+        else:
+            _bar(
+                p,
+                (top[0] - 0.35 * m, top[1] + 0.12 * m),
+                (top[0] + 0.3 * m, top[1] - 0.06 * m),
+                0.08 * m,
+                shade(METAL, 0.8),
+            )
+
+
+def _clay_load(at: Callable[[float, float], Point], p: Painter) -> None:
+    """Wet clay heaped on a cart's bed, laid out by `at`."""
+    m = METRE
+    for s, w, r in ((-0.6, 0, 0.75), (0.4, 0.1, 0.7), (0, -0.2, 0.6)):
+        cx, cy = at(s, w)
+        p.blob(cx - r * m, cy - 0.65 * m, cx + r * m, cy + 0.1 * m, CLAY_WET)
+        p.blob(cx - r * 0.6 * m, cy - 0.6 * m, cx, cy - 0.3 * m, shade(CLAY_WET, 1.12))
+
+
+def _clay_ramp(p: Painter, a: Point, b: Point) -> None:
+    """A cart road 2.6 m wide worn into the clay from `a` at a pit's edge out to `b`, darker
+    where the wheels have cut two ruts along it."""
+    m = METRE
+    w = (1.3 * m, -0.65 * m)
+    p.polygon(
+        [
+            (a[0] - w[0], a[1] - w[1]),
+            (a[0] + w[0], a[1] + w[1]),
+            (b[0] + w[0], b[1] + w[1]),
+            (b[0] - w[0], b[1] - w[1]),
+        ],
+        shade(CLAY_GROUND, 0.88),
+    )
+    for side in (-0.5, 0.5):
+        _bar(
+            p,
+            (a[0] + w[0] * side, a[1] + w[1] * side),
+            (b[0] + w[0] * side, b[1] + w[1] * side),
+            0.18 * m,
+            shade(CLAY_GROUND, 0.7),
+        )
+
+
+def clay_pit() -> Sprite:
+    """A working clay pit on a brickfield. An uneven pit cut in four benches into terracotta
+    clay, its wet faces banded with layers, puddles standing on its benches and floor, spoil
+    strewn about; diggers in shirtsleeves cutting clay with spades on the benches and a hand
+    wheeling a barrow up a plank run; a horse cart heaped with clay coming up out of it; a
+    narrow-gauge line of tubs from its edge to a tub tipped over by the pug mill, where a horse
+    plods round on the sweep; a moulding lean-to where a moulder strikes bricks in wooden moulds
+    at his bench; long hacks of cream green bricks drying under board caps beside the drying
+    shed; and the digger's hut with tools leant on it, stacked planks and a water butt."""
+    m = METRE
+    p = Painter(44, 36, (22, 21))
 
     def at(u: float, v: float) -> Point:
-        return _iso(0, 0, (u - 9) * m, (v - 8) * m)
+        return _iso(0, 0, (u - 2) * m, (v - 8) * m)
+
+    def low(u: float, v: float, depth: float) -> Point:
+        x, y = at(u, v)
+        return x, y + depth * m
 
     _ground(
         p,
-        [(at(10, 5.5), 13), (at(2, 12), 8), (at(2, 2), 7), (at(17, 1), 7), (at(-4, 8), 6)],
+        [
+            (at(10, 6), 13),
+            (at(-7, 4), 7),
+            (at(-4, 15), 9),
+            (at(18, 0), 8),
+            (at(21.5, 6), 5),
+            (at(6, 21), 8),
+        ],
         CLAY_GROUND,
     )
-    rim = _outline(at, 10, 5.5, 9.5, 8, 0)
-    second = _outline(at, 10.3, 6, 6.8, 5.6, 3)
-    floor = _outline(at, 10.6, 6.3, 3.8, 3.2, 6)
+    rim = _outline(at, 10, 6, 10, 8, 4)
+    first = _outline(at, 10.6, 6.6, 7.6, 6.2, 9)
+    second = _outline(at, 10.2, 7.2, 5.4, 4.3, 1)
+    floor = _outline(at, 10.8, 7, 3.2, 2.4, 11)
     _dug(
         p,
-        [rim, second, floor],
-        [1.7 * m, 1.6 * m, 0.4 * m],
-        [0.06, 0.06, 0.15],
-        (CLAY, CLAY_BENCH, CLAY_GROUND),
+        [rim, first, second, floor],
+        [1.4 * m, 1.2 * m, 1.3 * m, 0.4 * m],
+        [0.05, 0.05, 0.08, 0.15],
+        (CLAY_WET, CLAY_OCHRE, CLAY_GROUND),
     )
-    wx, wy = at(10.5, 6.5)
-    p.blob(wx - 2.6 * m, wy + 3.4 * m, wx + 2.4 * m, wy + 4.8 * m, PIT_WATER)
+    for (u, v, depth), r in (
+        ((11, 7.5, 4.3), 2.2),
+        ((14.5, 12, 1.4), 1.1),
+        ((6.5, 10.5, 2.6), 0.8),
+    ):
+        x, y = low(u, v, depth)
+        p.blob(x - r * m, y - r * m / 2, x + r * m, y + r * m / 2, PIT_WATER)
+        _bar(p, (x - r * 0.5 * m, y), (x + r * 0.1 * m, y), 0.1 * m, shade(PIT_WATER, 1.35))
+    for u, v, depth in ((8, 13, 1.4), (12.5, 12.8, 1.4), (9.5, 10.6, 2.6), (13, 9.6, 2.6)):
+        x, y = low(u, v, depth)
+        p.blob(x - 0.4 * m, y - 0.25 * m, x + 0.4 * m, y + 0.1 * m, shade(CLAY_WET, 1.1))
+    _clay_hand(p, *low(9, 12.6, 1.4), CLAY_SHIRTS[0], "dig", 1)
+    _clay_hand(p, *low(14, 11.8, 1.4), CLAY_SHIRTS[1], "dig", -1)
+    _clay_hand(p, *low(11.5, 9.8, 2.6), CLAY_SHIRTS[2], "dig", 1)
+    foot, head = low(5.5, 9, 3.9), at(1.5, 11)
+    _bar(p, foot, head, 0.5 * m, shade(TIMBER, 1.2))
     _bar(
-        p, (wx - 1.4 * m, wy + 4 * m), (wx + 0.2 * m, wy + 4 * m), 0.12 * m, shade(PIT_WATER, 1.35)
+        p, (foot[0], foot[1] + 0.12 * m), (head[0], head[1] + 0.12 * m), 0.1 * m, shade(TIMBER, 0.7)
     )
-    low, high = at(15.5, 6), at(19.2, 6)
-    p.polygon(
-        [
-            (low[0], low[1] + 3.3 * m),
-            (low[0] + 0.6 * m, low[1] + 3 * m),
-            (high[0] + 0.6 * m, high[1] - 0.3 * m),
-            high,
-        ],
-        shade(TIMBER, 1.15),
-        shade(TIMBER, 0.7),
-    )
-    bx, by = at(6.5, 3)
-    _wheelbarrow(p, bx, by + 1.7 * m, CLAY)
-    _drying_shed(p, *at(3, 18))
-    _rails_m(p, at(-6.5, 7), at(2.5, 7), (m, m / 2))
-    for u in (-4.5, -1.8):
-        _skip(p, *at(u, 7), CLAY)
-    for (u, v), half, tall in (((-1, 1), 3, 1.4), ((2, -3), 2.2, 1.0), ((21.5, 1), 2.4, 1.1)):
+    mx, my = (foot[0] * 0.45 + head[0] * 0.55), (foot[1] * 0.45 + head[1] * 0.55)
+    _wheelbarrow(p, mx - 0.6 * m, my - 0.3 * m, CLAY_WET)
+    _clay_hand(p, mx + 0.7 * m, my + 0.4 * m, CLAY_SHIRTS[3], "push", -1)
+    for u, v, half, tall in ((-1, 0, 2.6, 1.3), (20, -1, 2.2, 1.1), (21.5, 12, 1.8, 0.9)):
         _mound(p, *at(u, v), half * m, tall * m, shade(CLAY, 1.04))
-    _hut(p, *at(21.5, 8.5), (3.5, 3, 2.4), (126, 96, 66), (70, 66, 64))
+    for u, v, r in ((3, -1.5, 0.35), (4.5, -2.4, 0.3), (2, -2.8, 0.25), (5.5, -1.2, 0.3)):
+        x, y = at(u, v)
+        p.blob(x - r * m, y - r * 0.6 * m, x + r * m, y + r * 0.4 * m, CLAY_WET)
+    _clay_ramp(p, at(11.5, -0.5), at(17.5, -4.5))
+    _drying_shed(p, *at(4, 22))
+    _clay_hacks(p, *at(-6, 16.5), 3, 9)
+    _clay_lean_to(p, *at(-6, 10), CLAY_SHIRTS[1])
+    _rails_m(p, at(-9.5, 3.5), at(1.5, 3.5), (m, -m / 2))
+    for u in (-5.6, -3.2, -0.8):
+        _skip(p, *at(u, 3.5), CLAY_WET)
+    _clay_pug_mill(p, *at(-12, 4.5))
+    _clay_tipped(p, *at(-8.6, 3.5))
+    hx, hy = at(21, 8)
+    _hut(p, hx, hy, (3.5, 3, 2.4), (126, 96, 66), (70, 66, 64))
+    _clay_tools(p, *_iso(hx, hy, -1.2 * m, -1.75 * m))
+    _clay_butt(p, *at(22.8, 5.6))
+    _planks(p, *at(13, 19.5), 4, 0.8)
+    _food_cart(p, *at(19, -4.5), 3.2, 0.5, CLAY_GROUND, lambda put: _clay_load(put, p))
     return p.sprite()
 
 
