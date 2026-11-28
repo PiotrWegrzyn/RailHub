@@ -108,6 +108,25 @@ Query parameters:
     // Named with the version, so a browser never takes an older one it kept for a new page.
     const PAINTER = "painter.js?v=__VERSION__";
 
+    // The page's own copy of a file it loads with itself, as a Blob, failing if it isn't there.
+    async function fetched(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`${url}: ${response.status} ${response.statusText}`);
+        return response.blob();
+    }
+
+    // A worker running web/painter.js, sent first the game's wheel the page runs. The site keeps
+    // only the newest game, so a worker fetching its own after a newer one is published would run
+    // that one, and a new game it grew would be thrown away and grown again on the frames
+    // (railroads.ui.web_setup).
+    function workerStarter(wheel) {
+        return () => {
+            const worker = new Worker(PAINTER, { type: "module" });
+            worker.postMessage({ kind: "start", wheel });
+            return worker;
+        };
+    }
+
     const loader = document.getElementById("loader");
     const landingStatus = document.getElementById("landing-status");
     const timings = {};
@@ -256,11 +275,11 @@ Query parameters:
     // each time, as the memory grows) by their address in it: Pyodide's own conversions read an
     // address past 2 GiB as a negative number, and copy the wrong bytes there or fail.
     class Painters {
-        constructor(count, memory) {
+        constructor(count, memory, started) {
             this.memory = memory;
             this.inbox = [];
             this.workers = Array.from({ length: count }, (_, worker) => {
-                const painter = new Worker(PAINTER, { type: "module" });
+                const painter = started();
                 painter.onmessage = event => this.inbox.push({ worker, ...event.data });
                 painter.onerror = event => {
                     event.preventDefault();
@@ -301,15 +320,16 @@ Query parameters:
     // time a game is started. Bytes are copied by their address in Python's memory, as the
     // painting workers' are.
     class Setup {
-        constructor(memory) {
+        constructor(memory, started) {
             this.memory = memory;
+            this.launch = started;
             this.inbox = [];
             this.worker = null;
             this.spare = this.started();
         }
 
         started() {
-            const worker = new Worker(PAINTER, { type: "module" });
+            const worker = this.launch();
             worker.onmessage = event => {
                 if (worker === this.worker) this.inbox.push(event.data);
             };
@@ -377,6 +397,8 @@ Query parameters:
             else showLanding(play);
         });
 
+        const wheel = fetched(GAME_WHEEL);
+        wheel.catch(() => {});
         const pyodide = await loadPyodide({ indexURL: new URL("pyodide/", location.href).href });
         window.pyodide = pyodide;
         mark("pyodide");
@@ -387,7 +409,7 @@ Query parameters:
         await pyodide.loadPackage(["micropip", "numpy", "pillow"]);
         const micropip = pyodide.pyimport("micropip");
         await micropip.install.callKwargs(IMGUI_BUNDLE, { deps: false });
-        await micropip.install.callKwargs(GAME_WHEEL, { deps: false });
+        pyodide.unpackArchive(await (await wheel).arrayBuffer(), "wheel");
         mark("packages");
         await stage(90);
         await keepSaves(pyodide);
@@ -398,8 +420,9 @@ Query parameters:
         // the map on its frames.
         try {
             const memory = () => pyodide._module.HEAPU8;
-            window.railroadsPainters = new Painters(paintersWanted(query), memory);
-            window.railroadsSetup = new Setup(memory);
+            const started = workerStarter(await wheel);
+            window.railroadsPainters = new Painters(paintersWanted(query), memory, started);
+            window.railroadsSetup = new Setup(memory, started);
         } catch (error) {
             console.error("The painting workers could not start:", error);
         }

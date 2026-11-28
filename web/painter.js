@@ -1,6 +1,8 @@
 // A web worker painting chunks of the map for the page (railroads.ui.pixel.web_painter). It runs a
 // Python of its own, with numpy, Pillow and the game, and holds a copy of the map's pixel world
-// (railroads.ui.pixel.copies.WorldCopy). Messages from the page:
+// (railroads.ui.pixel.copies.WorldCopy). The page sends it first
+//     {kind: "start", wheel}         the game's wheel the page runs, a Blob
+// so it runs the very game the page does even once a newer one is published. Then:
 //     {kind: "world", world, data}   take up a new world, pickled whole
 //     {kind: "update", world, data}  take up what changed in it
 //     {kind: "paint", world, job, chunk: [x, y, resolution, fine relief, over ground]}
@@ -20,15 +22,14 @@
 // that grew it, or {kind: "failed", error}.
 import { loadPyodide } from "./pyodide/pyodide.mjs";
 
-const GAME_WHEEL = "wheels/railroads-__VERSION__-py3-none-any.whl";
-
 let pyodide = null;
 let copy = null;
 let dead = false;
 const early = [];
 
 self.onmessage = event => {
-    if (copy === null) early.push(event.data);
+    if (event.data.kind === "start") start(event.data).catch(die);
+    else if (copy === null) early.push(event.data);
     else handle(event.data);
 };
 
@@ -131,12 +132,11 @@ function setup({ data }) {
     }
 }
 
-async function start() {
+async function start({ wheel }) {
     pyodide = await loadPyodide({ indexURL: new URL("pyodide/", location.href).href });
-    await pyodide.loadPackage(["numpy", "pillow", new URL(GAME_WHEEL, location.href).href]);
+    await pyodide.loadPackage(["numpy", "pillow"]);
+    pyodide.unpackArchive(await wheel.arrayBuffer(), "wheel");
     copy = pyodide.pyimport("railroads.ui.pixel.copies").WorldCopy();
     postMessage({ kind: "ready", version: pyodide.pyimport("railroads.version").VERSION });
     for (const message of early.splice(0)) handle(message);
 }
-
-start().catch(die);
