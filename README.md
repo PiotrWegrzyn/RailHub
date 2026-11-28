@@ -169,10 +169,10 @@ uv run railroads --poland --seed 1 --simulate
 lets a stand-in player play all 200 years first, printing the map every ten years, and then opens
 the map in 2050 to look at the result (`--simulate 100` stops in 1950 instead, and the stand-in
 goes on playing if the clock runs on). It builds 5 stations when play starts and 2 more each
-decade, each on the free cell whose reach holds the most people no station serves yet, and each
-raised one level so it reaches three hexes out. It lays no track and runs no trains; of the cells
-a station reaches, a third thrive, half are content (half their needs met) and the rest go
-unsatisfied, and they grow and glow as if trains served them. Only the hexagon map is grown.
+decade, each on the free cell whose reach holds the most people no station serves yet. They stand
+at the first level, reaching one hex out, every one raised to the second in 1900 and the third,
+three hexes out, in 1950. It lays no track and runs no trains; every cell a station reaches is
+served in full, and grows and glows as if trains brought it all it needs. Only the hexagon map is grown.
 
 Drag the map or hold the arrow keys to move round it. Esc cancels track, a station move or a
 facility half built and, with nothing half built, closes every open window at once; the tutorial

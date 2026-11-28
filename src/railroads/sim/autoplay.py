@@ -1,8 +1,8 @@
 """A game played by a stand-in player, to see how the map grows when towns are served: from the
 start of play, stations open beside the towns with the most people, a few at first and more each
-decade, each raised a level so it reaches further. No track or trains are laid; instead each cell a
-station reaches is drawn thriving, content or unsatisfied, and its buildings grow as if trains
-brought them that share of what they need."""
+decade, at the first level, every one raised to the second in 1900 and the third in 1950 so they
+reach further. No track or trains are laid; instead every cell a station reaches is served in full,
+and its buildings grow as if trains brought them all they need."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -25,11 +25,8 @@ from railroads.sim.yearly import makes_of
 STATIONS_AT_START = 5
 STATIONS_PER_DECADE = 2
 DECADE = 10 * MONTHS_PER_YEAR
-# A station raised two levels reaches three cells out.
-STATION_LEVEL = 3
-THRIVING_PART = 1 / 3
-CONTENT_PART = 1 / 2
-CONTENT_SHARE = 0.5
+# The years from which every station stands at a level: the first until 1900.
+RAISED = ((1900, 2), (1950, 3))
 BUYS_PER_YEAR = 3
 
 
@@ -37,25 +34,25 @@ BUYS_PER_YEAR = 3
 class PlayerRule:
     stations_at_start: int = STATIONS_AT_START
     stations_per_decade: int = STATIONS_PER_DECADE
-    station_level: int = STATION_LEVEL
-    thriving_part: float = THRIVING_PART
-    content_part: float = CONTENT_PART
-    content_share: float = CONTENT_SHARE
+    raised: tuple[tuple[int, int], ...] = RAISED
     buys_per_year: int = BUYS_PER_YEAR
+
+    def level(self, year: int) -> int:
+        """The level every station stands at in a year."""
+        return max((level for since, level in self.raised if year >= since), default=1)
 
 
 PLAYER = PlayerRule()
 
 
 class StandInPlayer:
-    """Builds stations where they reach the most people no station serves yet and keeps the
-    growth's assumed shares for the cells they reach."""
+    """Builds stations where they reach the most people no station serves yet, raises them as
+    the years come, and serves in full every cell they reach."""
 
     def __init__(
         self,
         growth: Growth,
         railway: Railway,
-        rng: np.random.Generator,
         rule: PlayerRule = PLAYER,
     ) -> None:
         self.growth = growth
@@ -63,14 +60,14 @@ class StandInPlayer:
         self.rule = rule
         self.stations: list[Cell] = []
         self.months = 0
-        self._rng = rng
         self._grid = growth.constructions.tile_map.grid
         growth.assumed_shares = np.full(self._grid.rows * self._grid.cols, np.nan)
+        self.level = rule.level(growth.year)
         self.open_stations(rule.stations_at_start)
 
     @property
     def reach(self) -> int:
-        return self.railway.reach_at(self.rule.station_level)[0]
+        return self.railway.reach_at(self.level)[0]
 
     def open_stations(self, count: int) -> set[Cell]:
         """Builds up to `count` stations, each on the free cell whose reach holds the most
@@ -81,7 +78,7 @@ class StandInPlayer:
             if station is None:
                 break
             self.growth.constructions.build(Station(station))
-            self.railway.levels[station] = self.rule.station_level
+            self.railway.levels[station] = self.level
             self.railway.name_of(station)
             self._serve(station)
             self.stations.append(station)
@@ -104,19 +101,23 @@ class StandInPlayer:
         return None
 
     def _serve(self, station: Cell) -> None:
-        """Draws the share of each cell the station reaches that no other station reaches."""
-        rule = self.rule
+        """Serves in full every cell the station reaches."""
         shares = self.growth.assumed_shares
         assert shares is not None
         cells = np.array(list(self._grid.within(station, self.reach)))
-        reached = np.ravel_multi_index((cells[:, 0], cells[:, 1]), self._grid.shape)
-        reached = reached[np.isnan(shares[reached])]
-        drawn = self._rng.random(reached.size)
-        shares[reached] = np.where(
-            drawn < rule.thriving_part,
-            1.0,
-            np.where(drawn < rule.thriving_part + rule.content_part, rule.content_share, 0.0),
-        )
+        shares[np.ravel_multi_index((cells[:, 0], cells[:, 1]), self._grid.shape)] = 1.0
+
+    def _raise(self) -> set[Cell]:
+        """Raises every station to the level of the year if it has come, serving the cells
+        they now reach; returns the stations raised."""
+        level = self.rule.level(self.growth.year)
+        if level == self.level:
+            return set()
+        self.level = level
+        for station in self.stations:
+            self.railway.levels[station] = level
+            self._serve(station)
+        return set(self.stations)
 
     def month(self, rng: np.random.Generator) -> set[Cell]:
         """Grows one month, earning what the player's buildings would at the share of service
@@ -131,6 +132,7 @@ class StandInPlayer:
         self._earn()
         if self.months % MONTHS_PER_YEAR == 0:
             self._buy()
+            changed |= self._raise()
         if self.months % DECADE == 0:
             changed |= self.open_stations(self.rule.stations_per_decade)
         return changed
@@ -212,7 +214,7 @@ def play(
 ) -> StandInPlayer:
     """Plays `years` with a stand-in player without showing the map, reporting it every ten
     years."""
-    player = StandInPlayer(growth, railway, rng, rule)
+    player = StandInPlayer(growth, railway, rule)
     report(describe(player))
     for _ in range(years * MONTHS_PER_YEAR):
         player.month(rng)
