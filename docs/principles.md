@@ -132,7 +132,8 @@ The ideas every change to the game should follow.
 - Blocks of flats are the reward: they take a lot of the late goods, such as cars, appliances and
   cola; tenements take the same things, but less for each person living there.
 - Demand tiles open new buyers as they go up, so a level brings something more than its share:
-  cola for every home, cars and appliances first for tenements and a level later for houses.
+  cola for every home, cars and appliances first for tenements and a level later for houses,
+  leather for furniture makers' upholstery and later for car seats.
 - A bonus input raises output but never replaces the main input.
 - Raw goods are worked before buildings use them: logging camps fell logs, and only a sawmill's
   planks and wood chips go to other buildings. Homes and wood-burning engines burn logs as they are.
