@@ -2,21 +2,39 @@
 clock towers with gilded domes, halls of mirrors under a glass dome, and steelworks of blast
 furnaces and converters throwing fire."""
 
-from railroads.ui.pixel.art.grand_fire import WHITE_HOT
 from railroads.ui.pixel.art.industry import (
+    STEEL_COKE,
+    STEEL_GROUND,
+    STEEL_LIME,
+    STEEL_ORE,
     _bed,
     _door,
     _footing,
     _ring,
     _roof_rows,
-    _sawtooth,
-    _smoking_chimney,
-    _spill,
-    _stains,
+    _steel_bessemer,
+    _steel_bins,
+    _steel_cooling_bed,
+    _steel_dust_catcher,
+    _steel_flat,
+    _steel_furnace,
+    _steel_hopper,
+    _steel_hot_blast,
+    _steel_hot_car,
+    _steel_incline,
+    _steel_ingots,
+    _steel_shed,
+    _steel_siding,
+    _steel_slag,
+    _steel_stack,
+    _steel_stock,
+    _steel_stove,
+    _steel_teeming,
+    _steel_trestle,
+    _tall_chimney,
     _window,
 )
 from railroads.ui.pixel.art.painter import (
-    BRICK,
     RGB,
     SLATE,
     VERDIGRIS,
@@ -28,9 +46,10 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    METRE,
     _band,
     _bands,
-    _heap,
+    _iso,
     _on_wall,
     _patch,
     _plinth,
@@ -49,13 +68,6 @@ GILT: RGB = (214, 170, 60)
 MIRROR: RGB = (176, 214, 238)
 GLINT: RGB = (252, 254, 255)
 GLASSHOUSE: RGB = (196, 226, 240)
-
-IRON: RGB = (74, 72, 78)
-RUST: RGB = (130, 76, 56)
-STOVE: RGB = (140, 138, 144)
-CINDER: RGB = (58, 54, 56)
-MOLTEN: RGB = (246, 132, 36)
-ORE: RGB = (150, 76, 54)
 
 
 def _clock_face(p: Painter, x: float, y: float, r: float) -> None:
@@ -256,125 +268,121 @@ def mega_mirror_maker() -> Sprite:
     return p.sprite()
 
 
-def _blast_furnace(p: Painter, x: float, y: float, tall: float) -> None:
-    """A round banded blast furnace standing on (x, y), its throat glowing at the top, a stream of
-    molten iron running from its tap at the foot."""
-    _turned(
-        p,
-        x,
-        y,
-        [(0, 3), (tall * 0.25, 3), (tall * 0.75, 2.2), (tall, 1.6)],
-        shade(IRON, 0.9),
-        (40, 34, 32),
-    )
-    for f in (0.2, 0.45, 0.7):
-        _ring(p, x, y - tall * f, 3 - f, shade(IRON, 0.6))
-    p.blob(x - 1.2, y - tall - 1.2, x + 1.2, y - tall + 0.4, MOLTEN)
-    p.point(x, y - tall - 0.6, WHITE_HOT)
-    p.blob(x - 1.6, y - 1.6, x + 0.6, y + 0.4, MOLTEN)
-
-
-def _stove(p: Painter, x: float, y: float, tall: float) -> None:
-    """A tall grey steel hot-blast stove with a domed top banded in rust, standing on (x, y)."""
-    _turned(p, x, y, [(0, 1.8), (tall - 1.5, 1.8), (tall, 1)], STOVE, shade(STOVE, 0.7))
-    for f in (0.3, 0.65):
-        _ring(p, x, y - tall * f, 1.8, RUST)
-
-
-def _sparks(p: Painter, points: tuple[tuple[float, float], ...]) -> None:
-    for k, (x, y) in enumerate(points):
-        p.point(x, y, WHITE_HOT if k % 2 else MOLTEN)
-
-
-def _casting_hall(
-    p: Painter, x: float, y: float, length: float, depth: float, height: float
-) -> Top:
-    """A dark iron casting hall with a row of windows glowing from the fire inside and its door
-    open on molten iron."""
-    top = p.hall(x, y, length, depth, height, IRON, None)
-    left, front, right, _ = top
-    _plinth(p, top, height, IRON)
-    _stains(p, front, right, height, (0.2, 0.5, 0.8), shade(IRON, 0.55), 2)
-    spans = tuple((k + 0.5) / 7 for k in range(7))
-    _windows(p, left, front, spans, (2,), 3, shade(MOLTEN, 0.85), shade(IRON, 1.6))
-    _patch(p, front, right, (0.3, 0.7), (height - 4, height), MOLTEN)
-    _patch(p, front, right, (0.4, 0.6), (height - 3, height), WHITE_HOT)
-    return top
-
-
-def _ladle_car(p: Painter, x: float, y: float) -> None:
-    """A ladle car brimming with molten iron, standing on (x, y)."""
-    p.rect(x - 2.4, y - 1, x + 2.4, y, (40, 38, 40))
-    p.ellipse(x - 2, y - 4, x + 2, y - 0.6, shade(IRON, 0.8))
-    p.blob(x - 1.4, y - 4.2, x + 1.4, y - 3, MOLTEN)
-
-
 def big_steel_mill() -> Sprite:
-    """A steelworks on blackened ground: two blast furnaces glowing at their throats with a row of
-    rust-red hot-blast stoves, a dark casting hall whose windows glow with fire, molten iron
-    running into ladle cars, two banded chimneys smoking and sparks flying."""
-    p = Painter(46, 60, (22, 46))
-    foot = _footing(2, 1, 18, 8)
-    _bed(p, foot, CINDER, 3)
-    _spill(p, -15, 4, 3, ORE)
-    p.shadow(17, 4.5)
-    for x, y in ((9, -9), (12, -7.5), (15, -6)):
-        _stove(p, x, y, 18)
-    for x, y in ((-4, -6), (4, -7)):
-        _blast_furnace(p, x, y, 22)
-    _smoking_chimney(p, -10, -6, -34, shade(BRICK, 0.75), puffs=4, close=True)
-    top = _casting_hall(p, 2, 1, 18, 8, 7)
-    p.gable(top, 3, (60, 58, 62), IRON)
-    _heap(p, -15, 4, 3, 3, ORE)
-    for x in (12, 16):
-        _ladle_car(p, x, 9)
-    p.line([(8, 8), (11, 7.4)], MOLTEN)
-    _sparks(p, ((-6, -32), (-2, -33), (3, -34), (6, -31), (-4, -36), (5, -37)))
+    """A steelworks grown from the ironworks: two blast furnaces of light riveted steel with their
+    headgears and arching uptakes, each fed by a skip incline from a grid of stock bins heaped
+    with ore, coke and limestone where hopper wagons stand on the siding behind, a downcomer
+    falling to the dust catcher, four domed hot-blast stoves on their main and three steel stacks
+    smoking, two red brick Bessemer sheds open on a converter blowing fire and sparks and another
+    pouring its steel into a ladle, a long rolling mill under a rust-red roof with a glazed
+    clerestory, its door glowing over a bogie of red-hot ingots, and on the siding in front a
+    hot-metal car, ingots teemed from a ladle, a wagon of rails and stacks of blue-grey beams."""
+    m = METRE
+    p = Painter(58, 70, (29, 42))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 26) * m, (v - 9) * m)
+
+    def up(u: float, v: float, z: float) -> Point:
+        x, y = at(u, v)
+        return x, y - z * m
+
+    ground = [(-2, 1), (8, -7.5), (60, -7.5), (58, 12), (44, 28), (10, 28), (-6, 14)]
+    p.polygon([at(u, v) for u, v in ground], STEEL_GROUND)
+    p.soft([(*at(-4, 10), *at(16, 0))], shade(STEEL_ORE, 0.9), 0.35, 1.5)
+    p.shadow(22, 6, 2)
+    for u in (21, 28, 35):
+        _steel_stack(p, *at(u, 26.5), 48 * m)
+    dust = _steel_dust_catcher(p, *at(21.5, 21))
+    heads = []
+    for u in (4.5, 15.5):
+        fx, fy = at(u, 17.5)
+        heads.append((fy, _steel_furnace(p, fx, fy, 19 * m, 4.6 * m, dust)))
+    for u in (27, 32.5, 38, 43.5):
+        _steel_stove(p, *at(u, 19.5), 15 * m, 2.9 * m)
+    _steel_hot_blast(p, [up(44, 16, 7), up(18.5, 16, 7), up(17, 16, 8.2)])
+    _steel_siding(p, *at(-6, 13.5), 24)
+    for u, load in ((-1, STEEL_ORE), (6, STEEL_COKE), (13, STEEL_ORE)):
+        _steel_hopper(p, *at(u, 13.5), load)
+    for (fy, head), u in zip(heads, (3.5, 13), strict=True):
+        under = (head[0], fy - 1.5 * m)
+        _steel_incline(p, at(u, 10.6), under, under[1] - head[1], _iso(0, 0, 1.7 * m, 0))
+    _steel_bins(
+        p,
+        *at(-1.5, 10.6),
+        (
+            (STEEL_ORE, STEEL_COKE, STEEL_ORE, STEEL_LIME),
+            (STEEL_COKE, STEEL_ORE, STEEL_LIME, STEEL_COKE),
+        ),
+    )
+    _steel_bessemer(p, *at(20.5, 5), 7 * m, 10 * m, 10 * m, 4)
+    _steel_bessemer(p, *at(27.5, 5), 7 * m, 10 * m, 10 * m, 5, pouring=True)
+    _steel_shed(p, *at(44.5, 5.5), 25 * m, 11 * m, 9 * m, 3.3 * m, 0.72)
+    for u in (38, 46.5):
+        _steel_stock(p, *at(u, -1.8), 7.5, 2.2, 3)
+    _steel_siding(p, *at(7, -5.5), 55)
+    _steel_hot_car(p, *at(12, -5.5))
+    _steel_teeming(p, *at(24, -5.5))
+    _steel_ingots(p, *at(50.5, -5.5), 3)
+    _steel_flat(p, *at(57, -5.5))
     return p.sprite()
 
 
 def mega_steel_mill() -> Sprite:
-    """A great integrated steelworks: three blast furnaces with their stoves, a Bessemer converter
-    tipped and throwing a fountain of fire and sparks, a long rolling mill under a sawtooth roof
-    glowing from inside, a row of four tall chimneys smoking, glowing slag on the cinders and
-    ladle cars of molten iron on the tracks."""
-    p = Painter(58, 72, (29, 54))
-    foot = _footing(0, 2, 26, 9)
-    _bed(p, foot, CINDER, 4)
-    _spill(p, -21, 6, 3.5, ORE)
-    p.shadow(23, 6)
-    for k, x in enumerate((-14, -6, 2, 10)):
-        _smoking_chimney(p, x, -14 + k, -48 + k, shade(BRICK, 0.72), puffs=4, close=True)
-    for x, y in ((14, -12), (17, -10.5), (20, -9), (23, -7.5)):
-        _stove(p, x, y, 20)
-    for x, y in ((-10, -8), (-2, -9), (6, -10)):
-        _blast_furnace(p, x, y, 26)
-    top = _casting_hall(p, 0, 2, 26, 9, 9)
-    _sawtooth(p, top, 4, 3, (64, 62, 66), shade(MOLTEN, 0.9), IRON)
-    cx, cy = 17, 9
-    p.ellipse(cx - 3, cy - 7, cx + 3, cy - 1, shade(IRON, 0.85))
-    p.rect(cx - 4, cy - 4, cx + 4, cy - 3, (40, 38, 40))
-    p.polygon([(cx - 1, cy - 7), (cx - 6, cy - 16), (cx - 2, cy - 18), (cx + 2, cy - 7)], MOLTEN)
-    p.polygon(
-        [(cx - 0.5, cy - 7.5), (cx - 4, cy - 14), (cx - 2, cy - 15), (cx + 1, cy - 7.5)], WHITE_HOT
-    )
-    _sparks(
+    """A great integrated steelworks: a row of three blast furnaces of light riveted steel with
+    their headgears and arching uptakes, six domed hot-blast stoves and four steel stacks smoking
+    behind them, each furnace fed by a skip incline from a grid of stock bins under a high-line
+    trestle where hopper wagons tip their ore and coke, a slag tip glowing where a pot is
+    tipped down it, a Bessemer shop of three red brick bays open on converters blowing fire and
+    showering sparks or pouring into a ladle, a long rolling mill under a rust-red roof with a
+    glazed clerestory and its tall brick chimney, its door glowing over red-hot ingots and a
+    cooling bed of fresh rails, and a busy siding in front: hot-metal cars, ingots teemed from a
+    ladle, a wagon of rails and a stack of blue-grey beams."""
+    m = METRE
+    p = Painter(64, 80, (33, 46))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 28) * m, (v - 10) * m)
+
+    ground = [(-6, 4), (6, -8), (64, -8), (62, 12), (40, 32), (0, 32), (-9, 18)]
+    p.polygon([at(u, v) for u, v in ground], STEEL_GROUND)
+    p.soft([(*at(-6, 12), *at(12, 2))], shade(STEEL_ORE, 0.9), 0.35, 1.5)
+    p.shadow(25, 7, 1)
+    for u in (12, 18, 24, 30):
+        _steel_stack(p, *at(u, 30), 50 * m)
+    for u in (16, 21, 26, 31, 36, 41):
+        _steel_stove(p, *at(u, 25), 15 * m, 2.8 * m)
+    dusts = [_steel_dust_catcher(p, *at(u, 22)) for u in (5.5, 16, 26.5)]
+    heads = []
+    for u, dust in zip((0, 10.5, 21), dusts, strict=True):
+        fx, fy = at(u, 18.5)
+        heads.append((fy, _steel_furnace(p, fx, fy, 19 * m, 4.6 * m, dust)))
+    for (fy, head), u in zip(heads, (0, 9.5, 19), strict=True):
+        under = (head[0], fy - 1.5 * m)
+        _steel_incline(p, at(u, 12.4), under, under[1] - head[1], _iso(0, 0, 1.7 * m, 0))
+    deck = _steel_trestle(p, *at(-4, 14.2), 24, 6)
+    for k, load in enumerate((STEEL_ORE, STEEL_COKE, STEEL_ORE)):
+        _steel_hopper(p, *_iso(deck[0], deck[1], (k - 1) * 7 * m, 0), load)
+    _steel_slag(p, *at(-6, 9), 4.5 * m, 5.5 * m)
+    _steel_bins(
         p,
+        *at(-2.5, 12.4),
         (
-            (cx - 7, cy - 18),
-            (cx - 4, cy - 21),
-            (cx, cy - 20),
-            (cx - 8, cy - 14),
-            (cx + 2, cy - 16),
-            (cx - 6, cy - 23),
-            (cx + 3, cy - 22),
-            (cx - 9, cy - 19),
+            (STEEL_ORE, STEEL_COKE, STEEL_ORE, STEEL_LIME, STEEL_ORE),
+            (STEEL_COKE, STEEL_ORE, STEEL_LIME, STEEL_COKE, STEEL_ORE),
         ),
     )
-    _heap(p, -21, 6, 3.5, 3, ORE)
-    p.blob(-14, 9, -7, 12, shade(MOLTEN, 0.75))
-    p.blob(-12, 9.6, -9, 11, MOLTEN)
-    for x in (4, 9):
-        _ladle_car(p, x, 13)
-    _sparks(p, ((-10, -38), (-2, -40), (6, -41), (-6, -43), (2, -44)))
+    for k, u in enumerate((24, 30, 36)):
+        _steel_bessemer(p, *at(u, 5), 6 * m, 10 * m, 10.5 * m, 6 + k, pouring=k == 1)
+    sx, sy = at(56, 15)
+    _tall_chimney(p, sx, sy, 52 * m)
+    _steel_shed(p, *at(51, 5.5), 24 * m, 11 * m, 9.5 * m, 3.4 * m, 0.7)
+    _steel_stock(p, *at(41.5, -1.8), 5, 2.2, 3)
+    _steel_cooling_bed(p, *at(49.5, -2.1), 9, 6)
+    _steel_siding(p, *at(5, -5.5), 60)
+    for u in (9.5, 15):
+        _steel_hot_car(p, *at(u, -5.5))
+    _steel_teeming(p, *at(28, -5.5))
+    _steel_flat(p, *at(46, -5.5))
+    _steel_ingots(p, *at(56, -5.5), 3)
     return p.sprite()

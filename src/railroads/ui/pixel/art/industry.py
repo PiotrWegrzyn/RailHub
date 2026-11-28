@@ -1043,6 +1043,911 @@ def _cask_at(x: float, y: float, u: float, v: float, z: float = 0) -> Point:
     return x + (u + v) * m, y + (u - v) * m / 2 - z * m
 
 
+STEEL_JACKET: RGB = (104, 104, 110)
+STEEL_SLAG: RGB = (84, 80, 78)
+STEEL_SHELL: RGB = (152, 158, 168)
+STEEL_STOVE: RGB = (176, 180, 188)
+STEEL_FRAME: RGB = (78, 84, 96)
+STEEL_PIPE: RGB = (128, 134, 146)
+STEEL_CLAD: RGB = (168, 170, 172)
+STEEL_ROOF: RGB = (160, 80, 54)
+STEEL_BRICK: RGB = (150, 70, 52)
+STEEL_STOCK: RGB = (122, 142, 168)
+STEEL_ORE: RGB = (158, 74, 50)
+STEEL_COKE: RGB = (72, 72, 78)
+STEEL_LIME: RGB = (204, 200, 188)
+STEEL_GROUND: RGB = (116, 108, 100)
+STEEL_BIN: RGB = (158, 152, 142)
+STEEL_WAGON: RGB = (96, 92, 90)
+STEEL_BALLAST: RGB = (138, 130, 118)
+STEEL_SLEEPER: RGB = (80, 64, 50)
+STEEL_FUME: RGB = (196, 178, 164)
+HOT_WHITE: RGB = (255, 246, 214)
+HOT_YELLOW: RGB = (255, 206, 92)
+HOT_ORANGE: RGB = (240, 122, 34)
+RED_HOT: RGB = (186, 58, 30)
+
+
+def _steel_hoop(p: Painter, x: float, y: float, r: float, wide: float, colour: RGB) -> None:
+    """A hoop `wide` deep round the front of an upright round thing `r` wide whose axis passes
+    through (x, y), shaded on its right third as the thing is (_turned)."""
+    split = math.acos(1 / 3)
+    for a0, a1, tone in ((split, math.pi, 1.0), (0, split, 0.78)):
+        arc = [(x + r * math.cos(a), y + r / 2 * math.sin(a)) for a in np.linspace(a0, a1, 7)]
+        p.polygon(arc + [(ax, ay + wide) for ax, ay in arc[::-1]], shade(colour, tone))
+
+
+def _steel_round(
+    p: Painter,
+    x: float,
+    y: float,
+    profile: list[tuple[float, float]],
+    colour: RGB,
+    hoops: tuple[float, ...] = (),
+    cap: RGB | None = None,
+) -> None:
+    """An upright round thing of riveted steel plate (_turned) with a light streak down its lit
+    side, so that it reads as round, and a dark hoop round it at each of `hoops` heights."""
+    _turned(p, x, y, profile, colour, cap)
+    heights, widths = [h for h, _ in profile], [w for _, w in profile]
+    outer = [(x - 0.64 * w, y - h + 0.38 * w) for h, w in profile]
+    inner = [(x - 0.4 * w, y - h + 0.46 * w) for h, w in profile]
+    p.polygon(outer + inner[::-1], shade(colour, 1.14))
+    for h in hoops:
+        w = float(np.interp(h, heights, widths))
+        _steel_hoop(p, x, y - h, w, 0.2 * METRE, shade(colour, 0.7))
+
+
+def _steel_pipe(p: Painter, points: list[Point], wide: float, colour: RGB) -> None:
+    """A steel pipe `wide` thick bending through `points`, with rounded bends and a light streak
+    along its upper side."""
+    for a, b in itertools.pairwise(points):
+        _bar(p, a, b, wide, colour)
+    for x, y in points[1:-1]:
+        p.blob(x - wide / 2, y - wide / 2, x + wide / 2, y + wide / 2, colour)
+    lift = wide * 0.25
+    for (ax, ay), (bx, by) in itertools.pairwise(points):
+        _bar(p, (ax - lift, ay - lift), (bx - lift, by - lift), wide * 0.25, shade(colour, 1.3))
+
+
+def _steel_furnace(p: Painter, x: float, y: float, tall: float, r: float, down: Point) -> Point:
+    """A blast furnace standing on (x, y): a hearth and bosh of dark iron jacketed in cooling
+    plates, `r` wide at the bosh and fed through goosenecks from the bustle main round its waist,
+    with tuyeres glowing at its foot, under a riveted stack of light steel tapering up `tall` to
+    a deck railed round its bell; on the deck a lattice headgear with its sheave, and two gas
+    uptakes arching over to a bleeder with a flame at its tip, a downcomer falling from them to
+    `down`. Returns where its skip incline arrives."""
+    m = METRE
+    bosh = 6.5 * m
+    _steel_round(
+        p,
+        x,
+        y,
+        [(0, 0.78 * r), (2.6 * m, 0.78 * r), (bosh, r)],
+        STEEL_JACKET,
+        (1 * m, 1.9 * m, 3.6 * m, 4.6 * m, 5.6 * m),
+    )
+    _steel_round(
+        p,
+        x,
+        y - bosh,
+        [(0, r), (tall - bosh - 0.8 * m, 0.64 * r), (tall - bosh, 0.62 * r)],
+        STEEL_SHELL,
+        tuple(np.arange(1.6 * m, tall - bosh - 0.5 * m, 2.6 * m)),
+    )
+    ring = r + 1 * m
+    main = y - bosh - 1.4 * m
+    for a in np.linspace(0.18 * math.pi, 0.82 * math.pi, 5):
+        tx, ty = x + 0.8 * r * math.cos(a), y - 2.2 * m + 0.4 * r * math.sin(a)
+        gx, gy = x + ring * math.cos(a), main + ring / 2 * math.sin(a)
+        _steel_pipe(p, [(gx, gy), (gx, ty - 1.2 * m), (tx, ty)], 0.45 * m, STEEL_PIPE)
+        p.blob(tx - 0.22 * m, ty - 0.18 * m, tx + 0.22 * m, ty + 0.18 * m, HOT_YELLOW)
+    _steel_hoop(p, x, main - 0.5 * m, ring, 1.1 * m, STEEL_PIPE)
+    _steel_hoop(p, x, main - 0.5 * m, ring, 0.25 * m, shade(STEEL_PIPE, 1.3))
+    top = y - tall
+    deck = 0.62 * r + 1.4 * m
+    p.ellipse(x - deck, top - deck / 2 + 0.4 * m, x + deck, top + deck / 2 + 0.4 * m, STEEL_FRAME)
+    p.ellipse(x - deck, top - deck / 2, x + deck, top + deck / 2, shade(STEEL_SHELL, 1.1))
+    apex = (x - 0.4 * deck, top - 8.5 * m)
+    feet = ((x - 0.85 * deck, top + 0.1 * m), (x + 0.05 * deck, top - 0.4 * m))
+    for fx, fy in feet:
+        _bar(p, (fx, fy), apex, 0.4 * m, STEEL_FRAME)
+    for k in range(1, 4):
+        t = k / 4
+        a = (feet[0][0] + (apex[0] - feet[0][0]) * t, feet[0][1] + (apex[1] - feet[0][1]) * t)
+        b = (feet[1][0] + (apex[0] - feet[1][0]) * t, feet[1][1] + (apex[1] - feet[1][1]) * t)
+        _bar(p, a, b, 0.2 * m, STEEL_FRAME)
+        if k < 3:
+            c = (
+                feet[1][0] + (apex[0] - feet[1][0]) * (t + 0.25),
+                feet[1][1] + (apex[1] - feet[1][1]) * (t + 0.25),
+            )
+            _bar(p, a, c, 0.14 * m, STEEL_FRAME)
+    sx, sy = apex[0], apex[1] - 0.3 * m
+    p.ellipse(sx - 1 * m, sy - 1 * m, sx + 1 * m, sy + 1 * m, STEEL_FRAME)
+    p.blob(sx - 0.65 * m, sy - 0.65 * m, sx + 0.65 * m, sy + 0.65 * m, shade(STEEL_SHELL, 1.15))
+    p.blob(sx - 0.22 * m, sy - 0.22 * m, sx + 0.22 * m, sy + 0.22 * m, STEEL_FRAME)
+    _steel_round(
+        p,
+        x,
+        top,
+        [(0, 0.52 * r), (1.6 * m, 0.32 * r), (2.8 * m, 0.28 * r)],
+        STEEL_PIPE,
+        cap=shade(STEEL_PIPE, 1.2),
+    )
+    shoulder, crown = top - 4 * m, top - 6.2 * m
+    for side in (-1, 1):
+        ux = x + side * 0.55 * deck
+        _steel_pipe(
+            p,
+            [(ux, top + 0.3 * m), (ux, shoulder), (x + side * 0.25 * deck, crown)],
+            1 * m,
+            STEEL_PIPE,
+        )
+    _steel_pipe(p, [(x - 0.25 * deck, crown), (x + 0.25 * deck, crown)], 1 * m, STEEL_PIPE)
+    _steel_pipe(p, [(x, crown), (x, crown - 2.4 * m)], 0.6 * m, STEEL_PIPE)
+    p.rect(x - 0.55 * m, crown - 2.8 * m, x + 0.55 * m, crown - 2.4 * m, STEEL_FRAME)
+    for scale, tone in ((1, HOT_ORANGE), (0.55, HOT_YELLOW)):
+        p.polygon(
+            [
+                (x - 0.35 * m * scale, crown - 2.85 * m),
+                (x + 0.35 * m * scale, crown - 2.85 * m),
+                (x + 0.15 * m, crown - 2.85 * m - 1.3 * m * scale),
+            ],
+            tone,
+        )
+    ox = x + 0.55 * deck
+    _steel_pipe(p, [(ox, shoulder), (ox + 1.6 * m, shoulder + 1.2 * m), down], 1.3 * m, STEEL_PIPE)
+    rail = 1.1 * m
+    arc = [
+        (x + deck * math.cos(a), top + deck / 2 * math.sin(a)) for a in np.linspace(0, math.pi, 11)
+    ]
+    for a, b in itertools.pairwise(arc):
+        _bar(p, (a[0], a[1] - rail), (b[0], b[1] - rail), 0.14 * m, STEEL_FRAME)
+    for px, py in arc[1:-1:2]:
+        _bar(p, (px, py), (px, py - rail), 0.12 * m, STEEL_FRAME)
+    return apex[0], apex[1] + 2.5 * m
+
+
+def _steel_dust_catcher(p: Painter, x: float, y: float) -> Point:
+    """A dust catcher standing on (x, y): a squat steel drum on a cone over its hopper, standing on
+    legs; returns the top of it, where the downcomer comes in."""
+    m = METRE
+    for dx in (-1.6, 0.4, 1.6):
+        _bar(p, (x + dx * m, y), (x + dx * m * 0.7, y - 3 * m), 0.3 * m, STEEL_FRAME)
+    _steel_round(
+        p,
+        x,
+        y - 1.5 * m,
+        [(0, 0.5 * m), (2 * m, 2.2 * m), (8 * m, 2.2 * m), (9.6 * m, 0.8 * m)],
+        STEEL_SHELL,
+        (3.5 * m, 6 * m),
+    )
+    return x, y - 11 * m
+
+
+def _steel_stove(p: Painter, x: float, y: float, tall: float, r: float) -> None:
+    """A Cowper hot-blast stove standing on (x, y): a tall drum of light riveted steel `r` wide,
+    banded, with a domed top glinting where the light catches it and a valve on its crown."""
+    m = METRE
+    dome = [
+        (tall + 0.87 * r * math.sin(a), r * math.cos(a)) for a in np.linspace(0, math.pi / 2, 7)
+    ]
+    _steel_round(p, x, y, [(0, r), *dome], STEEL_STOVE, tuple(np.arange(1.5 * m, tall, 2.4 * m)))
+    _steel_hoop(p, x, y - tall, r, 0.35 * m, shade(STEEL_STOVE, 0.62))
+    p.blob(
+        x - 0.62 * r,
+        y - tall - 0.62 * r,
+        x - 0.16 * r,
+        y - tall - 0.28 * r,
+        shade(STEEL_STOVE, 1.25),
+    )
+    crown = y - tall - 0.87 * r
+    _turned(
+        p, x, crown + 0.3 * m, [(0, 0.5 * m), (1 * m, 0.5 * m)], STEEL_PIPE, shade(STEEL_PIPE, 1.2)
+    )
+
+
+def _steel_stack(p: Painter, x: float, y: float, tall: float) -> None:
+    """A slim riveted steel stack standing on (x, y), drawn for `tall` and lowered
+    (CHIMNEY_SHARE), flaring at its foot and sooted at its crown, smoking."""
+    m = METRE
+    tall *= CHIMNEY_SHARE
+    profile = [(0, 1.8 * m), (2 * m, 1.25 * m), (tall - 1 * m, 1.05 * m), (tall, 1.2 * m)]
+    _steel_round(p, x, y, profile, STEEL_PIPE, tuple(np.arange(4 * m, tall - 2 * m, 3.5 * m)))
+    _steel_hoop(p, x, y - tall, 1.2 * m, 1.6 * m, (64, 62, 64))
+    p.ellipse(x - 1.2 * m, y - tall - 0.6 * m, x + 1.2 * m, y - tall + 0.6 * m, (40, 38, 40))
+    _smoke(p, x + 1, y - tall - 3, (212, 212, 216), 2)
+
+
+def _steel_incline(p: Painter, foot: Point, under: Point, rise: float, side: Point) -> None:
+    """A skip incline: two lattice girders `side` apart rising from `foot` on the ground to `rise`
+    over `under` at a furnace's top, standing on trestles, with sleepers across them and a skip
+    of ore on its way up."""
+    m = METRE
+    head = (under[0], under[1] - rise)
+
+    def at(a: Point, b: Point, t: float) -> Point:
+        return a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+
+    def girder(off: float, colour: RGB) -> list[Point]:
+        a = (foot[0] + off * side[0], foot[1] + off * side[1])
+        b = (head[0] + off * side[0], head[1] + off * side[1])
+        g = (under[0] + off * side[0], under[1] + off * side[1])
+        deep = 1.4 * m
+
+        def low(t: float) -> Point:
+            x, y = at(a, b, t)
+            return x, y + deep * min(1.0, t * 5)
+
+        for t in (0.3, 0.55, 0.8):
+            _bar(p, low(t), at(a, g, t), 0.3 * m, shade(colour, 0.85))
+        _bar(p, low(0), low(1), 0.22 * m, colour)
+        panels = 10
+        for k in range(panels):
+            t0, t1 = k / panels, (k + 1) / panels
+            _bar(p, at(a, b, t0), low(t1), 0.13 * m, colour)
+            _bar(p, low(t1), at(a, b, t1), 0.13 * m, colour)
+        _bar(p, a, b, 0.32 * m, colour)
+        return [at(a, b, k / panels) for k in range(panels + 1)]
+
+    far = girder(-1, shade(STEEL_FRAME, 0.8))
+    near_rail = [at(foot, head, k / 10) for k in range(11)]
+    for (fx, fy), (nx, ny) in zip(far, near_rail, strict=True):
+        _bar(p, (fx, fy), (nx, ny), 0.18 * m, shade(STEEL_FRAME, 0.9))
+    t0, t1 = 0.6, 0.65
+    a, b = at(foot, head, t0), at(foot, head, t1)
+    lift = 0.9 * m
+    p.polygon([a, b, (b[0], b[1] - lift), (a[0], a[1] - lift)], shade(STEEL_FRAME, 1.2))
+    p.polygon(
+        [
+            (a[0], a[1] - lift),
+            (b[0], b[1] - lift),
+            (b[0] - side[0], b[1] - side[1] - lift),
+            (a[0] - side[0], a[1] - side[1] - lift),
+        ],
+        STEEL_ORE,
+    )
+    girder(0, STEEL_FRAME)
+    _bar(p, foot, head, 0.1 * m, shade(STEEL_SHELL, 1.1))
+
+
+def _steel_pile(
+    p: Painter, x: float, y: float, half: float, high: float, colour: RGB, seed: int = 0
+) -> None:
+    """A heap of lumpy stuff `half` wide either side of (x, y) and `high` tall, lit on its left
+    and strewn with lumps lighter and darker than it."""
+    m = METRE
+    apex = (x - 0.12 * half, y - high)
+    split = 1.25
+
+    def arc(a0: float, a1: float) -> list[Point]:
+        return [
+            (x + half * math.cos(a), y + half / 2 * math.sin(a)) for a in np.linspace(a0, a1, 8)
+        ]
+
+    p.polygon([*arc(split, math.pi), apex], colour)
+    p.polygon([*arc(0, split), apex], shade(colour, 0.74))
+    rng = np.random.default_rng(seed)
+    for _ in range(int(6 + half / m * 4)):
+        a = rng.uniform(0.15, math.pi - 0.15)
+        s = rng.uniform(0.05, 0.8)
+        bx, by = x + half * math.cos(a), y + half / 2 * math.sin(a)
+        lx, ly = bx + (apex[0] - bx) * s, by + (apex[1] - by) * s
+        tone = rng.uniform(1.15, 1.4) if math.cos(a) < 0.33 else rng.uniform(0.55, 0.7)
+        r = rng.uniform(0.16, 0.3) * m
+        p.blob(lx - r, ly - r * 0.7, lx + r, ly + r * 0.7, shade(colour, tone))
+
+
+def _steel_bins(p: Painter, x: float, y: float, rows: tuple[tuple[RGB, ...], ...]) -> None:
+    """A grid of open stock bins whose back left corner is on (x, y): low concrete walls round
+    bins 4 m square, a row of them behind each of `rows`, every bin
+    heaped over its walls with its load, such as ore, coke or limestone."""
+    m = METRE
+    cell, deep, wall, high = 4.0, 4.0, 0.4, 1.6
+    long = cell * max(len(row) for row in rows)
+
+    def at(u: float, v: float) -> Point:
+        return _iso(x, y, u * m, -v * m)
+
+    def wall_on(u0: float, v0: float, length: float, depth: float) -> None:
+        cx, cy = at(u0 + length / 2, v0 + depth / 2)
+        p.hall(cx, cy, length * m, depth * m, high * m, STEEL_BIN, shade(STEEL_BIN, 1.18))
+
+    wall_on(0, 0, long + wall, wall)
+    for j, row in enumerate(rows):
+        for k, load in enumerate(row):
+            wall_on(k * cell, j * deep, wall, deep)
+            _steel_pile(
+                p, *at((k + 0.55) * cell, (j + 0.5) * deep), 2.1 * m, 2.9 * m, load, 7 * j + k
+            )
+        wall_on(len(row) * cell, j * deep, wall, deep)
+        wall_on(0, (j + 1) * deep - wall, long + wall, wall)
+
+
+def _steel_siding(p: Painter, x: float, y: float, length: float) -> None:
+    """A siding on the ground from (x, y) `length` metres along the lit walls: a bed of ballast,
+    sleepers across it and two rails catching the light."""
+    m = METRE
+
+    def at(u: float, v: float) -> Point:
+        return _iso(x, y, u * m, v * m)
+
+    p.polygon([at(0, -1.7), at(length, -1.7), at(length, 1.7), at(0, 1.7)], STEEL_BALLAST)
+    for u in np.arange(0.4, length, 0.8):
+        _bar(p, at(u, -1.2), at(u, 1.2), 0.3 * m, STEEL_SLEEPER)
+    for v in (-0.72, 0.72):
+        _bar(p, at(0, v), at(length, v), 0.2 * m, shade(STEEL_PIPE, 0.6))
+        (ax, ay), (bx, by) = at(0, v), at(length, v)
+        _bar(p, (ax, ay - 0.12 * m), (bx, by - 0.12 * m), 0.1 * m, shade(STEEL_SHELL, 1.15))
+
+
+def _steel_hopper(p: Painter, x: float, y: float, load: RGB) -> None:
+    """A four-wheeled hopper wagon 6 m long standing along the lit walls with its middle on
+    (x, y) of a siding: a ribbed body with a lit rim, its chutes hanging between its wheels,
+    heaped with `load`."""
+    m = METRE
+    body = STEEL_WAGON
+    rail = _iso(x, y, 0, -0.72 * m)
+    for du in (-1.9, 1.9):
+        wx, wy = _iso(*rail, du * m, 0)
+        p.ellipse(wx - 0.5 * m, wy - 1 * m, wx + 0.5 * m, wy, (42, 40, 42))
+        p.blob(wx - 0.15 * m, wy - 0.65 * m, wx + 0.15 * m, wy - 0.35 * m, (120, 118, 118))
+    high, lift = 2 * m, 1.2 * m
+    top = p.hall(x, y - lift, 6 * m, 2.7 * m, high, body, None)
+    left, front, right, _ = top
+    base_l, base_f = (left[0], left[1] + high), (front[0], front[1] + high)
+    p.polygon(
+        [
+            _on_wall(base_l, base_f, 0.3, 0),
+            _on_wall(base_l, base_f, 0.7, 0),
+            _on_wall(base_l, base_f, 0.58, 0.75 * m),
+            _on_wall(base_l, base_f, 0.42, 0.75 * m),
+        ],
+        shade(body, 0.7),
+    )
+    _bar(p, base_l, base_f, 0.3 * m, (50, 48, 50))
+    for t in (0.04, 0.27, 0.5, 0.73, 0.96):
+        _bar(
+            p,
+            _on_wall(left, front, t, 0),
+            _on_wall(left, front, t, high),
+            0.14 * m,
+            shade(body, 0.72),
+        )
+    _bar(p, left, front, 0.2 * m, shade(body, 1.6))
+    _bar(p, front, right, 0.2 * m, shade(body, 1.3))
+    p.gable(top, 0.9 * m, load, load)
+    ridge_back, ridge_front = _ridge(top, 0.9 * m)
+    for t, up in ((0.2, 0.4), (0.45, 0.7), (0.7, 0.35), (0.85, 0.6)):
+        lx, ly = _on_wall(
+            _on_wall(left, front, t, 0), _on_wall(ridge_back, ridge_front, t, 0), up, 0
+        )
+        p.blob(lx - 0.2 * m, ly - 0.15 * m, lx + 0.2 * m, ly + 0.15 * m, shade(load, 1.3))
+
+
+def _steel_stock(p: Painter, x: float, y: float, long: float, wide: float, layers: int) -> None:
+    """Finished steel, rails and beams `long` metres long, stacked `layers` deep and `wide`
+    across on timber bearers at (x, y) along the lit walls: blue-grey, lit along the top so each
+    length shows, their ends dark on the shaded side."""
+    m = METRE
+    for along in (-0.32, 0.32):
+        bx, by = _iso(x, y, along * long * m, 0)
+        p.hall(
+            bx, by, 0.35 * m, wide * m + 0.6 * m, 0.3 * m, shade(TIMBER, 0.62), shade(TIMBER, 0.8)
+        )
+    high = 0.32 * m * layers
+    top = p.hall(x, y - 0.3 * m, long * m, wide * m, high, STEEL_STOCK, shade(STEEL_STOCK, 1.32))
+    left, front, right, back = top
+    count = round(wide / 0.45)
+    for k in range(1, count):
+        s = k / count
+        _bar(
+            p,
+            _on_wall(left, back, s, 0),
+            _on_wall(front, right, s, 0),
+            0.06 * m,
+            shade(STEEL_STOCK, 0.92),
+        )
+    for k in range(1, layers):
+        _band(p, left, front, high * k / layers, shade(STEEL_STOCK, 0.7))
+    for k in range(layers):
+        for s in np.linspace(0.12, 0.88, count):
+            ex, ey = _on_wall(front, right, s, high * (k + 0.5) / layers)
+            p.blob(
+                ex - 0.13 * m, ey - 0.1 * m, ex + 0.13 * m, ey + 0.1 * m, shade(STEEL_STOCK, 0.42)
+            )
+
+
+def _steel_corrugated(p: Painter, top: Top, rise: float, roof: RGB) -> None:
+    """Corrugations running down the lit side of a gable roof `rise` high on a block's top."""
+    m = METRE
+    left, front, _, _ = top
+    ridge_back, ridge_front = _ridge(top, rise)
+    count = max(2, round(math.dist(left, front) / (0.7 * m)))
+    for k in range(1, count):
+        t = k / count
+        _bar(
+            p,
+            _on_wall(left, front, t, 0),
+            _on_wall(ridge_back, ridge_front, t, 0),
+            0.1 * m,
+            shade(roof, 0.84 if k % 2 else 1.08),
+        )
+
+
+def _steel_glow(
+    p: Painter, a: Point, b: Point, span: tuple[float, float], drop: tuple[float, float]
+) -> None:
+    """An open doorway on the wall under the edge from `a` to `b` with hot metal glowing inside,
+    darkest at its head and brightest along the floor."""
+    (t0, t1), (d0, d1) = span, drop
+    tones = ((40, 28, 26), (96, 36, 24), RED_HOT, HOT_ORANGE, HOT_YELLOW)
+    for k, tone in enumerate(tones):
+        inset = (t1 - t0) * 0.07 * k
+        top = d0 + (d1 - d0) * (0.0 if k == 0 else 0.3 + 0.15 * k)
+        _patch(p, a, b, (t0 + inset, t1 - inset), (top, d1), tone)
+
+
+def _steel_ingots(p: Painter, x: float, y: float, count: int) -> None:
+    """A bogie of `count` red-hot ingots standing upright on (x, y) along the lit walls, glowing
+    yellow at their tops."""
+    m = METRE
+    long = count * 1.3 * m + 0.5 * m
+    rail = _iso(x, y, 0, -0.72 * m)
+    for du in (-0.32, 0.32):
+        wx, wy = _iso(*rail, du * long, 0)
+        p.ellipse(wx - 0.4 * m, wy - 0.8 * m, wx + 0.4 * m, wy, (42, 40, 42))
+    p.hall(x, y - 0.7 * m, long, 1.8 * m, 0.35 * m, (58, 56, 58), (88, 86, 90))
+    for k in range(count):
+        ix, iy = _iso(x, y - 1.05 * m, (k - (count - 1) / 2) * 1.3 * m, 0)
+        p.hall(ix, iy, 0.75 * m, 0.75 * m, 1.9 * m, HOT_ORANGE, HOT_YELLOW)
+
+
+def _steel_sparks(
+    p: Painter, x: float, y: float, reach: float, count: int, seed: int, lean: float = 0
+) -> None:
+    """`count` sparks thrown from (x, y) up to `reach` away and falling, leaning right by
+    `lean` radians, bright where they start and reddening as they fall."""
+    m = METRE
+    rng = np.random.default_rng(seed)
+    for _ in range(count):
+        angle = rng.uniform(-math.pi * 0.85, -math.pi * 0.15) + lean
+        speed = rng.uniform(0.45, 1) * reach
+        for s, tone, r in ((0.35, HOT_WHITE, 0.24), (0.7, HOT_YELLOW, 0.2), (1, HOT_ORANGE, 0.16)):
+            sx = x + math.cos(angle) * speed * s
+            sy = y + math.sin(angle) * speed * s + 0.6 * reach * s * s
+            p.blob(sx - r * m, sy - r * m, sx + r * m, sy + r * m, tone)
+
+
+def _steel_converter(p: Painter, x: float, y: float, size: float, pouring: bool = False) -> None:
+    """A Bessemer converter standing on (x, y), `size` across: a pear-shaped iron vessel on its
+    trunnion stand, rimmed by the glow; tipped to the left and blowing a roaring flame from its
+    mouth, or if `pouring` tipped to the right and pouring a thin bright stream of steel into a
+    ladle on the floor."""
+    iron = (54, 46, 46)
+    s = size
+    p.polygon(
+        [
+            (x - 0.55 * s, y),
+            (x - 0.3 * s, y - 0.9 * s),
+            (x + 0.3 * s, y - 0.9 * s),
+            (x + 0.55 * s, y),
+        ],
+        iron,
+    )
+    cx, cy = x, y - 1.05 * s
+    p.blob(cx - 0.56 * s, cy - 0.56 * s, cx + 0.44 * s, cy + 0.56 * s, HOT_ORANGE)
+    p.ellipse(cx - 0.48 * s, cy - 0.55 * s, cx + 0.5 * s, cy + 0.55 * s, iron)
+    if pouring:
+        p.polygon(
+            [
+                (cx + 0.3 * s, cy - 0.42 * s),
+                (cx + 0.46 * s, cy + 0.2 * s),
+                (cx + 1.0 * s, cy - 0.02 * s),
+                (cx + 0.84 * s, cy - 0.5 * s),
+            ],
+            iron,
+        )
+        lx, ly = x + 1.05 * s, y
+        lip = (cx + 0.97 * s, cy - 0.22 * s)
+        _turned(p, lx, ly, [(0, 0.32 * s), (0.75 * s, 0.42 * s)], iron, HOT_ORANGE)
+        p.blob(lx - 0.25 * s, ly - 0.83 * s, lx + 0.25 * s, ly - 0.67 * s, HOT_YELLOW)
+        _bar(p, lip, (lip[0] + 0.05 * s, ly - 0.75 * s), 0.13 * s, HOT_YELLOW)
+        _bar(p, lip, (lip[0] + 0.05 * s, ly - 0.75 * s), 0.05 * s, HOT_WHITE)
+        p.blob(cx - 0.08 * s, cy - 0.12 * s, cx + 0.12 * s, cy + 0.08 * s, (90, 80, 78))
+        return
+    nose = [
+        (cx - 0.44 * s, cy - 0.25 * s),
+        (cx + 0.22 * s, cy - 0.5 * s),
+        (cx - 0.1 * s, cy - 1.05 * s),
+        (cx - 0.66 * s, cy - 0.8 * s),
+    ]
+    p.polygon(nose, iron)
+    p.blob(cx - 0.08 * s, cy - 0.12 * s, cx + 0.12 * s, cy + 0.08 * s, (90, 80, 78))
+    mx, my = cx - 0.38 * s, cy - 0.93 * s
+    dx, dy = -0.36, -1.0
+    nx, ny = 1.0, -0.36
+    for scale, tone in ((1.0, HOT_ORANGE), (0.72, HOT_YELLOW), (0.42, HOT_WHITE)):
+        w, long = 0.3 * s * scale, 2.0 * s * scale
+        p.polygon(
+            [
+                (mx + nx * w, my + ny * w),
+                (mx + dx * long * 0.45 + nx * w * 1.5, my + dy * long * 0.45 + ny * w * 1.5),
+                (mx + dx * long, my + dy * long),
+                (mx + dx * long * 0.45 - nx * w * 1.5, my + dy * long * 0.45 - ny * w * 1.5),
+                (mx - nx * w, my - ny * w),
+            ],
+            tone,
+        )
+
+
+def _steel_shed(
+    p: Painter,
+    x: float,
+    y: float,
+    length: float,
+    depth: float,
+    high: float,
+    rise: float,
+    door: float,
+) -> Top:
+    """A long rolling mill: walls of grey corrugated iron on a red brick plinth between steel
+    stanchions, a strip of glazing under the eaves, a roof of rust-red corrugated iron with a
+    glazed clerestory along its ridge, and a tall open door `door` along its lit wall glowing
+    from the hot steel inside."""
+    m = METRE
+    top = p.hall(x, y, length, depth, high, STEEL_CLAD, None)
+    left, front, right, _ = top
+    for a, b, size, tone in ((left, front, length, 0.86), (front, right, depth, 0.68)):
+        step = 0.6 * m / size
+        for t in np.arange(step, 1, step):
+            _bar(
+                p,
+                _on_wall(a, b, t, 1.9 * m),
+                _on_wall(a, b, t, high),
+                0.08 * m,
+                shade(STEEL_CLAD, tone),
+            )
+        _patch(p, a, b, (0, 1), (0.5 * m, 1.7 * m), shade(GLAZING, 0.92 if tone > 0.8 else 0.74))
+        _patch(
+            p, a, b, (0, 1), (high - 1.4 * m, high), shade(STEEL_BRICK, 1.0 if tone > 0.8 else 0.78)
+        )
+        _band(p, a, b, high - 1.4 * m, shade(DRESSING, 0.9))
+        bays = max(1, round(size / (4.5 * m)))
+        for k in range(bays + 1):
+            t = k / bays
+            _bar(
+                p,
+                _on_wall(a, b, t, 0),
+                _on_wall(a, b, t, high - 1.4 * m),
+                0.35 * m,
+                shade(STEEL_FRAME, 1.1 if tone > 0.8 else 0.9),
+            )
+    half = 2.2 * m / length
+    _patch(p, left, front, (door - half - 0.01, door + half + 0.01), (2.3 * m, high), STEEL_FRAME)
+    _steel_glow(p, left, front, (door - half, door + half), (2.6 * m, high))
+    p.gable(top, rise, STEEL_ROOF, STEEL_CLAD)
+    _steel_corrugated(p, top, rise, STEEL_ROOF)
+    ridge_back, ridge_front = _ridge(top, rise)
+    _bar(p, ridge_back, ridge_front, 0.3 * m, shade(STEEL_ROOF, 1.3))
+    wide = min(3 * m, depth * 0.3)
+    sink = rise * wide / depth
+    mx, my = _on_wall(ridge_back, ridge_front, 0.5, sink)
+    lantern = p.hall(mx, my, length * 0.78, wide, 1.8 * m + sink, shade(GLAZING, 0.9), None)
+    l_left, l_front, l_right, _ = lantern
+    for a, b, size in ((l_left, l_front, length * 0.78), (l_front, l_right, wide)):
+        for t in np.arange(0, 1.001, 1.2 * m / size):
+            _bar(p, _on_wall(a, b, t, 0), _on_wall(a, b, t, 1.8 * m), 0.12 * m, STEEL_FRAME)
+    p.gable(lantern, 0.8 * m, STEEL_ROOF, STEEL_CLAD)
+    _bar(p, *_ridge(lantern, 0.8 * m), 0.2 * m, shade(STEEL_ROOF, 1.3))
+    return top
+
+
+def _steel_bessemer(
+    p: Painter,
+    x: float,
+    y: float,
+    length: float,
+    depth: float,
+    high: float,
+    seed: int,
+    pouring: bool = False,
+) -> Top:
+    """A Bessemer shed of red brick under a slate roof, its ridge running back from its lit
+    gable end, with a louvred lantern along it breathing a brown fume: the gable end stands open
+    on the glow inside, where a converter tipped on its trunnions blows a flame from its mouth
+    and sparks shower out, or if `pouring` pours its steel into a ladle (_steel_converter)."""
+    m = METRE
+    rise = 3.5 * m
+    top = p.hall(x, y, length, depth, high, STEEL_BRICK, None)
+    left, front, right, back = top
+    _plinth(p, top, high, STEEL_BRICK, 0.7 * m)
+    _stains(p, front, right, high, (0.1, 0.45, 0.9), shade(STEEL_BRICK, 0.55), 1.4 * m)
+    _bar(
+        p,
+        _on_wall(front, right, 0, 0.25 * m),
+        _on_wall(front, right, 1, 0.25 * m),
+        0.5 * m,
+        shade(DRESSING, 0.8),
+    )
+    for t in (0.28, 0.72):
+        _mill_window(p, front, right, depth, t, 1.4 * m, (2 * m, 6.5 * m), shade(MILL_GLASS, 0.85))
+    _gable_across(p, top, rise, MILL_SLATE, STEEL_BRICK)
+    near, far = _on_wall(left, front, 0.5, -rise), _on_wall(back, right, 0.5, -rise)
+    _bar(p, near, far, 0.3 * m, shade(MILL_SLATE, 1.35))
+    wide = length * 0.64
+    p.polygon(_round_head(left, front, length, 0.5, wide + 0.7 * m, -1.4 * m, high), DRESSING)
+    p.polygon(_round_head(left, front, length, 0.5, wide, -1.05 * m, high), (40, 28, 26))
+    for k, tone in enumerate(((96, 36, 24), RED_HOT, HOT_ORANGE)):
+        p.polygon(
+            _round_head(
+                left, front, length, 0.5, wide * (0.84 - 0.18 * k), (1.6 + 1.9 * k) * m, high
+            ),
+            tone,
+        )
+    cx, cy = _on_wall(left, front, 0.5, high - 0.2 * m)
+    if pouring:
+        _steel_converter(p, cx - 0.9 * m, cy, 2 * m, pouring=True)
+    else:
+        _steel_converter(p, cx + 0.3 * m, cy, 2.3 * m)
+    sink = rise * 1.6 / (length / m)
+    lx, ly = _on_wall(near, far, 0.5, sink)
+    louvre = (150, 142, 132)
+    vent = p.hall(lx, ly, 1.6 * m, depth * 0.55, 1.2 * m + sink, louvre, None)
+    for k in range(1, 4):
+        drop = (1.2 * m + sink) * k / 4
+        _band(p, vent[0], vent[1], drop, (92, 84, 80))
+        _band(p, vent[1], vent[2], drop, (74, 68, 66))
+    _gable_across(p, vent, 0.7 * m, MILL_SLATE, louvre)
+    vx, vy = _on_wall(vent[3], vent[2], 0.5, -1.8 * m)
+    p.soft(
+        [
+            (vx - 1.3 * m, vy - 1 * m, vx + 1.3 * m, vy + 1 * m),
+            (vx + 0.4 * m, vy - 3.6 * m, vx + 3.6 * m, vy - 1 * m),
+        ],
+        STEEL_FUME,
+        0.6,
+        0.6,
+    )
+    sx, sy = _on_wall(left, front, 0.42, high - 5.2 * m)
+    if not pouring:
+        _steel_sparks(p, sx, sy, 4.5 * m, 14, seed, -0.35)
+    return top
+
+
+def _steel_hot_blast(p: Painter, points: list[Point]) -> None:
+    """The hot-blast main through `points`: a fat steel pipe lagged in bands, carried from the
+    stoves to a furnace's bustle main."""
+    m = METRE
+    _steel_pipe(p, points, 1.3 * m, STEEL_PIPE)
+    for a, b in itertools.pairwise(points):
+        steps = max(1, round(math.dist(a, b) / (2.5 * m)))
+        for k in range(1, steps):
+            cx, cy = a[0] + (b[0] - a[0]) * k / steps, a[1] + (b[1] - a[1]) * k / steps
+            _bar(p, (cx, cy - 0.65 * m), (cx, cy + 0.65 * m), 0.25 * m, shade(STEEL_PIPE, 0.7))
+
+
+def _steel_teeming(p: Painter, x: float, y: float) -> None:
+    """Ingots teemed in the open on the siding at (x, y): a bogie of three tall iron moulds along
+    the lit walls, and over the first a ladle hung from the jib of a crane, pouring a thin
+    bright stream of steel into it."""
+    m = METRE
+    iron = (62, 58, 60)
+    rail = _iso(x, y, 0, -0.72 * m)
+    for du in (-1.6, 1.6):
+        wx, wy = _iso(*rail, du * m, 0)
+        p.ellipse(wx - 0.45 * m, wy - 0.9 * m, wx + 0.45 * m, wy, (42, 40, 42))
+    p.hall(x, y - 0.8 * m, 5 * m, 2 * m, 0.4 * m, (58, 56, 58), (88, 86, 90))
+    post = _iso(x, y, -1.2 * m, 3.4 * m)
+    jib_top = (post[0], post[1] - 9 * m)
+    first = _iso(x, y - 1.2 * m, -1.6 * m, 0)
+    hook = (first[0], first[1] - 6.6 * m)
+    _bar(p, post, jib_top, 0.5 * m, STEEL_FRAME)
+    _bar(
+        p,
+        (jib_top[0], jib_top[1] + 1.4 * m),
+        (hook[0] - 0.2 * m, jib_top[1] + 0.6 * m),
+        0.35 * m,
+        STEEL_FRAME,
+    )
+    _bar(p, jib_top, (hook[0] - 0.2 * m, jib_top[1] + 0.6 * m), 0.2 * m, STEEL_FRAME)
+    _bar(p, (hook[0], jib_top[1] + 0.6 * m), hook, 0.08 * m, (40, 38, 40))
+    for k in range(3):
+        mx, my = _iso(x, y - 1.2 * m, (k - 1) * 1.6 * m, 0)
+        top = p.hall(mx, my, 0.9 * m, 0.9 * m, 2 * m, iron, shade(iron, 1.3))
+        if k == 0:
+            cx, cy = (top[0][0] + top[2][0]) / 2, (top[0][1] + top[2][1]) / 2
+            p.blob(cx - 0.3 * m, cy - 0.15 * m, cx + 0.3 * m, cy + 0.15 * m, HOT_YELLOW)
+    _bar(p, (hook[0] - 0.9 * m, hook[1] + 0.9 * m), hook, 0.1 * m, (40, 38, 40))
+    _bar(p, (hook[0] + 0.9 * m, hook[1] + 0.9 * m), hook, 0.1 * m, (40, 38, 40))
+    _turned(p, hook[0], hook[1] + 2.9 * m, [(0, 0.7 * m), (2 * m, 1 * m)], iron, shade(iron, 0.8))
+    p.blob(hook[0] - 0.7 * m, hook[1] + 0.75 * m, hook[0] + 0.7 * m, hook[1] + 1.15 * m, HOT_ORANGE)
+    nozzle = (hook[0], hook[1] + 3.1 * m)
+    mould = (first[0], first[1] - 2 * m)
+    _bar(p, nozzle, mould, 0.2 * m, HOT_YELLOW)
+    _bar(p, nozzle, mould, 0.08 * m, HOT_WHITE)
+    _steel_sparks(p, mould[0], mould[1], 1.4 * m, 5, 11)
+
+
+def _steel_trestle(p: Painter, x: float, y: float, length: float, high: float) -> Point:
+    """A high-line trestle from (x, y) `length` metres along the lit walls and `high` tall, its
+    steel bents braced crosswise every 3 m under a deck of sleepers and rails; returns where its
+    middle is on the deck."""
+    m = METRE
+
+    def at(u: float, v: float, z: float = 0) -> Point:
+        px, py = _iso(x, y, u * m, v * m)
+        return px, py - z * m
+
+    for u in np.arange(0, length + 0.01, 3):
+        for v in (1.3, -1.3):
+            tone = STEEL_FRAME if v < 0 else shade(STEEL_FRAME, 0.8)
+            _bar(p, at(u, v), at(u, v * 0.75, high), 0.3 * m, tone)
+        _bar(p, at(u, -1.3), at(u, 0.97, high), 0.14 * m, shade(STEEL_FRAME, 0.9))
+        if u + 3 <= length + 0.01:
+            _bar(p, at(u, -1.3, high * 0.15), at(u + 3, -1.1, high * 0.9), 0.12 * m, STEEL_FRAME)
+    deck = [at(0, -1.7, high), at(length, -1.7, high), at(length, 1.7, high), at(0, 1.7, high)]
+    p.polygon(deck, shade(STEEL_SLEEPER, 1.2))
+    p.polygon(
+        [deck[0], deck[1], (deck[1][0], deck[1][1] + 0.7 * m), (deck[0][0], deck[0][1] + 0.7 * m)],
+        STEEL_FRAME,
+    )
+    for v in (-0.72, 0.72):
+        _bar(p, at(0, v, high + 0.1), at(length, v, high + 0.1), 0.12 * m, shade(STEEL_SHELL, 1.1))
+    return at(length / 2, 0, high)
+
+
+def _steel_slag(p: Painter, x: float, y: float, half: float, high: float) -> None:
+    """A tip of slag at (x, y): a long dark lumpy bank `half` wide either side and `high` tall,
+    with a slag pot on a car at its crest tipping a glowing run of molten slag down its lit face
+    and steam drifting off it."""
+    m = METRE
+    _steel_pile(p, x, y, half, high, STEEL_SLAG, 23)
+    crest = (x - 0.12 * half, y - high)
+    foot = (x - 0.5 * half, y + 0.3 * half)
+    run = [
+        (crest[0] - 0.2 * m, crest[1] + 0.3 * m),
+        (crest[0] + 0.4 * m, crest[1] + 0.4 * m),
+        (foot[0] + 0.7 * m, foot[1] - 0.2 * m),
+        (foot[0] - 0.8 * m, foot[1]),
+    ]
+    p.polygon(run, RED_HOT)
+    mid = ((run[0][0] + run[3][0]) / 2 + 0.3 * m, (run[0][1] + run[3][1]) / 2)
+    _bar(p, run[0], mid, 0.35 * m, HOT_ORANGE)
+    p.blob(foot[0] - 1.4 * m, foot[1] - 0.45 * m, foot[0] + 1 * m, foot[1] + 0.5 * m, RED_HOT)
+    p.blob(foot[0] - 0.8 * m, foot[1] - 0.25 * m, foot[0] + 0.4 * m, foot[1] + 0.3 * m, HOT_ORANGE)
+    pot = (crest[0] + 1.2 * m, crest[1] - 0.6 * m)
+    _bar(
+        p,
+        (pot[0] - 1.6 * m, pot[1] + 0.5 * m),
+        (pot[0] + 1.6 * m, pot[1] + 1.3 * m),
+        0.4 * m,
+        (44, 42, 44),
+    )
+    p.polygon(
+        [
+            (pot[0] - 1.4 * m, pot[1] - 1.6 * m),
+            (pot[0] + 0.8 * m, pot[1] - 0.6 * m),
+            (pot[0] + 0.4 * m, pot[1] + 0.7 * m),
+            (pot[0] - 1.2 * m, pot[1] + 0.3 * m),
+        ],
+        (66, 60, 60),
+    )
+    p.polygon(
+        [(pot[0] - 1.4 * m, pot[1] - 1.6 * m), (pot[0] - 0.9 * m, pot[1] - 1.2 * m), crest],
+        HOT_YELLOW,
+    )
+    p.soft(
+        [(x - 0.6 * half, y - high - 4 * m, x + 0.1 * half, y - high + 0.5 * m)],
+        (226, 224, 222),
+        0.7,
+        0.8,
+    )
+
+
+def _steel_flat(p: Painter, x: float, y: float) -> None:
+    """A flat wagon 7 m long standing along the lit walls with its middle on (x, y) of a siding,
+    loaded with blue-grey rails chained down on bolsters."""
+    m = METRE
+    rail = _iso(x, y, 0, -0.72 * m)
+    for du in (-2.3, 2.3):
+        wx, wy = _iso(*rail, du * m, 0)
+        p.ellipse(wx - 0.5 * m, wy - 1 * m, wx + 0.5 * m, wy, (42, 40, 42))
+    p.hall(x, y - 1 * m, 7 * m, 2.6 * m, 0.45 * m, STEEL_WAGON, shade(STEEL_WAGON, 1.3))
+    _steel_stock(p, x, y - 1.45 * m, 6.4, 1.8, 2)
+
+
+def _steel_hot_car(p: Painter, x: float, y: float) -> None:
+    """A hot-metal car with its middle on (x, y) of a siding: a squat iron ladle lined with
+    firebrick on a four-wheeled frame, its molten iron glowing under a skin of crust."""
+    m = METRE
+    iron = (66, 60, 60)
+    rail = _iso(x, y, 0, -0.72 * m)
+    for du in (-1.5, 1.5):
+        wx, wy = _iso(*rail, du * m, 0)
+        p.ellipse(wx - 0.45 * m, wy - 0.9 * m, wx + 0.45 * m, wy, (42, 40, 42))
+    p.hall(x, y - 0.9 * m, 4.6 * m, 2.4 * m, 0.4 * m, (52, 50, 52), (80, 78, 82))
+    _turned(p, x, y - 1.2 * m, [(0, 1.2 * m), (2.2 * m, 1.6 * m)], iron, HOT_ORANGE)
+    _steel_hoop(p, x, y - 2.2 * m, 1.45 * m, 0.3 * m, shade(iron, 0.7))
+    top = y - 3.4 * m
+    p.blob(x - 0.9 * m, top - 0.35 * m, x + 0.7 * m, top + 0.35 * m, HOT_YELLOW)
+    p.blob(x - 0.2 * m, top - 0.5 * m, x + 1.1 * m, top + 0.1 * m, RED_HOT)
+
+
+def _steel_cooling_bed(p: Painter, x: float, y: float, long: float, count: int) -> None:
+    """A cooling bed at (x, y) of `count` fresh rails `long` metres long lying side by side along
+    the lit walls on steel skids: the one furthest back, just out of the mill, still glowing
+    yellow, and the rest reddening and cooling to blue-grey the further out they lie."""
+    m = METRE
+    gap = 0.45
+
+    def at(u: float, v: float, z: float = 0) -> Point:
+        px, py = _iso(x, y, u * m, v * m)
+        return px, py - z * m
+
+    wide = gap * (count + 1)
+    for u in np.arange(-long / 2, long / 2 + 0.01, long / 6):
+        _bar(p, at(u, -wide / 2, 0.3), at(u, wide / 2, 0.3), 0.3 * m, STEEL_FRAME)
+        _bar(p, at(u, -wide / 2), at(u, -wide / 2, 0.3), 0.2 * m, shade(STEEL_FRAME, 0.8))
+    tones = (HOT_YELLOW, HOT_ORANGE, RED_HOT, (128, 52, 38), (104, 84, 86))
+    for k in range(count):
+        v = wide / 2 - gap * (k + 1)
+        tone = tones[k] if k < len(tones) else STEEL_STOCK
+        _bar(p, at(-long / 2, v, 0.5), at(long / 2, v, 0.5), 0.2 * m, shade(tone, 0.8))
+        _bar(p, at(-long / 2, v, 0.58), at(long / 2, v, 0.58), 0.08 * m, shade(tone, 1.2))
+
+
+def steel_mill() -> Sprite:
+    """An ironworks of the 1890s on cinder ground: a blast furnace with a dark iron hearth fed
+    through goosenecks and a stack of light riveted steel, a lattice headgear and arching gas
+    uptakes on its top, fed by a skip incline from a row of stock bins heaped with rust-red ore,
+    coke and white limestone, a downcomer falling to its dust catcher, three domed hot-blast
+    stoves on the hot-blast main and two steel stacks smoking behind it, a red brick Bessemer
+    shed open at its gable on a converter blowing fire and sparks, a long rolling mill of grey
+    corrugated iron under a rust-red roof with a glazed clerestory, its door glowing over a
+    bogie of red-hot ingots, sidings of hopper wagons and a stack of blue-grey rails and
+    beams."""
+    m = METRE
+    p = Painter(48, 56, (24, 37))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 19) * m, (v - 8) * m)
+
+    def up(u: float, v: float, z: float) -> Point:
+        x, y = at(u, v)
+        return x, y - z * m
+
+    ground = [(-1, -1), (6, -7), (44, -7), (42, 10), (30, 23), (6, 23), (-5, 9)]
+    p.polygon([at(u, v) for u, v in ground], STEEL_GROUND)
+    p.soft([(*at(0, 6), *at(16, -2))], shade(STEEL_ORE, 0.9), 0.35, 1.5)
+    p.shadow(18, 5, 2)
+    for u, v in ((18, 22.5), (25, 22.5)):
+        _steel_stack(p, *at(u, v), 46 * m)
+    dust = _steel_dust_catcher(p, *at(13.5, 20.5))
+    fx, fy = at(7.5, 17)
+    head = _steel_furnace(p, fx, fy, 19 * m, 4.6 * m, dust)
+    for u in (21, 26, 31):
+        _steel_stove(p, *at(u, 17.5), 15 * m, 2.8 * m)
+    _steel_hot_blast(p, [up(31, 14.2, 7), up(13, 14.2, 7), up(11.5, 14.2, 8.2)])
+    _steel_siding(p, *at(-4, 11), 21)
+    for u, load in ((2, STEEL_ORE), (9, STEEL_COKE)):
+        _steel_hopper(p, *at(u, 11), load)
+    under = (head[0], fy - 1.5 * m)
+    _steel_incline(p, at(7, 8.6), under, under[1] - head[1], _iso(0, 0, 1.7 * m, 0))
+    _steel_bins(
+        p,
+        *at(0.5, 8.6),
+        ((STEEL_ORE, STEEL_COKE, STEEL_ORE), (STEEL_COKE, STEEL_LIME, STEEL_ORE)),
+    )
+    _steel_bessemer(p, *at(21.5, 5), 7 * m, 10 * m, 10 * m, 3)
+    _steel_shed(p, *at(33.5, 5), 15 * m, 10 * m, 8 * m, 3 * m, 0.7)
+    _steel_stock(p, *at(29.5, -1.7), 8, 2.2, 3)
+    _steel_siding(p, *at(5, -5), 39)
+    _steel_ingots(p, *at(36, -5), 3)
+    return p.sprite()
+
+
 def _cask_light(way: Way) -> float:
     """How bright a round face turned `way` is drawn: as a building's lit wall when it faces the
     lit side, as its shaded wall when it faces the shaded side and brightest facing up."""
@@ -1880,50 +2785,6 @@ def food_plant() -> Sprite:
     ):
         _food_basket(p, *at(u, v), load)
     _food_cart(p, *at(4.4, -3.6), 3.4, 0.5, FOOD_SETTS, cabbages)
-    return p.sprite()
-
-
-def steel_mill() -> Sprite:
-    """A dark mill on blackened ground with a blast furnace glowing at its foot and a plume of
-    smoke, a row of glowing windows, a round banded furnace tower fed by an inclined hoist from a
-    heap of ore spread over the ground, a cinder track out of its furnace door and ingots stacked
-    by the wall."""
-    p = Painter(32, 46, (14, 38))
-    foot = _footing(0, 0, 11, 11)
-    cinder = (64, 60, 60)
-    _bed(p, foot, cinder, 1.6)
-    _spill(p, 13, 5, 3.5, (150, 76, 54))
-    p.shadow(12, 4)
-    _track(p, foot[0], foot[1], (0.15, 0.45), 3, (92, 84, 80))
-    iron = (82, 80, 84)
-    top = p.box(0, 0, 11, 9, iron, (60, 58, 62))
-    left, front, right, _ = top
-    _plinth(p, top, 9, iron)
-    _stains(p, front, right, 9, (0.15, 0.45, 0.8), shade(iron, 0.55), 2)
-    glow = (186, 104, 48)
-    _windows(p, left, front, (0.52, 0.66, 0.8, 0.94), (2.5,), 3, glow, shade(iron, 1.6))
-    _windows(p, front, right, (0.3, 0.55), (3,), 2, shade(glow, 0.8), shade(iron, 1.4))
-    p.line([left, front, right], shade(iron, 1.35))
-    furnace = shade(iron, 0.85)
-    _turned(p, 6.5, -6, [(0, 2.6), (13, 2.6), (17, 1.8), (20, 1.4)], furnace, (40, 36, 36))
-    for h in (4, 8, 12):
-        _ring(p, 6.5, -6 - h, 2.6, shade(furnace, 0.6))
-    p.point(6.5, -26.5, (255, 170, 60))
-    _heap(p, 13, 5, 3.5, 3, (150, 76, 54))
-    p.line([(13, 2), (8.5, -22)], (126, 96, 70))
-    p.line([(13.8, 2), (9.3, -22)], shade((126, 96, 70), 0.7))
-    p.rect(10.5, -15, 12.5, -13, (110, 106, 110))
-    p.rect(-9, -12, -6, -2, (238, 132, 40))
-    p.point(-8, -10, (255, 214, 120))
-    cap = _stack(p, -3, -9, -30, shade(BRICK, 0.7))
-    for i, (x, y, r) in enumerate([(-2, -33, 2), (0, -36, 3)]):
-        y += cap + 30
-        p.blob(x - r, y - r, x + r, y + r, (150, 148, 150) if i % 2 else (124, 122, 126))
-    for gx, gy in ((-9.5, 3.4), (-8, 4.4)):
-        p.point(gx, gy, (226, 120, 44))
-    ingot = (128, 128, 136)
-    for lift in (0, 1.2):
-        p.hall(-3, 7 - lift, 4, 2, 1.2, ingot, shade(ingot, 1.2))
     return p.sprite()
 
 
