@@ -777,7 +777,14 @@ class MapView:
         draw_found(
             draw_list, marks, self.tile_map.grid, self.search, center, top_left, bottom_right
         )
-        draw_owned_flags(draw_list, marks, self.tile_map.grid, self.growth.owners, center)
+        draw_owned_flags(
+            draw_list,
+            marks,
+            self.tile_map.grid,
+            self.growth.owners,
+            center,
+            (top_left, bottom_right),
+        )
         draw_station_names(draw_list, marks, self.tile_map.grid, self.railway, center)
         draw_compass(draw_list, self.camera, (bottom_right[0] - 36, top_left[1] + 36))
         self._draw_status(draw_list, top_left, bottom_right)

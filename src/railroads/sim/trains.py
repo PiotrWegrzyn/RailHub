@@ -402,8 +402,8 @@ class Kind(Keyed):
     slowly, and a heavy load slows them most: for short lines with many stops. General ones are
     the Planet and its heirs. Heavy freight engines pull twice as many cars or more and are hardly
     slowed by a full load, but run slowly, take longest of all to get going and cost the most to
-    run after express engines. Express engines carry only passengers, much faster, with a dining
-    car, but cost the most, so they pay on long lines."""
+    run after express engines. Express engines carry only passengers and mail, much faster, with
+    a dining car, and their passengers pay a higher fare, so they pay on long lines."""
 
     PIONEER = "pioneer"
     LIGHT = "light"
@@ -422,17 +422,15 @@ class Power(Keyed):
 # Speed 1 stands for this many km/h.
 KMH_PER_SPEED = 60.0
 # How much of its top speed an engine of a kind loses pulling as much as it can, and a share of
-# that for a share of it: half for most, less for heavy freight engines, more for light ones.
+# that for a share of it: half for most, less for heavy freight and express engines, more for
+# light ones.
 SLOWDOWN = {
     Kind.PIONEER: 0.5,
     Kind.LIGHT: 0.6,
     Kind.GENERAL: 0.5,
     Kind.HEAVY: 0.3,
-    Kind.EXPRESS: 0.5,
+    Kind.EXPRESS: 0.3,
 }
-# Passengers on an express pay this much more, and on a maglev MAGLEV_FARE times as much.
-EXPRESS_FARE = 1.2
-MAGLEV_FARE = 11.0
 # How much fuel (railroads.sim.fuel_market) an engine burns a cell for each car it is built to
 # pull, by what drives it: coal, diesel fuel or electricity. Light engines burn LIGHT_BURN of that.
 BURN_PER_CAR = {
@@ -451,7 +449,7 @@ BURN_ALONE = 0.5
 class Engine:
     """An engine model: the year it was built in history, how fast it runs against the Planet,
     how many cars it pulls (an express's coaches, without its dining car), what it costs, what it
-    is for and what drives it; it can be bought once a supply tile reaches a level (OPENED_BY).
+    is for and what drives it; it can be bought once a demand tile reaches a level (OPENED_BY).
     Electric engines run only on electrified track. Once a newer engine of its line can be bought, it is
     no longer sold (railroads.sim.railway.Railway.engines)."""
 
@@ -478,6 +476,11 @@ class Engine:
     pull: float = 0.0
     # Whether it pulls as much as its coaches full rather than full coal cars: railcars.
     railcar: bool = False
+    # How many times the usual fare its passengers pay: more on an express, the most on a maglev.
+    fare: float = 1.0
+    # What share of the usual burn of its power and size it burns: less for a later engine of
+    # its line in the same era of wagons, which wins over the one before by burning less.
+    burn_share: float = 1.0
 
     @property
     def electric(self) -> bool:
@@ -495,7 +498,7 @@ class Engine:
     def burn(self) -> float:
         """How much fuel it burns a cell pulling half the most it can."""
         light = LIGHT_BURN if self.kind == Kind.LIGHT else 1.0
-        return BURN_PER_CAR[self.power] * self.hauls * light
+        return BURN_PER_CAR[self.power] * self.hauls * light * self.burn_share
 
     @property
     def top_generation(self) -> int:
@@ -552,38 +555,89 @@ ENGINES: dict[str, Engine] = {
     "locomotion": Engine("Locomotion", 1820, 0.3, 2, 4_000.0, P, pickup=38.0, tank=8.0, pull=14.0),
     "rocket": Engine("Rocket", 1826, 0.4, 2, 6_000.0, P, pickup=36.0, tank=10.0, pull=8.0),
     "lion": Engine("Lion", 1834, 0.45, 2, 8_000.0, P, pickup=35.0, tank=12.0, pull=14.0),
+    "tank": Engine("Tank engine", 1837, 0.4, 2, 3_000.0, L, pickup=3.0, tank=13.0, pull=17.0),
     "planet": Engine(
-        "Planet steam engine", 1840, 0.5, 3, TRAIN_PRICE, G, pickup=12.0, tank=21.0, pull=40.0
+        "Planet steam engine", 1840, 0.5, 3, TRAIN_PRICE, G, pickup=12.0, tank=21.0, pull=30.0
     ),
-    "tank": Engine("Tank engine", 1840, 0.4, 2, 3_000.0, L, pickup=3.0, tank=13.0, pull=17.0),
     "goods": Engine("Goods engine", 1853, 0.35, 4, 15_000.0, H, pickup=50.0, tank=20.0, pull=55.0),
     "american": Engine(
-        "American 4-4-0", 1856, 0.7, 4, 30_000.0, G, pickup=11.0, tank=25.0, wood=True, pull=55.0
+        "American 4-4-0", 1856, 0.7, 4, 15_000.0, G, pickup=11.0, tank=25.0, wood=True, pull=35.0
     ),
     "single": Engine(
-        "Single-driver express", 1858, 1.0, 3, 40_000.0, X, pickup=12.0, tank=30.0, pull=75.0
+        "Single-driver express",
+        1858,
+        1.0,
+        3,
+        17_000.0,
+        X,
+        pickup=12.0,
+        tank=30.0,
+        pull=75.0,
+        fare=2.0,
     ),
     "light_tank": Engine(
-        "0-6-2 tank engine", 1862, 0.55, 2, 9_000.0, L, pickup=3.0, tank=16.0, pull=25.0
+        "0-6-2 tank engine", 1859, 0.55, 2, 5_000.0, L, pickup=3.0, tank=16.0, pull=21.0
     ),
     "mogul": Engine(
-        "Mogul freight engine", 1865, 0.45, 5, 45_000.0, H, pickup=45.0, tank=30.0, pull=65.0
+        "Mogul freight engine",
+        1865,
+        0.45,
+        5,
+        22_000.0,
+        H,
+        pickup=45.0,
+        tank=30.0,
+        pull=65.0,
+        burn_share=0.8,
+    ),
+    "consolidation": Engine(
+        "Consolidation 2-8-0", 1880, 0.5, 6, 68_000.0, H, pickup=42.0, tank=40.0, pull=125.0
+    ),
+    "ten_wheeler": Engine(
+        "Ten-wheeler 4-6-0", 1880, 0.85, 5, 45_000.0, G, pickup=10.0, tank=35.0, pull=65.0
+    ),
+    "branch_tank": Engine(
+        "Branch-line tank engine", 1882, 0.65, 3, 9_000.0, L, pickup=3.0, tank=18.0, pull=35.0
+    ),
+    "railmotor": Engine(
+        "Steam railmotor",
+        1899,
+        0.75,
+        3,
+        16_000.0,
+        L,
+        pickup=2.5,
+        tank=25.0,
+        railcar=True,
+        pull=90.0,
     ),
     "atlantic": Engine(
-        "Atlantic express", 1900, 1.5, 4, 120_000.0, X, pickup=10.0, tank=50.0, pull=150.0
+        "Atlantic express",
+        1900,
+        1.5,
+        4,
+        155_000.0,
+        X,
+        pickup=10.0,
+        tank=50.0,
+        pull=150.0,
+        fare=2.0,
+    ),
+    "interurban": Engine(
+        "Interurban car", 1902, 0.9, 2, 20_000.0, L, ELECTRIC, pickup=1.5, railcar=True, pull=95.0
     ),
     "mallet": Engine(
-        "Mallet articulated", 1905, 0.6, 6, 135_000.0, H, pickup=40.0, tank=50.0, pull=200.0
+        "Mallet articulated", 1905, 0.6, 6, 200_000.0, H, pickup=40.0, tank=50.0, pull=195.0
     ),
     "pacific": Engine(
-        "Pacific engine", 1910, 1.0, 5, 90_000.0, G, pickup=9.0, tank=50.0, pull=170.0
+        "Pacific engine", 1910, 1.0, 5, 135_000.0, G, pickup=9.0, tank=50.0, pull=100.0
     ),
     "boxcab": Engine(
-        "Boxcab electric", 1925, 1.6, 5, 270_000.0, G, ELECTRIC, pickup=6.0, pull=170.0
+        "Boxcab electric", 1925, 1.6, 5, 270_000.0, G, ELECTRIC, pickup=6.0, pull=100.0
     ),
     "railbus": Engine(
         "Railbus",
-        1935,
+        1931,
         1.0,
         3,
         27_000.0,
@@ -594,36 +648,96 @@ ENGINES: dict[str, Engine] = {
         railcar=True,
         pull=190.0,
     ),
+    "suburban": Engine(
+        "Suburban electric unit",
+        1932,
+        1.3,
+        3,
+        35_000.0,
+        L,
+        ELECTRIC,
+        pickup=1.5,
+        railcar=True,
+        pull=190.0,
+    ),
     "streamliner": Engine(
-        "Streamliner", 1935, 2.3, 5, 360_000.0, X, pickup=8.0, tank=60.0, pull=380.0
+        "Streamliner",
+        1935,
+        2.3,
+        5,
+        465_000.0,
+        X,
+        pickup=8.0,
+        tank=60.0,
+        pull=380.0,
+        fare=2.0,
     ),
     "big_boy": Engine(
-        "Big articulated", 1940, 0.7, 7, 405_000.0, H, pickup=35.0, tank=60.0, pull=370.0
+        "Big articulated", 1940, 0.7, 7, 610_000.0, H, pickup=35.0, tank=60.0, pull=365.0
+    ),
+    "mikado": Engine("Mikado 2-8-2", 1944, 1.2, 6, 405_000.0, G, pickup=8.0, tank=60.0, pull=190.0),
+    "diesel_railcar": Engine(
+        "Diesel railcar",
+        1947,
+        1.3,
+        3,
+        34_000.0,
+        L,
+        DIESEL,
+        pickup=2.0,
+        tank=80.0,
+        railcar=True,
+        pull=190.0,
+        burn_share=0.8,
     ),
     "mixed_diesel": Engine(
         "Mixed-traffic diesel",
         1950,
         1.3,
         6,
-        800_000.0,
+        610_000.0,
         G,
         DIESEL,
         pickup=7.0,
         tank=100.0,
-        pull=320.0,
-    ),
-    "heavy_diesel": Engine(
-        "Heavy diesel", 1960, 0.9, 8, 1_200_000.0, H, DIESEL, pickup=30.0, tank=100.0, pull=640.0
-    ),
-    "bullet": Engine(
-        "Bullet train", 1964, 3.5, 6, 1_100_000.0, X, ELECTRIC, pickup=7.0, pull=640.0
+        pull=190.0,
     ),
     "express": Engine(
-        "Universal electric", 1965, 2.4, 7, 2_400_000.0, G, ELECTRIC, pickup=5.0, pull=560.0
+        "Universal electric", 1958, 2.4, 7, 2_400_000.0, G, ELECTRIC, pickup=5.0, pull=335.0
+    ),
+    "heavy_diesel": Engine(
+        "Heavy diesel", 1960, 0.9, 8, 1_800_000.0, H, DIESEL, pickup=30.0, tank=100.0, pull=635.0
+    ),
+    "emu": Engine(
+        "Electric multiple unit",
+        1961,
+        1.8,
+        4,
+        60_000.0,
+        L,
+        ELECTRIC,
+        pickup=1.2,
+        railcar=True,
+        pull=365.0,
+    ),
+    "bullet": Engine(
+        "Bullet train", 1964, 3.5, 6, 2_750_000.0, X, ELECTRIC, pickup=7.0, pull=640.0, fare=2.0
+    ),
+    "universal_diesel": Engine(
+        "Universal diesel",
+        1971,
+        1.75,
+        7,
+        1_800_000.0,
+        G,
+        DIESEL,
+        pickup=6.0,
+        tank=120.0,
+        pull=335.0,
     ),
     "sprinter": Engine(
         "Sprinter unit",
-        1985,
+        1981,
         1.6,
         3,
         81_000.0,
@@ -632,82 +746,153 @@ ENGINES: dict[str, Engine] = {
         pickup=2.0,
         tank=100.0,
         railcar=True,
-        pull=280.0,
+        pull=275.0,
     ),
     "high_speed": Engine(
-        "High-speed electric", 1990, 5.0, 8, 3_200_000.0, X, ELECTRIC, pickup=6.0, pull=820.0
+        "High-speed electric",
+        1985,
+        5.0,
+        8,
+        8_400_000.0,
+        X,
+        ELECTRIC,
+        pickup=6.0,
+        pull=820.0,
+        fare=2.0,
     ),
     "twin_diesel": Engine(
         "Twin-unit diesel",
-        1995,
+        1988,
         1.0,
         10,
-        3_600_000.0,
+        5_500_000.0,
         H,
         DIESEL,
         pickup=28.0,
         tank=150.0,
-        pull=1250.0,
+        pull=1230.0,
     ),
     "modern_electric": Engine(
-        "Modern electric", 2000, 3.2, 8, 7_200_000.0, G, ELECTRIC, pickup=4.0, pull=990.0
+        "Modern electric", 1992, 3.2, 8, 7_300_000.0, G, ELECTRIC, pickup=4.0, pull=590.0
+    ),
+    "light_unit": Engine(
+        "Light diesel unit",
+        1998,
+        2.3,
+        4,
+        100_000.0,
+        L,
+        DIESEL,
+        pickup=1.5,
+        tank=120.0,
+        railcar=True,
+        pull=365.0,
+        burn_share=0.8,
+    ),
+    "modern_unit": Engine(
+        "Modern electric unit",
+        2001,
+        2.7,
+        4,
+        105_000.0,
+        L,
+        ELECTRIC,
+        pickup=1.0,
+        railcar=True,
+        pull=365.0,
+    ),
+    "modern_diesel": Engine(
+        "Modern diesel",
+        2002,
+        2.3,
+        8,
+        5_500_000.0,
+        G,
+        DIESEL,
+        pickup=5.0,
+        tank=160.0,
+        pull=590.0,
+    ),
+    "maglev": Engine(
+        "Maglev",
+        2019,
+        500.0 / KMH_PER_SPEED,
+        10,
+        10_000_000.0,
+        X,
+        MAGLEV,
+        pickup=5.0,
+        pull=1000.0,
+        fare=10.0,
     ),
     "super_diesel": Engine(
         "Super-heavy diesel",
-        2040,
+        2039,
         1.1,
         12,
-        10_800_000.0,
+        8_200_000.0,
         H,
         DIESEL,
         pickup=25.0,
         tank=200.0,
-        pull=1500.0,
-    ),
-    "maglev": Engine(
-        "Maglev", 2030, 500.0 / KMH_PER_SPEED, 10, 10_000_000.0, X, MAGLEV, pickup=5.0, pull=1000.0
+        pull=1475.0,
+        burn_share=0.8,
     ),
 }
 
 
-# The supply tile and level that open each engine for sale (railroads.sim.tiles): the level its tile
-# first reaches nearest the engine's year when the world goes at its own pace, one level apart
-# within a line. Steam engines come with coal,
-# heavy freight engines with steel, the wood-burning American with wood, expresses with
-# passengers, diesels with oil and electrics with copper.
+# The demand tile and level that open each engine for sale (railroads.sim.tiles): the level its
+# tile first reaches nearest the engine's year when the world goes at its own pace. The pioneers
+# come by turns with coal and passengers; general steam and heavy freight engines with coal, the
+# wood-burning American with wood, expresses with passengers, light engines of branch lines with
+# farming and electric railcars of the suburbs with textiles and household, other diesels with oil
+# and electrics with copper.
 OPENED_BY: Mapping[str, tuple[Tile, int]] = MappingProxyType(
     {
-        "penydarren": (Tile.COAL, 1),
-        "catch_me": (Tile.COAL, 3),
-        "salamanca": (Tile.COAL, 4),
-        "puffing_billy": (Tile.COAL, 5),
-        "locomotion": (Tile.COAL, 6),
-        "rocket": (Tile.COAL, 7),
-        "lion": (Tile.COAL, 8),
-        "planet": (Tile.COAL, 9),
-        "tank": (Tile.COAL, 9),
-        "goods": (Tile.STEEL, 11),
-        "american": (Tile.WOOD, 12),
-        "single": (Tile.PASSENGERS, 12),
-        "light_tank": (Tile.COAL, 13),
-        "mogul": (Tile.STEEL, 13),
-        "atlantic": (Tile.PASSENGERS, 18),
-        "mallet": (Tile.STEEL, 19),
-        "pacific": (Tile.COAL, 20),
-        "boxcab": (Tile.COPPER, 21),
-        "railbus": (Tile.OIL, 22),
-        "streamliner": (Tile.PASSENGERS, 23),
-        "big_boy": (Tile.STEEL, 23),
-        "mixed_diesel": (Tile.OIL, 24),
-        "heavy_diesel": (Tile.OIL, 26),
-        "bullet": (Tile.PASSENGERS, 26),
-        "express": (Tile.COPPER, 26),
-        "sprinter": (Tile.OIL, 29),
-        "high_speed": (Tile.PASSENGERS, 29),
-        "twin_diesel": (Tile.OIL, 30),
-        "modern_electric": (Tile.COPPER, 30),
-        "maglev": (Tile.PASSENGERS, 34),
-        "super_diesel": (Tile.OIL, 35),
+        "penydarren": (Tile.COAL, 2),
+        "catch_me": (Tile.PASSENGERS, 2),
+        "salamanca": (Tile.COAL, 3),
+        "puffing_billy": (Tile.PASSENGERS, 3),
+        "locomotion": (Tile.COAL, 4),
+        "rocket": (Tile.PASSENGERS, 4),
+        "lion": (Tile.COAL, 5),
+        "tank": (Tile.FARMING, 5),
+        "planet": (Tile.COAL, 6),
+        "goods": (Tile.COAL, 7),
+        "american": (Tile.WOOD, 7),
+        "single": (Tile.PASSENGERS, 7),
+        "light_tank": (Tile.FARMING, 7),
+        "mogul": (Tile.COAL, 8),
+        "consolidation": (Tile.COAL, 9),
+        "ten_wheeler": (Tile.COAL, 9),
+        "branch_tank": (Tile.FARMING, 9),
+        "railmotor": (Tile.FARMING, 10),
+        "atlantic": (Tile.PASSENGERS, 10),
+        "interurban": (Tile.HOUSEHOLD, 10),
+        "mallet": (Tile.COAL, 11),
+        "pacific": (Tile.COAL, 11),
+        "boxcab": (Tile.COPPER, 11),
+        "railbus": (Tile.FARMING, 12),
+        "suburban": (Tile.HOUSEHOLD, 12),
+        "streamliner": (Tile.PASSENGERS, 12),
+        "big_boy": (Tile.COAL, 13),
+        "mikado": (Tile.COAL, 13),
+        "diesel_railcar": (Tile.FARMING, 13),
+        "mixed_diesel": (Tile.OIL, 13),
+        "express": (Tile.COPPER, 13),
+        "heavy_diesel": (Tile.OIL, 14),
+        "emu": (Tile.HOUSEHOLD, 14),
+        "bullet": (Tile.PASSENGERS, 14),
+        "universal_diesel": (Tile.OIL, 14),
+        "sprinter": (Tile.FARMING, 15),
+        "high_speed": (Tile.PASSENGERS, 15),
+        "twin_diesel": (Tile.OIL, 15),
+        "modern_electric": (Tile.COPPER, 15),
+        "light_unit": (Tile.FARMING, 16),
+        "modern_unit": (Tile.HOUSEHOLD, 16),
+        "modern_diesel": (Tile.OIL, 16),
+        "maglev": (Tile.PASSENGERS, 17),
+        "super_diesel": (Tile.OIL, 18),
     }
 )
 

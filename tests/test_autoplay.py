@@ -33,7 +33,7 @@ def serving(player: StandInPlayer) -> set[tuple[int, int]]:
 def test_the_first_five_stations_open_at_the_five_most_crowded_towns() -> None:
     growth = grown()
 
-    player = StandInPlayer(growth, Railway(growth.constructions), np.random.default_rng(0))
+    player = StandInPlayer(growth, Railway(growth.constructions))
 
     assert serving(player) == set(TOWNS[1:])
 
@@ -43,7 +43,7 @@ def test_two_more_stations_open_each_decade() -> None:
     growth = grown(towns, same=True)
     for row, col in towns:
         growth.build(Building((row, col + 1), BuildingKind.FARM))
-    player = StandInPlayer(growth, Railway(growth.constructions), np.random.default_rng(0))
+    player = StandInPlayer(growth, Railway(growth.constructions))
 
     for _ in range(120):
         player.month(np.random.default_rng(1))
@@ -54,35 +54,58 @@ def test_two_more_stations_open_each_decade() -> None:
 def test_no_station_opens_where_nobody_lives() -> None:
     growth = grown(TOWNS[:2])
 
-    player = StandInPlayer(growth, Railway(growth.constructions), np.random.default_rng(0))
+    player = StandInPlayer(growth, Railway(growth.constructions))
 
     assert len(player.stations) == 2
 
 
-def test_a_station_is_raised_a_level_and_reaches_three_hexes_out() -> None:
+def test_a_station_starts_at_the_first_level_and_reaches_one_hex_out() -> None:
     growth = grown([(20, 20)])
 
     StandInPlayer(
         growth,
         Railway(growth.constructions),
-        np.random.default_rng(0),
         PlayerRule(stations_at_start=1),
     )
 
     assert growth.assumed_shares is not None
-    assert np.count_nonzero(~np.isnan(growth.assumed_shares)) == 37
+    assert np.count_nonzero(~np.isnan(growth.assumed_shares)) == 7
 
 
-def test_a_third_of_the_cells_reached_thrive_and_half_are_content() -> None:
+def test_every_cell_a_station_reaches_is_served_in_full() -> None:
     growth = grown([(20, 20)])
-    rule = PlayerRule(stations_at_start=1, station_level=60)
 
-    StandInPlayer(growth, Railway(growth.constructions), np.random.default_rng(0), rule)
+    StandInPlayer(growth, Railway(growth.constructions), PlayerRule(stations_at_start=1))
 
     assert growth.assumed_shares is not None
     shares = growth.assumed_shares[~np.isnan(growth.assumed_shares)]
-    assert np.mean(shares == 1.0) == pytest.approx(1 / 3, abs=0.03)
-    assert np.mean(shares == 0.5) == pytest.approx(1 / 2, abs=0.03)
+    assert set(shares.tolist()) == {1.0}
+
+
+@pytest.mark.parametrize(("year", "level"), [(1899, 1), (1900, 2), (1949, 2), (1950, 3)])
+def test_stations_stand_at_the_second_level_from_1900_and_the_third_from_1950(
+    year: int, level: int
+) -> None:
+    rule = PlayerRule()
+
+    found = rule.level(year)
+
+    assert found == level
+
+
+def test_stations_are_raised_when_their_year_comes_and_reach_further() -> None:
+    constructions = Constructions(square_map())
+    constructions.build(Building((20, 20), BuildingKind.HOUSE))
+    growth = Growth(constructions, QUIET, start_year=1899)
+    player = StandInPlayer(growth, Railway(constructions), PlayerRule(stations_at_start=1))
+    assert growth.assumed_shares is not None
+    before = np.count_nonzero(~np.isnan(growth.assumed_shares))
+
+    for _ in range(12):
+        player.month(np.random.default_rng(0))
+
+    assert player.railway.level(player.stations[0]) == 2
+    assert np.count_nonzero(~np.isnan(growth.assumed_shares)) > before
 
 
 def test_a_station_beside_a_served_town_leaves_its_cells_as_they_were() -> None:
@@ -90,7 +113,6 @@ def test_a_station_beside_a_served_town_leaves_its_cells_as_they_were() -> None:
     player = StandInPlayer(
         growth,
         Railway(growth.constructions),
-        np.random.default_rng(0),
         PlayerRule(stations_at_start=1),
     )
     assert growth.assumed_shares is not None
@@ -116,11 +138,11 @@ def test_a_thriving_cell_counts_as_served_without_any_trains() -> None:
 def test_stations_stand_on_free_cells_beside_the_houses() -> None:
     growth = grown([(20, 20)])
 
-    player = StandInPlayer(growth, Railway(growth.constructions), np.random.default_rng(0))
+    player = StandInPlayer(growth, Railway(growth.constructions))
 
     assert player.railway.stations() == player.stations
     assert player.stations[0] != (20, 20)
-    assert player.railway.level(player.stations[0]) == 3
+    assert player.railway.level(player.stations[0]) == 1
 
 
 def test_served_cells_show_the_satisfaction_drawn_for_them() -> None:
@@ -146,10 +168,7 @@ def test_reach_sums_add_up_every_cell_within_reach() -> None:
 
 def test_a_month_of_the_stand_in_is_done_in_steps_as_one_done_at_once() -> None:
     stepped, whole = grown(), grown()
-    players = [
-        StandInPlayer(growth, Railway(growth.constructions), np.random.default_rng(0))
-        for growth in (stepped, whole)
-    ]
+    players = [StandInPlayer(growth, Railway(growth.constructions)) for growth in (stepped, whole)]
     steps = players[0].month_steps(np.random.default_rng(1))
 
     taken = 0

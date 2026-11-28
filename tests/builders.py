@@ -25,15 +25,13 @@ from railroads.sim.points import Points
 from railroads.sim.railway import Railway
 from railroads.sim.routes import build_station, lay_route, plan_route
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
-from railroads.sim.tiles import FIRST_YEAR, Tile, Tiles, Year
+from railroads.sim.tiles import FIRST_YEAR, KIND_OPENED_BY, UNLOCKS, Tile, Tiles, Year
 from railroads.sim.trains import Stop
 from railroads.ui import web_setup
 from railroads.version import VERSION
 
 BOUNDS = Bounds(west=14.0, east=15.0, south=50.0, north=51.0)
 QUIET = GrowthRule(trades=False, ladders=(), forests=None)
-# A level above every one a demand tile opens a buyer at.
-OPEN_LEVEL = 99
 
 
 def layer(rows: int, cols: int, value: int) -> npt.NDArray[np.uint8]:
@@ -91,9 +89,18 @@ def _world_years() -> dict[int, Year]:
 
 def open_boards() -> Tiles:
     """Boards on which every good is made and wanted at its base and earns its base price, and
-    every buyer a demand tile opens is open, from the first year of the boards; the supply levels,
-    which open engines, and the eras come as they do when the lowest tiles always go up."""
+    every buyer a demand tile opens is open, from the first year of the boards; the levels, which
+    open engines and bridges, and the eras come as they do when the lowest tiles always go up,
+    a demand tile's at least as high as the highest buyer it opens."""
     return boards_with()
+
+
+def _buyers_open(levels: dict[Tile, int]) -> dict[Tile, int]:
+    """Demand levels raised to open every buyer a demand tile opens (railroads.sim.tiles)."""
+    opened = {**levels}
+    for tile, level in (*UNLOCKS.values(), *KIND_OPENED_BY.values()):
+        opened[tile] = max(opened.get(tile, 0), level)
+    return opened
 
 
 def boards_with(
@@ -105,7 +112,7 @@ def boards_with(
     tiles.years = {
         year: Year(
             world[year].supply,
-            MappingProxyType(dict.fromkeys(Tile, OPEN_LEVEL)),
+            MappingProxyType(_buyers_open(dict(world[year].demand))),
             MappingProxyType(made or {}),
             MappingProxyType(wanted or {}),
             world[year].era,

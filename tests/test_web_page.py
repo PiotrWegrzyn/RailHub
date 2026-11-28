@@ -5,6 +5,7 @@ from pathlib import Path
 from railroads.ui.waiting_screen import TIPS
 
 PAGE = Path(__file__).resolve().parents[1] / "web" / "index.html"
+PAINTER = PAGE.with_name("painter.js")
 PYPROJECT = Path(__file__).resolve().parents[1] / "pyproject.toml"
 
 
@@ -43,3 +44,14 @@ def test_the_page_starts_the_game_from_the_same_main_as_the_railroads_command() 
 
     assert started
     assert callable(getattr(importlib.import_module(module), function))
+
+
+def test_workers_run_the_wheel_the_page_loaded_rather_than_fetching_their_own() -> None:
+    painter = PAINTER.read_text()
+    page = PAGE.read_text()
+
+    fetched_by_worker = "wheels/" in painter or "__VERSION__" in painter
+    handed_over = 'postMessage({ kind: "start", wheel })' in page
+
+    assert not fetched_by_worker
+    assert handed_over

@@ -1,6 +1,6 @@
 """The help window: every building with what it makes and wants in a month, every good with
 what it earns and who makes and wants it, every engine with what it can do, when and with
-which supply level it is sold, and the real engines it is drawn after, how towns work, the target
+which demand level it is sold, and the real engines it is drawn after, how towns work, the target
 set for the company and going bankrupt, and why a game starts on a quarter of its place."""
 
 from dataclasses import dataclass
@@ -144,10 +144,11 @@ PORTS_HELP = (
 )
 PORT_GOOD_WIDTH = 110.0
 ENGINES_NOTE = (
-    "An engine is sold once its supply tile reaches its level on the supply and demand boards (Y),"
-    " until a newer one of its line comes: steam engines with coal, heavy freight engines with"
-    " steel, the wood-burning American with wood, expresses with passengers, diesels with oil and"
-    " electrics with copper. Engines are drawn after real ones, linked to their Wikipedia pages."
+    "An engine is sold once its demand tile reaches its level on the supply and demand boards (Y),"
+    " until a newer one of its line comes: steam and heavy freight engines with coal, the"
+    " wood-burning American with wood, expresses with passengers, light engines with farming,"
+    " electric railcars with textiles and household, other diesels with oil and electrics with"
+    " copper. Engines are drawn after real ones, linked to their Wikipedia pages."
 )
 GOODS_NOTE = (
     f"A good's freight is what carrying a unit of it earns: {FREIGHT_SHARE:.0%} of its market"

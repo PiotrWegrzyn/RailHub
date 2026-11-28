@@ -1157,7 +1157,8 @@ class Unit:
     coming down to `tip` at its end, curving for a long one; with passenger windows along it for
     a railcar or a high-speed train. A hood unit instead has a narrow hood with walkways round it
     and its cab near the front. Electrics carry pantographs; a maglev floats over its guideway on
-    a skirt instead of wheels."""
+    a skirt instead of wheels; a steam railcar has a chimney on its roof over the boiler at its
+    front."""
 
     half: float
     body: RGB
@@ -1177,10 +1178,14 @@ class Unit:
     pantographs: tuple[float, ...] = ()
     floats: bool = False
     roof: RGB = ROOF_GREY
+    # How tall a steam railcar's chimney stands over its roof; 0 for none.
+    stack: float = 0.0
 
     @property
-    def chimney(self) -> None:
-        return None
+    def chimney(self) -> tuple[float, float] | None:
+        if not self.stack:
+            return None
+        return self.half - 0.1, self.top + 0.015 + self.stack
 
     def model(self) -> Model:
         m = Model()
@@ -1190,6 +1195,10 @@ class Unit:
         else:
             _running_gear(m, h, self.bogies, self.axles)
         roof = self._hood(m) if self.hood else self._shell(m)
+        if self.chimney is not None:
+            u, high = self.chimney
+            m.cylinder_up(u, 0.02, (roof - 0.01, high - 0.012), BLACK_IRON)
+            m.cylinder_up(u, 0.028, (high - 0.012, high), BLACK_IRON)
         for u in self.pantographs:
             with m.coarse():
                 _pantograph(m, u, roof)
@@ -1239,7 +1248,7 @@ class Unit:
 
     @property
     def diesel(self) -> bool:
-        return not self.pantographs and not self.floats
+        return not self.pantographs and not self.floats and not self.stack
 
     def _fine(self, m: Model, roof: float) -> None:
         """Bogies with axle boxes and solid wheels, a fuel tank under a diesel, buffers and
@@ -2619,6 +2628,193 @@ ENGINES: dict[str, EngineModel] = {
             tip=0.22,
             ends=(236, 200, 40),
             vents=5,
+        )
+    ),
+    "consolidation": _entry(
+        Steam(
+            0.46,
+            (58, 66, 84),
+            BLACK_IRON,
+            ((0.2, 0.09, -0.02, -0.13),),
+            0.05,
+            (58, 66, 84),
+            leading=(0.37,),
+            radius=0.084,
+            cab=0.3,
+            smokebox=BLACK_IRON,
+            domes=(0.06, -0.06),
+            beam=CAB_RED,
+        ),
+        Tender(0.27, (58, 66, 84), (0.18, 0.0, -0.18), top=0.22),
+    ),
+    "ten_wheeler": _entry(
+        Steam(
+            0.42,
+            (118, 34, 30),
+            BLACK_IRON,
+            ((0.13, 0.01, -0.11),),
+            0.06,
+            (118, 34, 30),
+            leading=(0.33, 0.25),
+            radius=0.08,
+            cab=0.26,
+            smokebox=BLACK_IRON,
+            domes=(0.06, -0.06),
+            beam=BLACK_IRON,
+        ),
+        Tender(0.26, (118, 34, 30), (0.17, 0.0, -0.17), top=0.22),
+    ),
+    "mikado": _entry(
+        Steam(
+            0.5,
+            BLACK_IRON,
+            BLACK_IRON,
+            ((0.22, 0.11, 0.0, -0.11),),
+            0.052,
+            WHEEL_RED,
+            leading=(0.38,),
+            trailing=(-0.36,),
+            radius=0.09,
+            cab=0.3,
+            trim=(70, 70, 76),
+            smokebox=BLACK_IRON,
+            domes=(0.06, -0.08),
+            dome_color=BLACK_IRON,
+            stack=0.07,
+            deflectors=True,
+        ),
+        Tender(0.32, BLACK_IRON, (0.22, 0.13, -0.13, -0.22), top=0.25, trim=CAB_RED, width=0.09),
+    ),
+    "universal_diesel": _entry(
+        Unit(
+            0.46,
+            (46, 92, 62),
+            (226, 200, 96),
+            (0.29, -0.29),
+            axles=3,
+            top=0.28,
+            nose=0.04,
+            tip=0.22,
+            vents=3,
+        )
+    ),
+    "modern_diesel": _entry(
+        Unit(
+            0.48,
+            (40, 62, 132),
+            (196, 200, 208),
+            (0.28, -0.28),
+            top=0.29,
+            nose=0.06,
+            tip=0.21,
+            ends=(236, 200, 40),
+            vents=2,
+        )
+    ),
+    "branch_tank": _entry(
+        Steam(
+            0.4,
+            BLACK_IRON,
+            (40, 40, 46),
+            ((0.14, 0.04, -0.06),),
+            0.045,
+            WHEEL_RED,
+            radius=0.07,
+            cab=0.24,
+            smokebox=BLACK_IRON,
+            domes=(0.02,),
+            stack=0.11,
+            tanks=True,
+        )
+    ),
+    "railmotor": _entry(
+        Unit(
+            0.4,
+            (104, 58, 36),
+            (104, 58, 36),
+            (0.22, -0.22),
+            top=0.27,
+            band=(222, 202, 160),
+            windows=5,
+            stack=0.07,
+        )
+    ),
+    "diesel_railcar": _entry(
+        Unit(
+            0.4,
+            (190, 194, 200),
+            (90, 94, 102),
+            (0.24, -0.24),
+            top=0.27,
+            nose=0.03,
+            tip=0.22,
+            windows=6,
+        )
+    ),
+    "light_unit": _entry(
+        Unit(
+            0.42,
+            (196, 34, 42),
+            (230, 230, 232),
+            (0.26, -0.26),
+            top=0.27,
+            nose=0.08,
+            tip=0.17,
+            windows=6,
+        )
+    ),
+    "interurban": _entry(
+        Unit(
+            0.34,
+            (52, 86, 58),
+            (40, 40, 44),
+            (0.2, -0.2),
+            top=0.27,
+            band=DINER_CREAM,
+            windows=5,
+            pantographs=(0.0,),
+        )
+    ),
+    "suburban": _entry(
+        Unit(
+            0.4,
+            (150, 38, 34),
+            (150, 38, 34),
+            (0.25, -0.25),
+            top=0.27,
+            nose=0.03,
+            tip=0.22,
+            band=(214, 170, 72),
+            windows=6,
+            pantographs=(0.12,),
+        )
+    ),
+    "emu": _entry(
+        Unit(
+            0.44,
+            (58, 88, 150),
+            (40, 60, 110),
+            (0.28, -0.28),
+            top=0.27,
+            nose=0.03,
+            tip=0.22,
+            band=(226, 206, 120),
+            windows=7,
+            pantographs=(0.0,),
+        )
+    ),
+    "modern_unit": _entry(
+        Unit(
+            0.44,
+            (236, 236, 238),
+            (30, 120, 70),
+            (0.28, -0.28),
+            top=0.27,
+            nose=0.1,
+            tip=0.15,
+            ends=(240, 196, 36),
+            windows=7,
+            pantographs=(0.1,),
         )
     ),
     "maglev": _entry(

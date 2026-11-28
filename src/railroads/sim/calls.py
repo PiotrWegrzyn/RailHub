@@ -54,7 +54,7 @@ class StationCalls:
                     earned = (
                         demand.deliver(car.good, car.load)
                         * self._railway.price_factor(car.good)
-                        * self._railway.fare_factor(train)
+                        * self._railway.fare_factor(train, car.good)
                         * self._railway.facility_pay(stop.cell, car.good)
                     )
                     self._railway.finances.earn(earned, car.good.value)

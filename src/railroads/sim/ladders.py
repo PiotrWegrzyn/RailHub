@@ -326,18 +326,19 @@ BANANA_PLANTATIONS = Ladder(
     base=11.34,
 )
 
-# Oranges want hot, green land: not the desert, not the jungle.
+# Oranges want hot, green land: not the desert, not the jungle. They grow as apples do, best on
+# hills by water, so a savanna holds about as many orange farms as grassland holds orchards.
 ORANGE_FARMS = Ladder(
     kinds=(BuildingKind.ORANGE_FARM,),
     crowded_at=FARMS_CROWDED_OUT,
     land=Land(
         vegetation={Vegetation.BARREN: 0.0, Vegetation.FOREST: 0.0},
-        relief={Relief.HILLS: 1.0, Relief.MOUNTAINS: 0.0},
+        relief={Relief.FLAT: 0.4, Relief.HILLS: 1.5, Relief.MOUNTAINS: 0.0},
         temperature={Temperature.COLD: 0.0, Temperature.NORMAL: 0.0},
-        water={Terrain.RIVER: 2.0, Terrain.LAKE: 2.0},
+        water={Terrain.RIVER: 3.0, Terrain.LAKE: 3.0},
         open_field=OPEN_FIELD,
     ),
-    base=11.34,
+    base=3.78,
 )
 
 # Sugar grows on open, flat land wherever it is not cold: beet in mild lands, cane in hot ones.

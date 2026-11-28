@@ -2,8 +2,8 @@ from railroads.sim.level_perks import LevelPerk, Perk, perks
 from railroads.sim.tiles import Board, Tile
 
 
-def test_a_supply_level_that_opens_an_engine_names_it() -> None:
-    found = perks(Board.SUPPLY, Tile.COAL, 13)
+def test_a_demand_level_that_opens_an_engine_names_it() -> None:
+    found = perks(Board.DEMAND, Tile.FARMING, 7)
 
     assert found == [LevelPerk(Perk.ENGINE, "New engine for sale: 0-6-2 tank engine")]
 
@@ -23,15 +23,15 @@ def test_a_demand_level_that_opens_buyers_says_who_takes_what() -> None:
 
 
 def test_a_level_that_only_adds_its_share_brings_nothing_special() -> None:
-    supply, demand = perks(Board.SUPPLY, Tile.COAL, 10), perks(Board.DEMAND, Tile.COAL, 13)
+    supply, demand = perks(Board.SUPPLY, Tile.COAL, 10), perks(Board.DEMAND, Tile.COAL, 12)
 
     assert (supply, demand) == ([], [])
 
 
 def test_a_levels_perks_come_anew_each_time_they_are_asked_for() -> None:
-    first = perks(Board.SUPPLY, Tile.COAL, 13)
+    first = perks(Board.DEMAND, Tile.FARMING, 7)
     first.clear()
 
-    again = perks(Board.SUPPLY, Tile.COAL, 13)
+    again = perks(Board.DEMAND, Tile.FARMING, 7)
 
     assert again == [LevelPerk(Perk.ENGINE, "New engine for sale: 0-6-2 tank engine")]

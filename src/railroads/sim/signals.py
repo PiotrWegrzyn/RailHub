@@ -638,12 +638,11 @@ class Signals:
         if end is None:
             return None
         middle = self.blocks.middles[crossing.cell]
-        mine = crossing.start + self._to_middle(crossing.entry, crossing.exit, middle) * (
-            crossing.end - crossing.start
-        )
         theirs = start + self._to_middle(entry, exit_, middle) * (end - start)
-        shared = (start, crossing.start) if parting else (theirs, mine)
-        offset = shared[1] - shared[0]
+        # Measured at the cell's edge the two ways share, as on the cells they share beyond it,
+        # so that of two trains level there each judges the same one ahead.
+        offset = crossing.start - start if parting else crossing.end - end
+        shared = (start, crossing.start) if parting else (theirs, theirs + offset)
         if not self._leads(other, train, offset + other.along - train.along, offset):
             return None
         if other.cleared - SIGNAL_GAP - other.length < theirs - SAME:

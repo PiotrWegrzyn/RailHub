@@ -78,6 +78,10 @@ class Owners:
         # Per kind and cell, the shares bought there and the month from which each lot may be sold.
         self._held: dict[tuple[BuildingKind, Cell], list[tuple[int, int]]] = {}
         self.company = COMPANY
+        # Counts every change to the player's shares, and the flags found for the last count and
+        # constructions version, which the map asks for every frame.
+        self.version = 0
+        self._flags: tuple[tuple[int, int], list[tuple[Cell, bool]]] | None = None
 
     def shares(self, kind: BuildingKind) -> IntArray:
         """How many shares of the buildings of a kind the player owns in each cell."""
@@ -126,6 +130,7 @@ class Owners:
         grid = self._shares.setdefault(kind, np.zeros(self._growth.grid.shape, dtype=np.int64))
         added = max(0, min(shares, SHARES * int(self._growth.counts[kind][cell]) - int(grid[cell])))
         grid[cell] += added
+        self.version += 1
         return added
 
     def price_to_buy(self, kind: BuildingKind, cell: Cell | None = None) -> float | None:
@@ -184,9 +189,16 @@ class Owners:
 
     def flags(self) -> list[tuple[Cell, bool]]:
         """Every cell where the player owns shares of any building, and whether they control the
-        buildings of any kind there (controls_any), finding the kinds they own once for all."""
-        kinds = self.kinds()
-        return [(cell, any(self.controls(cell, kind) for kind in kinds)) for cell in self.cells()]
+        buildings of any kind there (controls_any), finding the kinds they own once for all;
+        worked out again only once the shares or the buildings have changed."""
+        key = (self.version, self._growth.constructions.version)
+        if self._flags is None or self._flags[0] != key:
+            kinds = self.kinds()
+            found = [
+                (cell, any(self.controls(cell, kind) for kind in kinds)) for cell in self.cells()
+            ]
+            self._flags = (key, found)
+        return self._flags[1]
 
     def sellable(self, cell: Cell, kind: BuildingKind) -> int:
         """How many of the player's shares of a kind in a cell they may sell now: all but those
@@ -218,6 +230,7 @@ class Owners:
         sold = min(lot, free)
         railway.finances.earn(price * sold / LOT, "shares sold")
         self._shares[kind][cell] -= sold
+        self.version += 1
         return None
 
     def lose(self, cell: Cell, kind: BuildingKind, gone: int) -> int:
@@ -229,6 +242,7 @@ class Owners:
         left = SHARES * max(0, int(self._growth.counts[kind][cell]) - gone)
         lost = max(0, int(grid[cell]) - left)
         grid[cell] -= lost
+        self.version += 1
         self._hold_at_most(cell, kind, int(grid[cell]))
         return lost
 
@@ -294,3 +308,4 @@ class Owners:
         """Takes the shares and company of the owners of the game before it moved."""
         self._shares = {kind: move.grid(shares) for kind, shares in old._shares.items()}
         self.company = old.company
+        self.version += 1

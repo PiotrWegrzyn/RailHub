@@ -452,14 +452,14 @@ def ordered_kinds() -> frozenset[BuildingKind]:
 
 
 # The tile level on a board each kind of bridge after wood is built from: stone once ore and stone
-# are wanted two levels above where they start in 1850, steel and the flyovers it brings once
-# steel is made at level 16, about 1885, and concrete once chemicals and building materials are
-# at level 21, about 1925.
+# are wanted at level 8, about 1869, steel and the flyovers it brings once steel and metals are
+# wanted at level 8, about 1879, and concrete once chemicals and building materials are wanted
+# at level 11, about 1925.
 BRIDGES_OPENED_BY: Mapping[Bridge, tuple[Board, Tile, int]] = MappingProxyType(
     {
         Bridge.STONE: (Board.DEMAND, T.ORE, 8),
-        Bridge.STEEL: (Board.SUPPLY, T.STEEL, 16),
-        Bridge.CONCRETE: (Board.SUPPLY, T.CHEMICALS, 21),
+        Bridge.STEEL: (Board.DEMAND, T.STEEL, 8),
+        Bridge.CONCRETE: (Board.DEMAND, T.CHEMICALS, 11),
     }
 )
 

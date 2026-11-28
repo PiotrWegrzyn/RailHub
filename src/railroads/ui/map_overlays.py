@@ -193,18 +193,30 @@ def draw_station_names(
 
 
 def draw_owned_flags(
-    draw_list: imgui.ImDrawList, camera: IsoCamera, grid: Grid, owners: Owners, center: Vec2
+    draw_list: imgui.ImDrawList,
+    camera: IsoCamera,
+    grid: Grid,
+    owners: Owners,
+    center: Vec2,
+    clip: tuple[Vec2, Vec2],
 ) -> None:
     """A flag in the company's colours over every cell where the player owns a building, once a
     cell is FLAGS_FROM_WIDTH pixels wide: a small one, or a big waving one where they control
-    the buildings of a kind."""
+    the buildings of a kind; only those whose flag shows within `clip`, all placed at once."""
     width = camera.cell_width
-    if width < FLAGS_FROM_WIDTH:
+    flags = owners.flags()
+    if width < FLAGS_FROM_WIDTH or not flags:
         return
     colours = rgba_u32(FLAG_POLE), rgba_u32(FLAG_CLOTH), rgba_u32(FLAG_STRIPE)
     now = imgui.get_time()
-    for cell, big in owners.flags():
-        x, y = camera.to_screen(*grid.center(*cell), center)
+    rows, cols = np.array([cell for cell, _ in flags]).T
+    xs, ys = camera.to_screen(*grid.center(rows, cols), center)
+    reach = width * FLAG_HEIGHT * BIG_FLAG
+    (left, top), (right, bottom) = clip
+    seen = (xs > left - reach) & (xs < right + reach) & (ys > top) & (ys - reach < bottom)
+    for k in np.flatnonzero(seen).tolist():
+        big = flags[k][1]
+        x, y = float(xs[k]), float(ys[k])
         height = width * FLAG_HEIGHT * (BIG_FLAG if big else 1.0)
         foot = (x + width * FLAG_RIGHT, y)
         top = (foot[0], y - height)

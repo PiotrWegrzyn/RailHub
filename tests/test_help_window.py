@@ -95,8 +95,8 @@ def test_the_help_lists_every_engine_by_year() -> None:
     ("name", "sold_until"),
     [
         ("lion", (1840, "Planet steam engine")),
-        ("tank", (1862, "0-6-2 tank engine")),
-        ("light_tank", (1935, "Railbus")),
+        ("tank", (1859, "0-6-2 tank engine")),
+        ("light_tank", (1882, "Branch-line tank engine")),
         ("big_boy", (1960, "Heavy diesel")),
         ("modern_electric", None),
         ("super_diesel", None),
@@ -108,12 +108,12 @@ def test_the_help_says_until_when_an_engine_is_sold(name: str, sold_until) -> No
     assert row.sold_until == sold_until
 
 
-def test_the_help_gives_the_supply_tile_level_that_opens_an_engine() -> None:
+def test_the_help_gives_the_demand_tile_level_that_opens_an_engine() -> None:
     row = engine_row("pacific")
 
     opened = row.opened_by
 
-    assert opened == "coal supply level 20"
+    assert opened == "coal demand level 11"
 
 
 def test_only_the_super_heavy_diesel_is_drawn_after_no_real_engine() -> None:

@@ -151,8 +151,9 @@ class PageSetup:
         frame, passing on to `report`, `advance` and `see` what the worker says of how far it
         got and its pictures of the map growing, `size` points big (none without it) and leaving
         the ground to the graphics card if `over_ground`; None if the worker failed or runs
-        another version of the game, as a browser may keep an older web/painter.js for a while
-        after a new one is published, for the caller to grow it itself."""
+        another version of the game, for the caller to grow it itself. The page starts its
+        workers with the game it loaded itself (web/index.html), so a newer game published
+        meanwhile never makes a game grow twice."""
         wanted = (settings, size, over_ground)
         if self.ahead != wanted:
             self._page.start(pickle.dumps(wanted, protocol=pickle.HIGHEST_PROTOCOL))

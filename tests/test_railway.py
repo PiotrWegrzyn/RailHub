@@ -288,9 +288,9 @@ def test_removing_one_loaded_car_keeps_the_others_full_and_returns_its_goods() -
     _, railway = joined_stations()
     stockpile = railway.station_goods((6, 3)).stockpile
     cars = ENGINES["planet"].cars
-    stockpile[Good.WHEAT] = (cars - 1) * BULK_CAR + 10.0
+    stockpile[Good.BREAD] = (cars - 1) * BULK_CAR + 10.0
     train = railway.buy()
-    train.stops = [Stop((6, 3), [Good.WHEAT] * cars, wait_for_load=True), Stop((6, 20))]
+    train.stops = [Stop((6, 3), [Good.BREAD] * cars, wait_for_load=True), Stop((6, 20))]
     railway.run(0.001)
 
     train.stops[0].cars.pop()
@@ -298,7 +298,7 @@ def test_removing_one_loaded_car_keeps_the_others_full_and_returns_its_goods() -
     railway.run(0.001)
 
     assert [car.load for car in train.cars] == [BULK_CAR] * (cars - 1)
-    assert stockpile[Good.WHEAT] == pytest.approx(10.0)
+    assert stockpile[Good.BREAD] == pytest.approx(10.0)
     assert railway.station_goods((6, 3)).brought == {}
 
 
