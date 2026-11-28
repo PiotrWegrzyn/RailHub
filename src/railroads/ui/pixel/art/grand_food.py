@@ -16,7 +16,33 @@ from collections.abc import (
 import numpy as np
 
 from railroads.ui.pixel.art.crafts import (
+    BUTCHER_PLASTER,
+    BUTCHER_ROOF,
+    COBBLES,
+    IRON,
+    SHOP_GLOW,
+    STRIPES,
+    WHITE_TILE,
+    _craft_awning,
+    _craft_band,
+    _craft_beam,
+    _craft_casement,
+    _craft_framing,
+    _craft_gilt_pig,
+    _craft_log_pile,
+    _craft_meat_window,
+    _craft_smokehouse,
+    _craft_sty,
     _hip,
+)
+from railroads.ui.pixel.art.crafts import (
+    GILT as CRAFT_GILT,
+)
+from railroads.ui.pixel.art.crafts import (
+    OAK as CRAFT_OAK,
+)
+from railroads.ui.pixel.art.crafts import (
+    YARD as CRAFT_YARD,
 )
 from railroads.ui.pixel.art.industry import (
     BREW_BRICK,
@@ -89,7 +115,6 @@ from railroads.ui.pixel.art.industry import (
     _cask_straw,
     _cold_door,
     _cooper_shavings,
-    _door,
     _food_basket,
     _food_cart,
     _food_cases,
@@ -110,7 +135,6 @@ from railroads.ui.pixel.art.industry import (
     _sake_namako,
     _sake_noren,
     _sake_roof,
-    _smoke,
     _stains,
     _still_pagoda,
     _still_peat,
@@ -127,8 +151,6 @@ from railroads.ui.pixel.art.industry import (
     _sugar_stack,
     _sugar_wagon,
     _sugar_window,
-    _track,
-    _window,
     _wine_cart,
     _wine_press,
     _wine_vines,
@@ -164,8 +186,10 @@ from railroads.ui.pixel.art.parts import (
     _iso,
     _on_wall,
     _patch,
+    _pig,
     _plinth,
     _ridge,
+    _tiles,
     _turned,
     _vault,
 )
@@ -1458,17 +1482,6 @@ COLD_DOOR: RGB = (150, 170, 186)
 STEER: tuple[RGB, RGB] = ((138, 84, 50), (96, 58, 36))
 
 
-def _ham(p: Painter, x: float, y: float, size: float = 1) -> None:
-    """A ham hung from a bracket at (x, y) as a sign."""
-    s = size
-    p.line([(x, y), (x - 3 * s, y + 1)], (60, 56, 54))
-    hx, hy = x - 3 * s, y + 1 + 3 * s
-    p.ellipse(hx - 3 * s, hy - 2 * s, hx + 1 * s, hy + 2 * s, HAM)
-    p.point(hx - 2 * s, hy - 1 * s, shade(HAM, 1.3))
-    p.line([(hx + 1 * s, hy - 1 * s), (hx + 2 * s, hy - 2 * s)], BONE)
-    p.point(hx + 2.6 * s, hy - 2.6 * s, BONE)
-
-
 MEAT_VAN: RGB = (238, 238, 232)
 
 MEAT_STRIPE: RGB = (176, 40, 44)
@@ -1942,162 +1955,89 @@ def mega_meat_factory() -> Sprite:
     return p.sprite()
 
 
-SAUSAGE_WALL: RGB = (226, 210, 180)
-
-SAUSAGE_ROOF: RGB = (150, 70, 52)
-
-FRAME: RGB = (96, 64, 44)
-
-SAUSAGE: RGB = (170, 74, 54)
-
-SIGN_BOARD: RGB = (130, 80, 50)
-
-SMOKEHOUSE: RGB = (134, 69, 48)
-
-WOOD_SMOKE: RGB = (176, 170, 164)
-
-
-def _half_timbered(p: Painter, top: Top, height: float, bays: int) -> None:
-    """Dark timber framing on a cream wall: posts between `bays` bays, a rail at each floor and
-    a brace across every other bay."""
-    left, front, right, _ = top
-    floors = max(1, round(height / 5))
-    for k in range(bays + 1):
-        t = k / bays
-        p.line([_on_wall(left, front, t, 0), _on_wall(left, front, t, height)], FRAME)
-    for f in range(floors + 1):
-        d = height * f / floors
-        _bands(p, left, front, right, d, FRAME, shade(FRAME, 0.8))
-    for k in range(0, bays, 2):
-        t0, t1 = k / bays, (k + 1) / bays
-        for f in range(floors):
-            d0, d1 = height * f / floors, height * (f + 1) / floors
-            p.line([_on_wall(left, front, t0, d1), _on_wall(left, front, t1, d0)], FRAME)
-    for t in (0.5, 1):
-        p.line([_on_wall(front, right, t, 0), _on_wall(front, right, t, height)], shade(FRAME, 0.8))
-
-
-def _garland(p: Painter, a: Point, b: Point, links: int) -> None:
-    """A string of sausages hung in loops between `a` and `b`."""
-    for k in range(links):
-        x0, y0 = _on_wall(a, b, k / links, 0)
-        x1, y1 = _on_wall(a, b, (k + 1) / links, 0)
-        mid = ((x0 + x1) / 2, (y0 + y1) / 2 + 1.6)
-        p.line([(x0, y0), mid, (x1, y1)], SAUSAGE)
-        p.point(mid[0], mid[1], shade(SAUSAGE, 1.3))
-
-
-def _rack(p: Painter, x: float, y: float, length: float, tall: float) -> None:
-    """A drying rack of two posts and a pole running down along the ground from (x, y), hung
-    with sausages."""
-    end = (x + length, y + length / 2)
-    for px, py in ((x, y), end):
-        p.line([(px, py), (px, py - tall)], FRAME)
-    a, b = (x, y - tall), (end[0], end[1] - tall)
-    p.line([a, b], shade(FRAME, 1.3))
-    steps = round(length / 1.6)
-    for k in range(1, steps):
-        sx, sy = _on_wall(a, b, k / steps, 0)
-        p.line([(sx, sy), (sx, sy + 3.4)], SAUSAGE if k % 2 else (200, 120, 84))
-
-
-def _smokehouse(p: Painter, x: float, y: float, half: float, tall: float) -> None:
-    """A square brick smokehouse standing on (x, y) with a small iron door, under a little slate
-    cap smoking with wood smoke."""
-    top = p.box(x, y, half, tall, SMOKEHOUSE, None)
-    left, front, right, _ = top
-    _plinth(p, top, tall, SMOKEHOUSE)
-    _stains(p, left, front, tall, (0.2, 0.8), shade(SMOKEHOUSE, 0.65), 2)
-    _patch(p, front, right, (0.3, 0.7), (tall - 3.4, tall - 0.4), (54, 50, 52))
-    _bands(p, left, front, right, 1, (54, 48, 46), (44, 40, 40))
-    cx, cy = front[0], (left[1] + right[1]) / 2
-    p.rect(cx - half * 0.5, cy - 2.4, cx + half * 0.5, cy, shade(SMOKEHOUSE, 0.8))
-    p.polygon(
-        [(cx - half * 0.8, cy - 2.4), (cx, cy - 4), (cx + half * 0.8, cy - 2.4)], (88, 84, 92)
-    )
-    _smoke(p, cx + 0.5, cy - 6.5, WOOD_SMOKE, 3)
-
-
-def _sausage_house(p: Painter, x: float, y: float, length: float, height: float) -> Top:
-    """A half-timbered butcher's house: a lit shop window of sausages under a brown sign board, a
-    door with sausages hung over it, and a red tiled gable."""
-    top = p.hall(x, y, length, 8, height, SAUSAGE_WALL, None)
-    left, front, right, _ = top
-    _half_timbered(p, top, height, round(length / 3))
-    _patch(p, left, front, (0.08, 0.5), (height - 4.6, height - 3.8), SIGN_BOARD)
-    _patch(p, left, front, (0.1, 0.48), (height - 3.4, height - 1), (244, 210, 136))
-    for t in (0.16, 0.26, 0.36):
-        p.line(
-            [_on_wall(left, front, t, height - 3.2), _on_wall(left, front, t, height - 1.6)],
-            SAUSAGE,
-        )
-    _door(p, left, front, (0.6, 0.74), height - 4, height, (104, 66, 44))
-    _garland(p, _on_wall(left, front, 0.56, height - 5), _on_wall(left, front, 0.78, height - 5), 3)
-    _plinth(p, top, height, SAUSAGE_WALL)
-    _window(p, front, right, (0.2, 0.4), 2, shade(WINDOW, 0.85))
-    p.gable(top, 4.5, SAUSAGE_ROOF, SAUSAGE_WALL)
-    _roof_rows(p, top, 4.5, SAUSAGE_ROOF)
-    return top
-
-
 def big_sausage_maker() -> Sprite:
-    """A big butcher's: a two-storey half-timbered house under red tiles with a lit shop window of
-    sausages under its sign and sausages strung over its door, a square brick smokehouse beside it
-    smoking with wood smoke, and a rack of sausages drying outside."""
-    p = Painter(43, 48, (21, 34))
-    foot = _footing(-3, 0, 14, 8)
-    _bed(p, foot)
-    _bed(p, _footing(12, -3, 4, 4), margin=1)
-    p.shadow(16, 4)
-    _track(p, foot[0], foot[1], (0.6, 0.74), 3.5, ruts=False)
-    _smokehouse(p, 12, -3, 4, 14)
-    top = _sausage_house(p, -3, 0, 14, 10)
-    x, y = _on_roof(top, 4.5, 0.25, 0.9)
-    p.rect(x - 1, y - 3, x + 1, y + 0.5, BRICK)
-    _rack(p, 4, 6, 10, 6)
-    _ham(p, *_on_wall(top[0], top[1], 0.02, 2), 0.8)
+    """A smoked-meats works: on the street a pork butcher's house of two half-timbered storeys
+    over its shop, the shop front in white tiles with windows of sausages and hams under red and
+    pink awnings; behind it a curing hall of smoke-browned brick; two smokehouses with wood smoke
+    seeping from their louvred lanterns and beech logs stacked before them; and a delivery yard
+    behind a brick wall, entered through a gateway with the gilt pig standing on its iron arch,
+    where a white meat wagon waits to be loaded and pink pigs root in a pen by their sty."""
+    m = METRE
+    p = Painter(56, 46, (28, 30))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 20) * m, (v - 12) * m)
+
+    p.polygon([at(-1, -2), at(41, -2), at(41, 26), at(-1, 26)], COBBLES, shade(COBBLES, 0.85))
+    p.polygon([at(15, 0), at(41, 0), at(41, 15), at(15, 15)], CRAFT_YARD)
+    _craft_curing_hall(p, *at(16, 20.5), 22 * m, 9 * m, 7 * m)
+    _craft_smokehouse(p, *at(31.5, 22), 7)
+    _craft_smokehouse(p, *at(37, 22), 7)
+    for u in (31.5, 37):
+        _craft_log_pile(p, *at(u, 18.8), 3.2 * m, 1.5 * m)
+    _meat_wagon(p, *at(23, 9))
+    pen = (at(30, 2), at(40, 2), at(40, 11), at(30, 11))
+    near_left, near_right, far_right, far_left = pen
+    p.polygon(list(pen), MUD, shade(MUD, 0.8))
+    _fence(p, near_left, far_left, METRE)
+    _fence(p, far_left, far_right, METRE)
+    _craft_sty(p, *at(38, 9.5))
+    _pig(p, *at(35, 6.5), BEAST, 1)
+    _pig(p, *at(32.5, 4.5), BEAST, -1)
+    _pig(p, *at(36.5, 3.5), BEAST, -1)
+    _fence(p, near_left, near_right, METRE)
+    _fence(p, near_right, far_right, METRE)
+    _craft_butcher_house(p, *at(7, 5.5), 13 * m, 8 * m, 2)
+    _craft_street_wall(p, at(15, -0.5), at(19, -0.5))
+    _craft_street_wall(p, at(24, -0.5), at(41, -0.5))
+    _craft_pig_gate(p, *at(21.5, -0.5), 5, 3.0)
     return p.sprite()
 
 
 def mega_sausage_maker() -> Sprite:
-    """A great sausage works: a long half-timbered hall of two storeys under red tiles with shop
-    windows of sausages, a giant sausage on its ridge for a sign, two tall brick smokehouses behind
-    smoking with wood smoke, racks of sausages drying in the yard, a ham hung out by the door and
-    a cart of crates."""
-    p = Painter(56, 58, (28, 42))
-    foot = _footing(-5, 0, 22, 9)
-    _bed(p, foot)
-    for x, y in ((10, -8), (16, -5)):
-        _bed(p, _footing(x, y, 4.5, 4.5), margin=1)
-    p.shadow(22, 5)
-    _track(p, foot[0], foot[1], (0.6, 0.74), 5, ruts=False)
-    for x, y in ((10, -8), (16, -5)):
-        _smokehouse(p, x, y, 4.2, 17)
-    top = _sausage_house(p, -5, 0, 22, 12)
-    left, front, _, _ = top
-    for along in (0.15, 0.85):
-        x, y = _on_roof(top, 4.5, along, 0.9)
-        p.rect(x - 1, y - 3, x + 1, y + 0.5, BRICK)
-    rb, rf = _ridge(top, 4.5)
-    links = []
-    for k in range(6):
-        t = 0.32 + 0.36 * k / 5
-        sx, sy = _on_wall(rb, rf, t, -3.5)
-        links.append((sx, sy - 1.6 * (1 - (2 * k / 5 - 1) ** 2)))
-    for x, y in (links[1], links[4]):
-        p.line([(x, y), (x, y + 3.5)], (60, 56, 54))
-    for x, y in links:
-        p.blob(x - 2.2, y - 2, x + 2.2, y + 2, (90, 40, 34))
-    for x, y in links:
-        p.blob(x - 1.8, y - 1.6, x + 1.8, y + 1.4, (212, 112, 82))
-    for x, y in links[1:-1]:
-        p.point(x - 0.6, y - 1.2, (240, 170, 130))
-    for x, y in (links[0], links[-1]):
-        p.point(x + (-2 if x == links[0][0] else 1.8), y, (60, 56, 54))
-    _ham(p, *_on_wall(left, front, 0.02, 2), 1)
-    _rack(p, 4, 7, 10, 6)
-    _rack(p, 10, 3, 10, 6)
-    _cart(p, -14, 11, ((150, 112, 74), (150, 112, 74)))
+    """A great smoked-meats works: on the street a grand pork butcher's house of three
+    half-timbered storeys over its shop, its windows of sausages and hams under red and pink
+    awnings, and a great gilt pig standing on its roof; behind it a long curing hall of
+    smoke-browned brick fronted by a row of four tall smokehouses, wood smoke rising from all
+    their lanterns, with beech logs stacked by them; and a delivery yard behind a brick wall,
+    entered through a gateway with the gilt pig on its iron arch, where two white meat wagons are
+    loaded and pink pigs root in a pen by their sty."""
+    m = METRE
+    p = Painter(66, 56, (33, 38))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 23.5) * m, (v - 14.5) * m)
+
+    def up(u: float, v: float, z: float) -> Point:
+        x, y = at(u, v)
+        return x, y - z * m
+
+    p.polygon([at(0, -2), at(47.5, -2), at(47.5, 30.5), at(0, 30.5)], COBBLES, shade(COBBLES, 0.85))
+    p.polygon([at(18, 0), at(47.5, 0), at(47.5, 18), at(18, 18)], CRAFT_YARD)
+    _craft_curing_hall(p, *at(22, 25.5), 34 * m, 9 * m, 8 * m)
+    for u in (11, 18, 25, 32):
+        _craft_smokehouse(p, *at(u, 18.5), 10)
+        _craft_log_pile(p, *at(u + 3.4, 15.5), 2.6 * m, 1.4 * m)
+    _craft_smokehouse(p, *at(43, 25), 8)
+    _meat_wagon(p, *at(26, 10))
+    _meat_wagon(p, *at(30.5, 7.5))
+    pen = (at(37, 2), at(47, 2), at(47, 12), at(37, 12))
+    near_left, near_right, far_right, far_left = pen
+    p.polygon(list(pen), MUD, shade(MUD, 0.8))
+    _fence(p, near_left, far_left, METRE)
+    _fence(p, far_left, far_right, METRE)
+    _craft_sty(p, *at(45, 10.5))
+    for u, v, facing in ((42, 7.5, 1), (39.5, 5, -1), (43.5, 4, -1), (40.5, 9, 1)):
+        _pig(p, *at(u, v), BEAST, facing)
+    _fence(p, near_left, near_right, METRE)
+    _fence(p, near_right, far_right, METRE)
+    house = _craft_butcher_house(p, *at(8.5, 6), 16 * m, 9 * m, 3)
+    px, py = _on_wall(*_ridge(house, 9 * m * 0.6), 0.5, 0)
+    p.hall(px, py + 0.3 * m, 1.8 * m, 1.0 * m, 0.7 * m, CRAFT_GILT, shade(CRAFT_GILT, 1.15))
+    _craft_gilt_pig(p, px, py - 0.4 * m - 2.5 * m, 5 * m)
+    _craft_street_wall(p, at(18, -0.5), at(22, -0.5))
+    _craft_street_wall(p, at(27, -0.5), at(47.5, -0.5))
+    _craft_pig_gate(p, *at(24.5, -0.5), 5, 3.0)
     return p.sprite()
 
 
@@ -3492,3 +3432,204 @@ def mega_sake_brewery() -> Sprite:
     _drink_wall(p, *at(14, -9), 22)
     _drink_gate(p, *at(11, -9), 2.2)
     return p.sprite()
+
+
+CURING_BRICK: RGB = (152, 92, 70)
+
+GATE_BRICK: RGB = (162, 86, 62)
+
+COPING: RGB = (206, 198, 184)
+
+
+def _craft_butcher_house(
+    p: Painter, x: float, y: float, long: float, deep: float, floors: int
+) -> Top:
+    """A pork butcher's house on the street `long` along the lit walls and `deep`, of `floors`
+    storeys over its shop: the shop front in white tiles under a red fascia lettered in gold,
+    windows hung with sausages and hams under red and pink striped awnings either side of a
+    glazed door, half-timbered upper floors of cream plaster and dark oak with casement windows,
+    and a steep red-brown roof with dormers and chimneys. Returns its top."""
+    m = METRE
+    shop, storey = 3.2 * m, 2.8 * m
+    upper = floors * storey
+    high = upper + shop
+    top = p.hall(x, y, long, deep, high, BUTCHER_PLASTER, None)
+    left, front, right, _ = top
+    _plinth(p, top, high, (170, 160, 146), 0.5 * m)
+    for f in range(floors):
+        drop = (f * storey, (f + 1) * storey)
+        _craft_framing(p, left, front, long, drop, CRAFT_OAK)
+        _craft_framing(p, front, right, deep, drop, shade(CRAFT_OAK, 0.8))
+    _craft_framing(p, front, right, deep, (upper, high - 0.5 * m), shade(CRAFT_OAK, 0.8))
+    _patch(p, left, front, (0, 1), (upper, high - 0.5 * m), WHITE_TILE)
+    _patch(p, left, front, (0.02, 0.98), (upper, upper + 0.45 * m), (150, 36, 44))
+    for t0 in np.arange(0.36, 0.62, 0.06):
+        _craft_beam(
+            p,
+            left,
+            front,
+            (t0, upper + 0.22 * m),
+            (t0 + 0.04, upper + 0.22 * m),
+            0.16 * m,
+            CRAFT_GILT,
+        )
+    door = 1.0 * m / long
+    for span in ((0.05, 0.5 - door * 1.6), (0.5 + door * 1.6, 0.95)):
+        _craft_meat_window(p, left, front, long, span, (upper + 0.8 * m, high - 0.5 * m))
+        _craft_awning(
+            p, left, front, (span[0] - 0.01, span[1] + 0.01), upper + 0.45 * m, 0.7 * m, STRIPES
+        )
+    _patch(p, left, front, (0.5 - door, 0.5 + door), (upper + 0.6 * m, high), DOOR)
+    _patch(
+        p,
+        left,
+        front,
+        (0.5 - door * 0.7, 0.5 + door * 0.7),
+        (upper + 0.8 * m, upper + 1.7 * m),
+        SHOP_GLOW,
+    )
+    count = max(2, round(long / (2.6 * m)))
+    for f in range(floors):
+        head = f * storey + 0.7 * m
+        for k in range(count):
+            _craft_casement(
+                p, left, front, long, (k + 0.5) / count, 1.1 * m, (head, head + 1.3 * m), WINDOW
+            )
+        for t in (0.3, 0.7):
+            _craft_casement(
+                p, front, right, deep, t, 1.0 * m, (head, head + 1.3 * m), shade(WINDOW, 0.8)
+            )
+    rise = deep * 0.6
+    p.gable(top, rise, BUTCHER_ROOF, BUTCHER_PLASTER)
+    _tiles(p, top, rise, BUTCHER_ROOF, (0.25, 0.5, 0.75))
+    ridge_back, ridge_front = _ridge(top, rise)
+    _bar(
+        p,
+        ridge_front,
+        ((front[0] + right[0]) / 2, (front[1] + right[1]) / 2),
+        0.22 * m,
+        shade(CRAFT_OAK, 0.8),
+    )
+    for t in (0.25, 0.75):
+        foot = _on_wall(front, right, t, 0)
+        _bar(p, foot, _on_wall(ridge_front, foot, 0.5, 0), 0.18 * m, shade(CRAFT_OAK, 0.8))
+    dormers = max(1, round(long / (6 * m)))
+    for k in range(dormers):
+        d = p.hall(
+            *_on_wall(left, front, (k + 0.5) / dormers, -1.4 * m),
+            1.8 * m,
+            1.6 * m,
+            1.6 * m,
+            BUTCHER_PLASTER,
+            None,
+        )
+        _craft_casement(p, d[0], d[1], 1.8 * m, 0.5, 1.0 * m, (0.4 * m, 1.3 * m), WINDOW)
+        _gable_across(p, d, 1.0 * m, BUTCHER_ROOF, BUTCHER_PLASTER)
+    for along in (0.2, 0.8):
+        cx, cy = _on_wall(ridge_back, ridge_front, along, 0)
+        p.hall(cx, cy + 0.4 * m, 0.9 * m, 0.9 * m, 1.6 * m, BRICK, (60, 50, 48))
+    return top
+
+
+def _craft_curing_hall(
+    p: Painter, x: float, y: float, long: float, deep: float, high: float
+) -> Top:
+    """The works where the meat is cured and the sausage made, `long` along the lit walls and
+    `deep`, `high` to its eaves, of smoke-browned brick on (x, y): cream string courses, rows of
+    white-framed windows, wide doors open onto the yard, and a louvred vent along its tiled
+    ridge. Returns its top."""
+    m = METRE
+    top = p.hall(x, y, long, deep, high, CURING_BRICK, None)
+    left, front, right, _ = top
+    _plinth(p, top, high, CURING_BRICK, 0.6 * m)
+    for drop in (0.4 * m, high - 3.4 * m):
+        _craft_band(p, top, drop, 0.3 * m, COPING)
+    floors = max(1, round(high / (3.6 * m)))
+    count = max(2, round(long / (2.4 * m)))
+    doors = (round(count * 0.3), round(count * 0.7))
+    for f in range(floors):
+        head = high - (f + 1) * (high / floors) + 0.9 * m
+        for k in range(count):
+            if f == 0 and k in doors:
+                continue
+            _craft_casement(
+                p, left, front, long, (k + 0.5) / count, 1.1 * m, (head, head + 1.6 * m), WINDOW
+            )
+        for k in range(2):
+            _craft_casement(
+                p,
+                front,
+                right,
+                deep,
+                (k + 0.5) / 2,
+                1.1 * m,
+                (head, head + 1.6 * m),
+                shade(WINDOW, 0.8),
+            )
+    for k in doors:
+        t, half = (k + 0.5) / count, 1.2 * m / long
+        _patch(p, left, front, (t - half, t + half), (high - 3.0 * m, high), (58, 48, 44))
+        _patch(p, left, front, (t - half, t + half), (high - 1.4 * m, high), (122, 96, 80))
+        _patch(
+            p,
+            left,
+            front,
+            (t - half * 1.3, t + half * 1.3),
+            (high - 3.3 * m, high - 3.0 * m),
+            COPING,
+        )
+    rise = deep * 0.4
+    p.gable(top, rise, BUTCHER_ROOF, CURING_BRICK)
+    _tiles(p, top, rise, BUTCHER_ROOF, (0.3, 0.6))
+    ridge_back, ridge_front = _ridge(top, rise)
+    vx, vy = _on_wall(ridge_back, ridge_front, 0.5, 0)
+    vent = p.hall(vx, vy + 0.4 * m, long * 0.5, 1.2 * m, 0.9 * m, shade(CURING_BRICK, 0.9), None)
+    for d in (0.3 * m, 0.6 * m):
+        _craft_beam(p, vent[0], vent[1], (0.02, d), (0.98, d), 0.1 * m, (60, 52, 48))
+    p.gable(vent, 0.5 * m, BUTCHER_ROOF, CURING_BRICK)
+    return top
+
+
+def _craft_street_wall(p: Painter, a: Point, b: Point) -> None:
+    """A low brick yard wall 1.6 m high on the ground from `a` to `b`, with a stone coping."""
+    m = METRE
+    high = 1.6 * m
+    p.polygon([a, b, (b[0], b[1] - high), (a[0], a[1] - high)], GATE_BRICK, shade(GATE_BRICK, 0.6))
+    for k in range(1, 6):
+        _bar(
+            p,
+            _on_wall(a, b, 0, k * 0.27 * m),
+            _on_wall(a, b, 1, k * 0.27 * m),
+            0.04 * m,
+            shade(GATE_BRICK, 0.85),
+        )
+    _bar(p, (a[0], a[1] - high), (b[0], b[1] - high), 0.25 * m, COPING)
+
+
+def _craft_pig_gate(p: Painter, x: float, y: float, wide: float, pig: float) -> None:
+    """A yard gateway `wide` metres across on the ground at (x, y) along the lit walls: two brick
+    piers 3.4 m tall under stone caps, a wrought-iron arch between them and the gilt pig `pig`
+    metres long standing on its crown."""
+    m = METRE
+    high = 3.4 * m
+    tops = []
+    for side in (-1, 1):
+        px, py = _iso(x, y, side * wide / 2 * m, 0)
+        pier = p.hall(px, py, 0.9 * m, 0.9 * m, high, GATE_BRICK, None)
+        _craft_band(p, pier, 0.6 * m, 0.2 * m, shade(GATE_BRICK, 0.8))
+        p.hall(px, py - high, 1.2 * m, 1.2 * m, 0.3 * m, COPING, shade(COPING, 1.05))
+        tops.append((px, py - high - 0.3 * m))
+    a, b = tops
+    arc = [
+        (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f - 1.8 * m * math.sin(math.pi * f))
+        for f in np.linspace(0, 1, 9)
+    ]
+    inner = [(ax, ay + 0.45 * m) for ax, ay in arc]
+    for k in range(8):
+        _bar(p, arc[k], arc[k + 1], 0.18 * m, IRON)
+        _bar(p, inner[k], inner[k + 1], 0.1 * m, IRON)
+        if 0 < k < 8:
+            _bar(p, arc[k], inner[k], 0.06 * m, IRON)
+    crown = arc[4]
+    _bar(p, crown, (crown[0], crown[1] - 0.4 * m), 0.12 * m, IRON)
+    _craft_gilt_pig(p, crown[0], crown[1] - 0.4 * m - 0.5 * pig * m, pig * m)

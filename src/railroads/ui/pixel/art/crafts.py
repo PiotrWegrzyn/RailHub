@@ -2,14 +2,27 @@
 sausage makers, the makers of luxury goods, manors, theatres and hospitals."""
 
 import math
-from collections.abc import Callable
-from itertools import pairwise
+from collections.abc import (
+    Callable,
+)
+from itertools import (
+    pairwise,
+)
 
 import numpy as np
 
-from railroads.ui.pixel.art.churches import _ribs
-from railroads.ui.pixel.art.commerce import PAVING, _lamp_post
-from railroads.ui.pixel.art.homes import _chimney_on, _foot, _outward
+from railroads.ui.pixel.art.churches import (
+    _ribs,
+)
+from railroads.ui.pixel.art.commerce import (
+    PAVING,
+    _lamp_post,
+)
+from railroads.ui.pixel.art.homes import (
+    _chimney_on,
+    _foot,
+    _outward,
+)
 from railroads.ui.pixel.art.industry import (
     DRESSING,
     OXBLOOD,
@@ -60,6 +73,7 @@ from railroads.ui.pixel.art.parts import (
 )
 
 MOLTEN: RGB = (240, 128, 36)
+
 SLATE: RGB = (88, 84, 92)
 
 
@@ -191,15 +205,25 @@ def _craft_log_pile(p: Painter, x: float, y: float, long: float, high: float) ->
 
 
 TERRACOTTA: RGB = (198, 108, 68)
+
 POTTER_WALL: RGB = (238, 216, 170)
+
 PANTILE: RGB = (192, 94, 58)
+
 KILN_BRICK: RGB = (160, 90, 64)
+
 COBALT: RGB = (44, 80, 172)
+
 CELADON: RGB = (72, 146, 96)
+
 CREAM_GLAZE: RGB = (242, 232, 204)
+
 GREENWARE: RGB = (224, 212, 188)
+
 CLAY: RGB = (156, 150, 140)
+
 BEATEN_EARTH: RGB = (180, 160, 122)
+
 PLANK: RGB = (150, 112, 74)
 
 
@@ -290,11 +314,13 @@ def _craft_ware_stall(p: Painter, x: float, y: float) -> None:
                 _craft_pot(p, cx, cy, (0.95 if k % 2 else 0.7) * m, colour, True)
 
 
-def _craft_bottle_kiln(p: Painter, x: float, y: float) -> None:
-    """A potter's bottle kiln of brick 6 m across and 8.6 m tall standing on (x, y): a squat
-    belly bound with iron hoops narrowing to a sooted neck, an arched firing mouth glowing low at
-    its front and a wisp of smoke from its top."""
-    m = METRE
+def _craft_bottle_kiln(
+    p: Painter, x: float, y: float, size: float = 1, smoking: bool = True
+) -> None:
+    """A potter's bottle kiln of brick standing on (x, y), 6 m across and 8.6 m tall times
+    `size`: a squat belly bound with iron hoops narrowing to a sooted neck, an arched firing mouth
+    glowing low at its front and, if `smoking`, a wisp of smoke from its top."""
+    m = METRE * size
     profile = [
         (0, 2.8 * m),
         (1.6 * m, 2.95 * m),
@@ -309,13 +335,16 @@ def _craft_bottle_kiln(p: Painter, x: float, y: float) -> None:
     neck = [(h - 5.6 * m, w) for h, w in profile if h >= 6.6 * m]
     _turned(p, x, y - 5.6 * m, [(0, 1.75 * m), *neck], shade(KILN_BRICK, 0.66), rim)
     for h, half in ((1.0 * m, 2.92 * m), (2.4 * m, 2.92 * m), (3.8 * m, 2.6 * m)):
-        _craft_hoop(p, x, y - h, half, 0.16 * m, (64, 60, 62))
+        _craft_hoop(p, x, y - h, half, 0.16 * METRE, (64, 60, 62))
     mx, my = x - 0.9 * m, y + 1.32 * m
-    p.polygon(_craft_arch(mx, my, 1.5 * m, 2.1 * m), shade(KILN_BRICK, 0.6))
-    p.polygon(_craft_arch(mx, my, 1.0 * m, 1.7 * m), (56, 40, 34))
-    p.blob(mx - 0.42 * m, my - 0.9 * m, mx + 0.42 * m, my, MOLTEN)
-    p.blob(mx - 0.22 * m, my - 0.55 * m, mx + 0.16 * m, my - 0.12 * m, (255, 214, 120))
-    _craft_smoke(p, x + 0.5 * m, y - 10 * m, 1.8 * m, 2)
+    p.polygon(_craft_arch(mx, my, 1.5 * METRE, 2.1 * METRE), shade(KILN_BRICK, 0.6))
+    p.polygon(_craft_arch(mx, my, 1.0 * METRE, 1.7 * METRE), (56, 40, 34))
+    p.blob(mx - 0.42 * METRE, my - 0.9 * METRE, mx + 0.42 * METRE, my, MOLTEN)
+    p.blob(
+        mx - 0.22 * METRE, my - 0.55 * METRE, mx + 0.16 * METRE, my - 0.12 * METRE, (255, 214, 120)
+    )
+    if smoking:
+        _craft_smoke(p, x + 0.5 * m, y - 10 * m, 1.8 * m, 2)
 
 
 def potter() -> Sprite:
@@ -376,10 +405,7 @@ def potter() -> Sprite:
     p.hall(cx, cy + 0.4 * m, 0.8 * m, 0.8 * m, 1.4 * m, KILN_BRICK, (60, 50, 48))
     _craft_mound(p, *at(10.2, 4.4), 1.5 * m, 1.3 * m, CLAY)
     for v in (2.8, 1.2):
-        board, b_front, _, _ = _craft_trestle(p, *at(4.5, v), 6.5 * m, 0.9 * m)
-        for k in range(10):
-            px, py = _on_wall(board, b_front, (k + 0.5) / 10, 0)
-            _craft_pot(p, px + 0.25 * m, py - 0.1 * m, (0.5 if k % 2 else 0.4) * m, GREENWARE)
+        _craft_drying_board(p, *at(4.5, v), 6.5 * m, 10)
     _craft_ware_stall(p, *at(13.5, 2.2))
     for u, v, tall, colour in (
         (17.4, 4.2, 1.4, COBALT),
@@ -392,12 +418,19 @@ def potter() -> Sprite:
 
 
 ROOF_TILE: RGB = (194, 98, 60)
+
 RAW_TILE: RGB = (214, 178, 136)
+
 STOVE_GREEN: RGB = (58, 136, 92)
+
 TILE_WHITE: RGB = (244, 244, 238)
+
 CREAM_CLAY: RGB = (232, 212, 162)
+
 OFFICE_WALL: RGB = (236, 226, 204)
+
 WORKS_BRICK: RGB = (164, 84, 58)
+
 WORKS_YARD: RGB = (148, 132, 104)
 
 
@@ -649,12 +682,19 @@ def tile_works() -> Sprite:
 
 
 SOOTED_BRICK: RGB = (150, 76, 56)
+
 CAST_IRON: RGB = (98, 100, 106)
+
 FURNACE_IRON: RGB = (82, 80, 84)
+
 WHITE_HOT: RGB = (255, 238, 176)
+
 MOULDING_SAND: RGB = (206, 174, 122)
+
 BLACK_SAND: RGB = (76, 70, 64)
+
 FOUNDRY_YARD: RGB = (124, 114, 100)
+
 FURNACE_GLOW: RGB = (150, 88, 56)
 
 
@@ -1034,17 +1074,29 @@ def foundry() -> Sprite:
 
 
 SAUSAGE: RGB = (184, 58, 52)
+
 HAM: RGB = (160, 74, 58)
+
 BUTCHER_PLASTER: RGB = (240, 228, 200)
+
 OAK: RGB = (84, 56, 42)
+
 BUTCHER_ROOF: RGB = (132, 64, 54)
+
 WHITE_TILE: RGB = (236, 238, 234)
+
 STRIPES: tuple[RGB, RGB] = ((198, 54, 62), (248, 222, 222))
+
 SMOKED_BRICK: RGB = (128, 84, 64)
+
 SHOP_GLOW: RGB = (250, 228, 182)
+
 IRON: RGB = (46, 42, 42)
+
 COBBLES: RGB = (176, 168, 152)
+
 YARD: RGB = (150, 132, 100)
+
 MUD: RGB = (118, 92, 64)
 
 
@@ -1178,16 +1230,16 @@ def _craft_pig_sign(p: Painter, x: float, y: float) -> None:
     _craft_gilt_pig(p, mx, my + 0.45 * m, 2.6 * m)
 
 
-def _craft_smokehouse(p: Painter, x: float, y: float) -> None:
-    """A smokehouse 4 by 4 m and 6 m to its eaves of smoke-browned brick standing on (x, y): soot
-    creeping down from its eaves, a riveted iron door, a steep pyramid roof of dark tiles and a
-    louvred lantern on it with wood smoke seeping out between the slats."""
+def _craft_smokehouse(p: Painter, x: float, y: float, tall: float = 6) -> None:
+    """A smokehouse 4 by 4 m and `tall` metres to its eaves of smoke-browned brick standing on
+    (x, y): soot creeping down from its eaves, a riveted iron door, a steep pyramid roof of dark
+    tiles and a louvred lantern on it with wood smoke seeping out between the slats."""
     m = METRE
-    high = 6 * m
+    high = tall * m
     top = p.hall(x, y, 4 * m, 4 * m, high, SMOKED_BRICK, None)
     left, front, right, _ = top
     _plinth(p, top, high, SMOKED_BRICK, 0.5 * m)
-    for drop in (1.6 * m, 3.2 * m, 4.6 * m):
+    for drop in np.arange(1.6 * m, high - 1.2 * m, 1.5 * m):
         _craft_band(p, top, drop, 0.1 * m, shade(SMOKED_BRICK, 0.86))
     soot = shade(SMOKED_BRICK, 0.62)
     for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
@@ -1328,13 +1380,21 @@ def _luxury_shop(sign: RGB, goods: RGB) -> Painter:
 
 
 WEAVE_PLASTER: RGB = (236, 218, 182)
+
 WEAVE_ROOF: RGB = (150, 54, 46)
+
 WEAVE_MADDER: RGB = (164, 36, 44)
+
 WEAVE_INDIGO: RGB = (44, 56, 124)
+
 WEAVE_SAFFRON: RGB = (236, 174, 50)
+
 WEAVE_CREAM: RGB = (244, 232, 206)
+
 WEAVE_TIMBER: RGB = (112, 78, 52)
+
 WEAVE_YARD: RGB = (170, 150, 116)
+
 WEAVE_RUGS: tuple[tuple[RGB, RGB, RGB], ...] = (
     (WEAVE_MADDER, WEAVE_INDIGO, WEAVE_SAFFRON),
     (WEAVE_INDIGO, WEAVE_MADDER, WEAVE_CREAM),
@@ -1796,9 +1856,13 @@ def mirror_maker() -> Sprite:
 
 
 MANOR_ROOF: RGB = (158, 72, 54)
+
 SHUTTER: RGB = (58, 96, 70)
+
 LAWN: RGB = (104, 156, 74)
+
 GRAVEL: RGB = (214, 204, 178)
+
 BLOOMS: tuple[RGB, ...] = ((214, 70, 84), (244, 214, 96), (236, 236, 240))
 
 
@@ -1942,9 +2006,13 @@ def manor() -> Sprite:
 
 
 THEATRE_WALL: RGB = (238, 222, 186)
+
 COLUMN: RGB = (248, 245, 236)
+
 GILT: RGB = (228, 182, 70)
+
 CURTAIN: RGB = (150, 34, 44)
+
 POSTERS: tuple[RGB, ...] = ((204, 52, 48), (240, 200, 72), (64, 104, 178), (236, 232, 220))
 
 
@@ -2178,7 +2246,9 @@ def hospital() -> Sprite:
 
 # The dark timber, pale plaster and black tiles of the workshops of East Asia.
 DARK_TIMBER: RGB = (112, 82, 58)
+
 PLASTER: RGB = (236, 230, 214)
+
 BLACK_TILE: RGB = (58, 60, 68)
 
 
@@ -2251,21 +2321,15 @@ def fish_dryer() -> Sprite:
 
 ROOF: RGB = (150, 70, 52)
 
-
 SADDLE: RGB = (150, 86, 44)
-
 
 SADDLE_TAN: RGB = (196, 142, 88)
 
-
 HARNESS: RGB = (58, 40, 30)
-
 
 BUCKLE: RGB = (214, 176, 80)
 
-
 SADDLER_SIGN: RGB = (104, 58, 34)
-
 
 SADDLER_RENDER: RGB = (228, 206, 168)
 
@@ -3158,3 +3222,13 @@ def saddler() -> Sprite:
     _bar(p, (hx - 2.8 * m, hy - 3.2 * m), up(12.2, 0.8, 1.65), 0.05 * m, HARNESS)
     _saddle_trestle(p, *at(19.6, -1.6), SADDLE_TAN)
     return p.sprite()
+
+
+def _craft_drying_board(p: Painter, x: float, y: float, long: float, pots: int) -> None:
+    """A board `long` along the lit walls on trestles at (x, y) set out with `pots` unfired pots
+    drying in a row, big and small by turns."""
+    m = METRE
+    board, front, _, _ = _craft_trestle(p, x, y, long, 0.9 * m)
+    for k in range(pots):
+        px, py = _on_wall(board, front, (k + 0.5) / pots, 0)
+        _craft_pot(p, px + 0.25 * m, py - 0.1 * m, (0.5 if k % 2 else 0.4) * m, GREENWARE)
