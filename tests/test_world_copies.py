@@ -1,4 +1,3 @@
-import pickle
 import subprocess
 import sys
 
@@ -8,7 +7,6 @@ from screens import world_over_mountains
 from railroads.sim.constructions import Building, BuildingKind, Track, TrackWidth
 from railroads.sim.tilemap import Vegetation
 from railroads.sim.track_rules import TrackBed
-from railroads.sim.trade import Satisfaction
 from railroads.ui.pixel.copies import (
     GROUND,
     TRACK,
@@ -108,20 +106,6 @@ def test_a_copy_keeps_up_with_buildings_track_and_forests() -> None:
     assert not np.array_equal(world.render(*plains, 2), before)
 
 
-def test_a_copy_keeps_up_with_how_satisfied_cells_are() -> None:
-    world, _, plains = world_over_mountains()
-    copy = copied(world)
-    seen = Seen.now(world)
-    levels = np.full(world.tile_map.grid.shape, -1, dtype=np.int8)
-    levels[8:13, 2:7] = Satisfaction.THRIVING
-
-    changed = world.satisfaction_changed(levels)
-    copy.update(1, update_message(world, seen))
-
-    assert plains in changed
-    assert np.array_equal(copy.paint(1, (*plains, 2, False, False)), world.render(*plains, 2))
-
-
 def test_nothing_is_sent_while_the_world_stays_as_it_was() -> None:
     world, _, _ = world_over_mountains()
     seen = Seen.now(world)
@@ -140,7 +124,7 @@ def test_a_copy_leaves_out_what_belongs_to_a_world_it_no_longer_has() -> None:
     world.buildings_changed([(10, 4)])
 
     copy.start(2, world_message(world))
-    copy.update(1, pickle.dumps({"satisfaction": np.zeros(world.tile_map.grid.shape, np.int8)}))
+    copy.update(1, update_message(world, seen))
     painted = copy.paint(1, (*plains, 2, False, False))
 
     assert copy.world is not old

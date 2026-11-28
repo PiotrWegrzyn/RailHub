@@ -583,11 +583,20 @@ def test_without_threads_a_new_game_grows_on_the_frames_when_the_page_worker_fai
 
 
 def colours_changed_by_a_month(app: App) -> None:
-    """Lets a month pass that the view takes as changing every cell's mood, so the ground
-    pictures take their colours again."""
+    """Lets a month pass that changes a forest, so the ground pictures take their colours
+    again."""
     view = app.view
-    view._satisfaction = np.full_like(view._satisfaction, 2)
+    game = view.game
+    steps = game.month_steps
+
+    def with_a_forest_changed(rng: np.random.Generator, date: str = "") -> Any:
+        month = yield from steps(rng, date)
+        view.growth.forests_changed = {(0, 0)}
+        return month
+
+    game.month_steps = with_a_forest_changed
     view.month_passed(np.random.default_rng(1))
+    del game.month_steps
 
 
 def test_a_month_that_changes_colours_paints_the_overview_again_within_its_steps(

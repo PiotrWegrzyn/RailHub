@@ -28,7 +28,7 @@ from railroads.sim.ladder_types import Ladder
 from railroads.sim.railway import Railway
 from railroads.sim.station_trade import StationPreview
 from railroads.sim.steps import Steps, finish
-from railroads.sim.tilemap import Terrain, TileMap
+from railroads.sim.tilemap import TileMap
 from railroads.sim.year_caches import boards_changed
 from railroads.ui.build_menu import (
     BuildMenu,
@@ -76,8 +76,6 @@ from railroads.ui.minimap import FRAME_PAD, Minimap, MinimapLayout, view_corners
 from railroads.ui.ornate import DEEP, bar_buttons, frame_window, keep_in_front, ornate_window
 from railroads.ui.pixel.dots_shader import DotShader, dot_vertices
 from railroads.ui.pixel.gl_util import free_textures
-from railroads.ui.pixel.ground import glow_strength
-from railroads.ui.pixel.ground_palette import GLOW
 from railroads.ui.pixel.ground_shader import (
     GroundShader,
     Screen,
@@ -521,14 +519,10 @@ class MapView:
             self.summaries.add(month.summary)
         for headline in month.headlines:
             self.summaries.add(headline)
-        satisfaction = self.growth.satisfaction()
-        moods_changed = not np.array_equal(satisfaction, self._satisfaction)
-        self._satisfaction = satisfaction
-        if moods_changed or self.growth.forests_changed:
+        self._satisfaction = self.growth.satisfaction()
+        if self.growth.forests_changed:
             self._ground_version += 1
             self._colors_version += 1
-            if self._pixels is not None:
-                self._pixels.refresh(self._pixels.world.satisfaction_changed(satisfaction))
             # The ground pictures the last frame showed are painted again in the new colours in
             # steps of their own, the old ones showing until then, rather than all on one frame.
             # The others are dropped, to be painted when they next show.
@@ -623,16 +617,8 @@ class MapView:
         return self._textures[with_lines]
 
     def _ground_colors(self) -> Pixels:
-        """Every cell's colour on the ground picture, tinted towards GLOW on land that is served."""
-        colors = cell_colors(self.tile_map)
-        strength = glow_strength(self._satisfaction).ravel()
-        land = (self.tile_map.terrain == Terrain.LAND).ravel()
-        glowing = np.flatnonzero(land & (strength > 0))
-        share = strength[glowing, None]
-        flat = colors.reshape(-1, 4)
-        tinted = flat[glowing, :3] * (1 - share) + np.array(GLOW) * share
-        flat[glowing, :3] = tinted.astype(np.uint8)
-        return colors
+        """Every cell's colour on the ground picture."""
+        return cell_colors(self.tile_map)
 
     def _draw_map(self) -> None:
         origin = imgui.get_cursor_screen_pos()
@@ -1133,7 +1119,6 @@ class MapView:
             station_levels=self.railway.levels,
             finest=_finest_sprite_sheet(),
         )
-        world.satisfaction = self._satisfaction.copy()
         self._pixels = PixelLayer(world)
 
     def simulate(self, years: int, rng: np.random.Generator) -> None:
@@ -1168,7 +1153,6 @@ class MapView:
                 ground.biomes,
                 self.tile_map.deposits,
                 ground.hills,
-                glow_strength(ground.satisfaction),
                 ground.mountains,
                 ground.streams,
             )

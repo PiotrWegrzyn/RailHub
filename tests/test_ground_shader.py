@@ -49,14 +49,14 @@ def test_the_shader_has_every_table_and_number_of_the_cpu_ground_written_in() ->
     assert source.count("vec3(") > 52
 
 
-def test_each_cell_hands_the_shader_its_biome_deposit_hills_and_glow() -> None:
+def test_each_cell_hands_the_shader_its_biome_deposit_and_hills() -> None:
     biomes = np.array([[7, 0]])
     deposits = np.array([[8, 0]])
     hills = np.array([[True, False]])
 
-    info = ground_shader.cell_info(biomes, deposits, hills, np.array([[0.24, 0.0]]))
+    info = ground_shader.cell_info(biomes, deposits, hills)
 
-    assert info.tolist() == [[[7, 8, 1, 60], [0, 0, 0, 0]]]
+    assert info.tolist() == [[[7, 8, 1, 0], [0, 0, 0, 0]]]
 
 
 class DeletingGL:
@@ -103,6 +103,6 @@ def test_mountain_cells_are_marked_beside_hills_for_the_shader() -> None:
     hills = np.array([[True, False, False]])
     mountains = np.array([[False, True, False]])
 
-    info = ground_shader.cell_info(biomes, None, hills, np.zeros((1, 3)), mountains)
+    info = ground_shader.cell_info(biomes, None, hills, mountains)
 
     assert info[0, :, 2].tolist() == [1, 2, 0]

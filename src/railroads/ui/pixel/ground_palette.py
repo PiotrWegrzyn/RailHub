@@ -9,7 +9,6 @@ import numpy as np
 
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.goods import HOMES, MAKES, RECIPES
-from railroads.sim.trade import Satisfaction
 from railroads.ui.biomes import Biome
 from railroads.ui.pixel.art.parts import METRE as SPRITE_METRE
 from railroads.ui.pixel.art.parts import SCALE as SPRITE_SCALE
@@ -235,19 +234,6 @@ WARP_FINE = 0.12
 WARP_BROAD = 0.3
 
 
-# Land whose buildings are content or thriving is washed with a warm glow: how strongly, by
-# their satisfaction.
-GLOW: RGB = (255, 214, 110)
-
-
-SERVED_GLOW = {
-    Satisfaction.UNSATISFIED: 0.0,
-    Satisfaction.SHORT: 0.06,
-    Satisfaction.CONTENT: 0.12,
-    Satisfaction.THRIVING: 0.24,
-}
-
-
 # Farms grow wheat, which is what they make; other crops grow in rows (CROP_ROWS) over soil.
 SOIL = np.array((128, 88, 54), dtype=np.float32)
 SOIL_DARK = np.array((100, 68, 42), dtype=np.float32)
@@ -389,12 +375,13 @@ FLOOR_FROM = 0.8
 BARE_ABOVE = 0.3
 BARE_MARGIN = 1e-4
 CLEARING = -4.0
-# Logging camps stand in the woods: their cells keep their trees, but for a small clearing round
-# the mill itself, MILL_CLEARING of its yard's reach across and half that down, its edge frayed,
-# its middle CLEARING_DROP art pixels in front of the mill so its yard shows below it.
+# Logging camps stand in the woods: their cells keep their trees, but for the clearing the camp's
+# own picture fills with its trodden floor and the trees round it, MILL_CLEARING of its reach
+# across and half that down, its edge frayed, its middle CLEARING_DROP art pixels in front of the
+# camp's foot.
 IN_THE_WOODS = (BuildingKind.LOGGING_CAMP,)
-MILL_CLEARING = 1.2
-CLEARING_DROP = 3.0
+MILL_CLEARING = 0.6
+CLEARING_DROP = 1.0
 # Where the woods' share of the ground is worked out around each point: the point itself and six
 # around it, in cells.
 AROUND = (

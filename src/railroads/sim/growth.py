@@ -820,6 +820,11 @@ class Growth:
         """The points of one kind, or of one ladder, in each cell's neighbourhood."""
         return self._nearby[points]
 
+    def served(self, points: Channel) -> FloatArray:
+        """Each flat cell's served points of one kind, or of one ladder: its buildings' points
+        times how satisfied they were in the last month of trade, up to twice them."""
+        return self._served[points]
+
     def chances(self, ladder: Ladder = TOWNS) -> FloatArray:
         """Each cell's chance of a turn on the ladder this month, the player's buildings of its
         kinds raising it (Owners.chance_factor)."""

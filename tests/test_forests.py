@@ -6,6 +6,7 @@ from railroads.sim.forests import FORESTS, ForestRule, change_forests, forest_tu
 from railroads.sim.grids import HexGrid
 from railroads.sim.growth import Growth
 from railroads.sim.ladders import LOGGING_CAMPS, TOWNS, GrowthRule
+from railroads.sim.points import Points
 from railroads.sim.reach import Neighbourhoods
 from railroads.sim.tilemap import Relief, TileMap, Vegetation
 
@@ -22,6 +23,11 @@ def make_map(size: int = 12, hill: tuple[int, int] | None = None) -> TileMap:
     if hill is not None:
         relief[hill] = Relief.HILLS
     return flat_map(grid=grid, vegetation=vegetation, relief=relief)
+
+
+def satisfy(growth: Growth, cell: tuple[int, int]) -> None:
+    """Counts the logging camp in a cell as having sold all its logs last month."""
+    growth.served(Points.TIMBER)[cell[0] * growth.grid.cols + cell[1]] = 1.0
 
 
 def near(tile_map: TileMap) -> np.ndarray:
@@ -55,7 +61,7 @@ def test_people_and_industry_clear_the_forest_around_them() -> None:
     assert grown.size == 0
 
 
-def test_a_logging_camp_clears_forest_110_times_faster_than_a_house() -> None:
+def test_a_satisfied_logging_camp_clears_forest_far_faster_than_a_house() -> None:
     tile_map = make_map(40)
     tile_map.set_vegetation(np.arange(40 * 40), Vegetation.FOREST)
     ones = np.ones(40 * 40, dtype=np.int64)
@@ -64,8 +70,7 @@ def test_a_logging_camp_clears_forest_110_times_faster_than_a_house() -> None:
     by_people, _ = forest_turn(tile_map, near(tile_map), ones, ones * 0, FORESTS, 100, rng)
     by_mills, _ = forest_turn(tile_map, near(tile_map), ones * 0, ones, FORESTS, 100, rng)
 
-    assert by_people.size < 15
-    assert 240 < by_mills.size < 420
+    assert by_mills.size > 10 * max(by_people.size, 1)
 
 
 def test_forest_spreads_onto_grass_beside_it_but_not_onto_barren_land() -> None:
@@ -90,6 +95,7 @@ def test_a_logging_camp_left_with_too_little_forest_closes() -> None:
     constructions.build(Building((5, 2), BuildingKind.LOGGING_CAMP))
     rule = GrowthRule(trades=False, ladders=(), forests=ForestRule(clearing_per_mill=1.0))
     growth = Growth(constructions, rule)
+    satisfy(growth, (5, 2))
 
     changed = growth.month(np.random.default_rng(0))
 
@@ -97,6 +103,21 @@ def test_a_logging_camp_left_with_too_little_forest_closes() -> None:
     assert (5, 2) in changed
     assert tile_map.vegetation[5, 2] == Vegetation.GRASS
     assert (5, 2) in growth.forests_changed
+
+
+def test_a_logging_camp_that_sells_nothing_clears_no_forest() -> None:
+    tile_map = make_map()
+    constructions = Constructions(tile_map)
+    constructions.build(Building((5, 2), BuildingKind.LOGGING_CAMP))
+    rule = GrowthRule(trades=False, ladders=(), forests=STILL)
+    growth = Growth(constructions, rule)
+    before = forest_cells(tile_map)
+    clearing = ForestRule(clearing_per_point=0.0, clearing_per_mill=1.0, spread_per_forest=0.0)
+
+    change_forests(growth, clearing, 1, np.random.default_rng(0))
+
+    assert forest_cells(tile_map) == before
+    assert growth.count(BuildingKind.LOGGING_CAMP)[5, 2] == 1
 
 
 def test_a_closed_logging_camp_comes_up_again_in_the_nearest_cell_that_suits_one() -> None:
@@ -107,6 +128,7 @@ def test_a_closed_logging_camp_comes_up_again_in_the_nearest_cell_that_suits_one
         constructions, GrowthRule(trades=False, ladders=(LOGGING_CAMPS,), forests=STILL)
     )
     clearing = ForestRule(clearing_per_mill=1.0, spread_per_forest=0.0)
+    satisfy(growth, (5, 2))
 
     changed = change_forests(growth, clearing, 1, np.random.default_rng(0))
 

@@ -14,10 +14,6 @@ from railroads.ui.pixel.noise import TABLE_SIZE
 from railroads.ui.pixel.relief import LIGHT
 from railroads.ui.pixel.sheet import FINE
 
-# Each cell's glow is handed to the graphics card in steps of this much.
-GLOW_STEPS = 250
-
-
 # The woods are worked out this many art pixels round a chunk, as far as anything in it looks for
 # them: the crowns and shadows of trees standing there, and where crowns reach.
 WOODS_MARGIN = 16
@@ -572,10 +568,6 @@ void main() {
         }
     }
     rgb = shore(rgb, art, water);
-    if (!water) {
-        float glow = float(info.a) / @GLOW_STEPS@;
-        rgb = rgb * (1.0 - glow) + @GLOW@ * glow;
-    }
     uint deposit = info.g;
     if (!water && deposit > 0u && deposit != @GARRISON@u
             && hash(fdiv(ix, 12), fdiv(iy, 12), 71) > @SIGNS_ABOVE@) {
@@ -1741,8 +1733,6 @@ def fragment_source() -> str:
         "BEACH_NEAR": glsl_number(cpu.BEACH[0]),
         "BEACH_FAR": glsl_number(cpu.BEACH[1]),
         "SAND": _vec3(cpu.SAND),
-        "GLOW_STEPS": glsl_number(GLOW_STEPS),
-        "GLOW": _vec3(cpu.GLOW),
         "GARRISON": str(int(Deposit.GARRISON)),
         "WOOL": str(int(Deposit.WOOL)),
         "SIGNS_ABOVE": glsl_number(1 - cpu.DEPOSIT_SIGNS),

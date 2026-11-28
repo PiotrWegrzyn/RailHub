@@ -18,7 +18,6 @@ from railroads.sim.constructions import (
 )
 from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
-from railroads.sim.trade import Satisfaction
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel import track_art
 from railroads.ui.pixel.art.ports import port_sprite
@@ -35,8 +34,8 @@ from railroads.ui.pixel.scenery import BUILDING_SPRITES, Scenery
 from railroads.ui.pixel.sheet import FINE, FINEST, SHEET_INDEX, SpriteSheet
 from railroads.ui.pixel.track_art import (
     GAUGE,
-    RAIL,
-    RAIL_HEAD,
+    LOOK,
+    TRIANGLE_FLOATS,
     TrackShapes,
     _crisp,
     _raised_strip,
@@ -694,7 +693,7 @@ def test_maglev_track_is_a_beam_without_rails(sheet: SpriteSheet) -> None:
     guideway = track_chunk(sheet, [Track((10, 3), (0, 6), maglev=True)], resolution=FINEST)[1]
 
     def rail_coloured(chunk: np.ndarray) -> int:
-        return int((np.abs(chunk[..., :3].astype(int) - RAIL).max(axis=-1) < 12).sum())
+        return int((np.abs(chunk[..., :3].astype(int) - LOOK.rail_head).max(axis=-1) < 12).sum())
 
     def concrete(chunk: np.ndarray) -> int:
         rgb = chunk[..., :3].astype(int)
@@ -894,7 +893,7 @@ def test_fine_track_keeps_one_pixel_rails_over_twice_the_pixels(sheet: SpriteShe
     fine = world.track.layer([piece], left, top, 64, 64, FINE)
 
     rails = [
-        np.all(np.abs(layer[..., :3] - np.array(RAIL) / 255) < 0.01, axis=-1)
+        np.all(np.abs(layer[..., :3] - np.array(LOOK.rail_head) / 255) < 0.01, axis=-1)
         for layer in (coarse, fine)
     ]
     assert fine.shape == (128, 128, 4)
@@ -932,20 +931,6 @@ def test_grass_lies_darker_in_the_shade_of_a_tree(sheet: SpriteSheet) -> None:
     foot = (20 + 1, 40 + 3)
     assert shaded[foot].sum() < 0.85 * open_grass[foot].sum()
     assert np.array_equal(shaded[:, :20], open_grass[:, :20])
-
-
-def test_only_a_change_of_glow_marks_chunks_to_draw_again(sheet: SpriteSheet) -> None:
-    world = make_world(sheet)
-    levels = world.satisfaction.copy()
-    levels[3, 3] = Satisfaction.UNSATISFIED
-    unseen = world.satisfaction_changed(levels)
-    levels = levels.copy()
-    levels[3, 3] = Satisfaction.THRIVING
-
-    seen = world.satisfaction_changed(levels)
-
-    assert unseen == set()
-    assert seen
 
 
 def test_a_chunk_drawn_over_ground_laid_on_its_ground_matches_the_whole_chunk(
@@ -1285,7 +1270,7 @@ def test_both_rails_of_straight_track_show_as_full_bright_lines(
     layer = world.track.layer([piece], left, top, 64, 64, resolution)
 
     column = layer[:, layer.shape[1] // 2, :3].min(axis=-1)
-    bright = np.flatnonzero(column > RAIL[2] / 255 - 0.05)
+    bright = np.flatnonzero(column > LOOK.rail_head[2] / 255 - 0.05)
     assert len(bright) == 2
     assert bright[1] - bright[0] > 1
 
@@ -1296,7 +1281,7 @@ def track_shapes_of(world: PixelWorld, cell: Cell, scale: int) -> TrackShapes:
 
 
 def test_track_shapes_come_back_as_they_were_packed() -> None:
-    triangles = np.arange(18, dtype=np.float32).reshape(3, 6)
+    triangles = np.arange(3 * TRIANGLE_FLOATS, dtype=np.float32).reshape(3, TRIANGLE_FLOATS)
     lifts = np.arange(9, dtype=np.float32).reshape(3, 3)
 
     shapes = TrackShapes.unpacked(TrackShapes(triangles, lifts, 8, 2).packed())
@@ -1343,21 +1328,21 @@ def offset_of(world: PixelWorld, cell: Cell = (10, 3)) -> tuple[int, int]:
     return chunk[0] * CHUNK, chunk[1] * CHUNK
 
 
-def test_rails_the_graphics_card_draws_are_a_tenth_of_the_gauge_wide_and_fade_far_off(
+def test_rails_the_graphics_card_draws_are_as_wide_as_the_look_says_and_fade_far_off(
     sheet: SpriteSheet,
 ) -> None:
     world, _ = track_chunk(sheet, [Track((10, 3), (0, 6))])
-    rail = np.array([*RAIL, 255]) / 255
+    rail = np.array([*LOOK.rail_head, 255]) / 255
 
     widths = {}
     for scale in (2, 24):
         shapes = track_shapes_of(world, (10, 3), scale)
-        lit = shapes.triangles[np.all(np.isclose(shapes.triangles[:, 2:], rail), axis=1)]
+        lit = shapes.triangles[np.all(np.isclose(shapes.triangles[:, 2:6], rail), axis=1)]
         quads = lit[:6, :2] / shapes.quality
         widths[scale] = float(np.linalg.norm(quads[0] - quads[5]))
 
     assert widths[2] < 1.0
-    assert widths[24] == pytest.approx(RAIL_HEAD * PIXEL_CELL_WIDTH * 24, abs=0.5)
+    assert widths[24] == pytest.approx(LOOK.rail * GAUGE * PIXEL_CELL_WIDTH * 24, abs=0.5)
     assert widths[24] < GAUGE * PIXEL_CELL_WIDTH * 24 / 4
 
 
