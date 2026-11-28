@@ -6487,8 +6487,8 @@ SUGAR_WAGON: RGB = (128, 74, 54)
 def _sugar_window(
     p: Painter, a: Point, b: Point, length: float, t: float, wide: float, span: tuple[float, float]
 ) -> None:
-    """A sash window with a segmental head under a cream brick arch and a white sill, its frame
-    and bars painted sugar white, `wide` across about `t` along the wall under the edge from `a`
+    """A sash window with a segmental head in a white-painted surround with a white sill, its
+    frame and bars painted sugar white, `wide` across about `t` along the wall under the edge from `a`
     to `b`, which is `length` units long, from `span[0]` down the wall to `span[1]`; darker on
     the shaded wall."""
     m = METRE
@@ -6504,7 +6504,7 @@ def _sugar_window(
 
     half = wide / 2 / length
     pad = 0.18 * m / length
-    p.polygon(outline(half + pad, head - 0.3 * m, 0.4 * m), shade(SUGAR_CREAM, tone))
+    p.polygon(outline(half + pad, head - 0.3 * m, 0.4 * m), shade(SUGAR_WHITE, 0.9 * tone))
     p.polygon(outline(half + pad * 0.5, head - 0.08 * m, 0.3 * m), shade(SUGAR_WHITE, tone))
     p.polygon(outline(half, head, 0.25 * m), shade(MILL_GLASS, tone))
     bar = shade(SUGAR_WHITE, tone)
@@ -6658,8 +6658,8 @@ def _sugar_wagon(p: Painter, x: float, y: float) -> None:
 
 def _sugar_stack(p: Painter, x: float, y: float, tall: float) -> None:
     """A square brick boiler stack drawn for `tall` units and lowered (CHIMNEY_SHARE), standing
-    on (x, y): tapering from 2.6 m a side at its foot to 1.6 m, banded in cream brick, with a
-    corbelled cream crown and a dark mouth, smoking."""
+    on (x, y): tapering from 2.6 m a side at its foot to 1.6 m, banded in white, with a
+    corbelled white crown and a dark mouth, smoking."""
     m = METRE
     tall *= CHIMNEY_SHARE
 
@@ -6675,64 +6675,185 @@ def _sugar_stack(p: Painter, x: float, y: float, tall: float) -> None:
     faces(0, tall, SUGAR_BRICK, shade(SUGAR_BRICK, 0.76))
     faces(0, 1.2 * m, shade(SUGAR_BRICK, 0.8), shade(SUGAR_BRICK, 0.62))
     for up in (0.3, 0.6):
-        faces(tall * up, tall * up + 0.45 * m, SUGAR_CREAM, shade(SUGAR_CREAM, 0.78))
-    faces(tall - 2.4 * m, tall - 1.6 * m, SUGAR_CREAM, shade(SUGAR_CREAM, 0.78))
-    crown = p.box(x, y - tall + 1.2 * m, 2.1 * m, 1.2 * m, SUGAR_CREAM, (40, 34, 34))
-    p.box(x, y - tall + 1.2 * m, 2.1 * m, 0.35 * m, shade(SUGAR_CREAM, 0.85), None)
+        faces(tall * up, tall * up + 0.45 * m, SUGAR_WHITE, shade(SUGAR_WHITE, 0.78))
+    faces(tall - 2.4 * m, tall - 1.6 * m, SUGAR_WHITE, shade(SUGAR_WHITE, 0.78))
+    crown = p.box(x, y - tall + 1.2 * m, 2.1 * m, 1.2 * m, SUGAR_WHITE, (40, 34, 34))
+    p.box(x, y - tall + 1.2 * m, 2.1 * m, 0.35 * m, shade(SUGAR_WHITE, 0.85), None)
     cx, cy = (crown[0][0] + crown[2][0]) / 2, (crown[0][1] + crown[2][1]) / 2
     _smoke(p, cx + 1, cy - 3, (206, 206, 212), 2)
 
 
+def _sugar_board(
+    p: Painter, a: Point, b: Point, span: tuple[float, float], drop: float, tall: float
+) -> None:
+    """A long name board painted sugarloaf blue on the wall under the edge from `a` to `b`, from
+    `span[0]` to `span[1]` along it and `drop` down it, `tall` high: edged in a white bead and
+    lettered in white capitals, word by word."""
+    m = METRE
+    t0, t1 = span
+    run = math.dist(a, b) / math.hypot(1, 0.5) / m
+    _patch(p, a, b, span, (drop, drop + tall), shade(SUGAR_BLUE, 0.7))
+    _patch(
+        p,
+        a,
+        b,
+        (t0 + 0.1 / run, t1 - 0.1 / run),
+        (drop + 0.1 * m, drop + tall - 0.1 * m),
+        SUGAR_WHITE,
+    )
+    _patch(
+        p,
+        a,
+        b,
+        (t0 + 0.18 / run, t1 - 0.18 / run),
+        (drop + 0.18 * m, drop + tall - 0.18 * m),
+        SUGAR_BLUE,
+    )
+    words = (4, 2, 7, 3, 8)
+    letter, gap, space = 0.36, 0.16, 0.5
+    width = sum(n * (letter + gap) - gap for n in words) + space * (len(words) - 1)
+    s = t0 + ((t1 - t0) * run - width) / 2 / run
+    for n in words:
+        for _ in range(n):
+            _patch(
+                p,
+                a,
+                b,
+                (s, s + letter / run),
+                (drop + 0.36 * tall, drop + 0.66 * tall),
+                SUGAR_WHITE,
+            )
+            s += (letter + gap) / run
+        s += (space - gap) / run
+
+
+def _sugar_awning(
+    p: Painter,
+    a: Point,
+    b: Point,
+    span: tuple[float, float],
+    drop: float,
+    out: float,
+    fall: float,
+) -> None:
+    """A striped canvas awning in sugarloaf blue and white over a door in the wall under the edge
+    from `a` to `b`: hung from `span[0]` to `span[1]` along it `drop` down it, sloping `out` m
+    out from the wall and `fall` m down, with a scalloped valance and iron brackets."""
+    m = METRE
+
+    def wall(t: float, extra: float = 0) -> Point:
+        return _on_wall(a, b, t, drop + extra)
+
+    def edge(t: float, extra: float = 0) -> Point:
+        x, y = _on_wall(a, b, t, drop + fall * m + extra)
+        return x - out * m, y + out * m / 2
+
+    t0, t1 = span
+    stripes = 9
+    _bar(p, wall(t0, fall * m), edge(t0), 0.08 * m, (50, 50, 56))
+    for k in range(stripes):
+        s0, s1 = t0 + (t1 - t0) * k / stripes, t0 + (t1 - t0) * (k + 1) / stripes
+        colour = SUGAR_BLUE if k % 2 == 0 else SUGAR_WHITE
+        p.polygon([wall(s0), wall(s1), edge(s1), edge(s0)], colour)
+        middle = (s0 + s1) / 2
+        p.polygon(
+            [edge(s0), edge(s1), edge(s1, 0.3 * m), edge(middle, 0.42 * m), edge(s0, 0.3 * m)],
+            shade(colour, 0.86),
+        )
+    p.polygon([wall(t1), edge(t1), edge(t1, 0.3 * m), wall(t1, fall * m)], shade(SUGAR_BLUE, 0.7))
+    _bar(p, wall(t1, fall * m), edge(t1, 0.3 * m), 0.08 * m, (50, 50, 56))
+
+
+def _sugar_display(p: Painter, x: float, y: float, tiers: int) -> None:
+    """A stepped timber stand 2.6 m long by a door on (x, y), along the lit walls, with `tiers`
+    steps each set back and up from the one before, and a row of five sugarloaves in blue paper
+    standing on every step."""
+    m = METRE
+    for k in reversed(range(tiers)):
+        cx, cy = _iso(x, y, 0, k * 0.55 * m)
+        high = 0.35 * (k + 1) * m
+        step = p.hall(cx, cy, 2.6 * m, 0.55 * m, high, shade(TIMBER, 0.95), shade(TIMBER, 1.15))
+        for j in range(5):
+            lx, ly = _on_wall(step[0], step[3], 0.5, 0)
+            lx, ly = _iso(lx, ly, (0.3 + j * 0.5) * m, 0)
+            _sugar_loaf(p, lx, ly + 0.05 * m, 0.9 * m)
+
+
 def sugar_refinery() -> Sprite:
     """A Victorian sugar refinery: a block 20 by 12 m and six storeys, 18 m to its cornice, in
-    warm red brick banded in cream at every floor, with rows of white-painted sash windows under
-    cream arches, blue taking-in doors stacked up one bay under a hoist with a sack swinging from
-    it, and a slate roof with a louvred ventilator along its ridge. At its end rises the
+    warm red brick with a white cornice and white bands at every floor, rows of sash windows in
+    white-painted surrounds, a ground floor rendered white with blue shutters and a blue name
+    board lettered in white over it, blue taking-in doors stacked up one bay under a hoist with a sack swinging from
+    it, and a slate roof with a louvred ventilator along its ridge, the square stack of the
+    boilers inside rising behind it banded and crowned in white. At its end rises the
     cream-brick char house, a tower for the bone-char filters, louvred at its top under a slate
-    pyramid, with a boiler house at its foot and behind that a square tapering stack banded and
-    crowned in cream, smoking. Before it a siding brings wagons of pale sugar beet to a long beet
-    clamp, white sacks of sugar wait by its door, and a dray stands loaded with sugarloaves in
-    their blue paper."""
+    pyramid. A blue-and-white striped awning shades the dispatch door, with sugarloaves in their
+    blue paper ranked on a stepped stand beside it and white sacks stamped in blue; a dray stands
+    loaded with more sugarloaves, and a siding brings wagons of pale sugar beet to a long beet
+    clamp."""
     m = METRE
-    p = Painter(43, 42, (18, 31))
+    p = Painter(39, 50, (18, 39))
 
     def at(u: float, v: float) -> Point:
         return _iso(0, 0, (u - 12) * m, (v - 2) * m)
 
     length, depth, high = 20 * m, 12 * m, 18 * m
-    p.polygon([at(-0.5, -8), at(28, -8), at(28, 0), at(-0.5, 0)], SUGAR_GROUND)
+    p.polygon([at(-0.5, -8), at(27.5, -8), at(27.5, 0), at(-0.5, 0)], SUGAR_GROUND)
     foot = _footing(*at(10, 6), length, depth)
     _bed(p, foot)
     _bed(p, _footing(*at(23.5, 3.5), 7 * m, 7 * m), margin=1)
-    p.shadow(16, 6, 6)
-    _sugar_stack(p, *at(29.6, 9.6), 56 * m)
+    p.shadow(15, 6, 5)
+    _sugar_stack(p, *at(5, 14.5), 50 * m)
     top = p.hall(*at(10, 6), length, depth, high, SUGAR_BRICK, None)
     left, front, right, _ = top
     _plinth(p, top, high, SUGAR_BRICK, 1.0 * m)
     _stains(p, left, front, high, (0.03, 0.27, 0.52, 0.94), shade(SUGAR_BRICK, 0.7), 1.6 * m)
-    floors = ((1.0, 2.6), (3.8, 5.4), (6.6, 8.2), (9.4, 11.0), (12.2, 13.8), (15.0, 16.8))
+    floors = ((1.2, 2.7), (3.9, 5.4), (6.7, 8.2), (9.5, 11.0), (12.3, 13.6), (15.5, 17.0))
+    door = 6
     for a, b, tone, bays in ((left, front, 1.0, 8), (front, right, 0.8, 5)):
-        _patch(p, a, b, (0, 1), (0, 0.6 * m), shade(SUGAR_CREAM, tone))
-        _patch(p, a, b, (0, 1), (0.6 * m, 0.75 * m), shade(SUGAR_BRICK, 0.7 * tone))
-        for drop in (3.25, 6.05, 8.85, 11.65):
-            _patch(p, a, b, (0, 1), (drop * m, (drop + 0.2) * m), shade(SUGAR_CREAM, tone))
-        _patch(p, a, b, (0, 1), (14.3 * m, 14.65 * m), shade(SUGAR_CREAM, tone))
+        white = shade(SUGAR_WHITE, tone)
+        _patch(p, a, b, (0, 1), (0, 0.8 * m), white)
+        _patch(p, a, b, (0, 1), (0.8 * m, 0.95 * m), shade(SUGAR_BRICK, 0.62 * tone))
+        for drop in (3.3, 6.1, 8.9, 11.7):
+            _patch(p, a, b, (0, 1), (drop * m, (drop + 0.22) * m), white)
+        _patch(p, a, b, (0, 1), (13.6 * m, 17.05 * m), shade(SUGAR_WHITE, 0.94 * tone))
+        _patch(p, a, b, (0, 1), (13.6 * m, 13.85 * m), shade(SUGAR_WHITE, 0.8 * tone))
         span = length if bays == 8 else depth
         for k in range(bays):
             t = (k + 0.5) / bays
+            if bays == 8 and k == door:
+                continue
             for head, foot_at in floors:
-                if bays == 8 and k == 6:
-                    continue
                 _sugar_window(p, a, b, span, t, 1.1 * m, (head * m, foot_at * m))
-    t = 6.5 / 8
+            if bays == 8:
+                for side in (-1, 1):
+                    edge = t + side * 0.55 * m / length
+                    leaf = side * 0.5 * m / length
+                    _patch(
+                        p,
+                        a,
+                        b,
+                        (min(edge, edge + leaf), max(edge, edge + leaf)),
+                        (15.3 * m, 17.1 * m),
+                        SUGAR_BLUE,
+                    )
+                    _bar(
+                        p,
+                        _on_wall(a, b, edge + leaf / 2, 15.3 * m),
+                        _on_wall(a, b, edge + leaf / 2, 17.1 * m),
+                        0.04 * m,
+                        shade(SUGAR_BLUE, 0.7),
+                    )
+    _sugar_board(p, left, front, (0.03, 0.72), 13.75 * m, 1.15 * m)
+    t = (door + 0.5) / 8
     for head, foot_at in floors[:5]:
         _patch(
             p,
             left,
             front,
-            (t - 0.034, t + 0.034),
-            ((head - 0.1) * m, (foot_at + 0.3) * m),
-            SUGAR_CREAM,
+            (t - 0.036, t + 0.036),
+            ((head - 0.12) * m, (foot_at + 0.32) * m),
+            SUGAR_WHITE,
         )
         _patch(p, left, front, (t - 0.028, t + 0.028), (head * m, (foot_at + 0.3) * m), SUGAR_BLUE)
         _bar(
@@ -6742,15 +6863,16 @@ def sugar_refinery() -> Sprite:
             0.05 * m,
             shade(SUGAR_BLUE, 0.65),
         )
-    p.polygon(_round_head(left, front, length, t, 2.6 * m, 14.9 * m, high), SUGAR_CREAM)
-    p.polygon(_round_head(left, front, length, t, 2.1 * m, 15.15 * m, high), DOORWAY)
-    _patch(p, left, front, (t - 0.05, t - 0.004), (15.9 * m, high), SUGAR_BLUE)
+    p.polygon(_round_head(left, front, length, t, 2.7 * m, 14.6 * m, high), SUGAR_WHITE)
+    p.polygon(_round_head(left, front, length, t, 2.2 * m, 14.85 * m, high), DOORWAY)
+    for s in (t - 0.055, t + 0.033):
+        _patch(p, left, front, (s, s + 0.022), (15.9 * m, high - 0.05 * m), SUGAR_BLUE)
     rise = 4.5 * m
     p.gable(top, rise, MILL_SLATE, SUGAR_BRICK)
     _roof_rows(p, top, rise, MILL_SLATE, (0.25, 0.5, 0.75))
     ridge_back, ridge_front = _ridge(top, rise)
     vx, vy = _on_wall(ridge_back, ridge_front, 0.42, 0)
-    vent = p.hall(vx, vy + 0.5 * m, 10 * m, 1.6 * m, 1.5 * m, shade(SUGAR_CREAM, 0.9), None)
+    vent = p.hall(vx, vy + 0.5 * m, 10 * m, 1.6 * m, 1.5 * m, SUGAR_WHITE, None)
     for a, b, tone in ((vent[0], vent[1], 1.0), (vent[1], vent[2], 0.8)):
         for k in range(1, 4):
             drop = 1.0 * m * k / 4
@@ -6759,40 +6881,36 @@ def sugar_refinery() -> Sprite:
                 _on_wall(a, b, 0, drop),
                 _on_wall(a, b, 1, drop),
                 0.12 * m,
-                shade(SUGAR_CREAM, 0.55 * tone),
+                shade(SUGAR_WHITE, 0.6 * tone),
             )
-    p.gable(vent, 0.7 * m, MILL_SLATE, shade(SUGAR_CREAM, 0.9))
+    p.gable(vent, 0.7 * m, MILL_SLATE, SUGAR_WHITE)
     hx, hy = _on_wall(left, front, t, 0)
     hood = p.hall(hx - 0.4 * m, hy + 1.4 * m, 2.4 * m, 1.6 * m, 2.4 * m, SUGAR_BRICK, None)
     h_left, h_front, h_right, h_back = hood
-    _patch(p, h_left, h_front, (0.2, 0.8), (0.9 * m, 2.4 * m), SUGAR_BLUE)
+    _patch(p, h_left, h_front, (0.15, 0.85), (0.8 * m, 2.4 * m), SUGAR_WHITE)
+    _patch(p, h_left, h_front, (0.22, 0.78), (0.9 * m, 2.4 * m), SUGAR_BLUE)
     near, far = _on_wall(h_left, h_front, 0.5, -1.2 * m), _on_wall(h_back, h_right, 0.5, -1.2 * m)
     p.polygon([h_front, h_right, far, near], shade(MILL_SLATE, 0.72), shade(MILL_SLATE, 0.5))
     p.polygon([h_left, h_back, far, near], MILL_SLATE, shade(MILL_SLATE, 0.6))
-    p.polygon([h_left, h_front, near], SUGAR_BRICK, shade(SUGAR_BRICK, 0.55))
+    p.polygon([h_left, h_front, near], SUGAR_WHITE, shade(SUGAR_WHITE, 0.6))
     beam = _on_wall(h_left, h_front, 0.5, 0.7 * m)
     tip = (beam[0] - 1.4 * m, beam[1] + 0.7 * m)
     _bar(p, beam, tip, 0.22 * m, (54, 50, 50))
     _bar(p, tip, (tip[0], tip[1] + 3.4 * m), 0.06 * m, (60, 54, 50))
     sx, sy = tip[0], tip[1] + 4.4 * m
     p.ellipse(sx - 0.38 * m, sy - 1.1 * m, sx + 0.38 * m, sy + 0.1 * m, SUGAR_WHITE)
-    _bar(
-        p,
-        (sx - 0.2 * m, sy - 0.9 * m),
-        (sx + 0.2 * m, sy - 0.9 * m),
-        0.08 * m,
-        shade(SUGAR_WHITE, 0.7),
-    )
+    _bar(p, (sx - 0.2 * m, sy - 0.6 * m), (sx + 0.2 * m, sy - 0.6 * m), 0.16 * m, SUGAR_BLUE)
     tower = p.hall(*at(23.5, 3.5), 7 * m, 7 * m, 26 * m, SUGAR_CREAM, None)
     t_left, t_front, t_right, _ = tower
     _plinth(p, tower, 26 * m, SUGAR_CREAM, 1.0 * m)
     for a, b, tone in ((t_left, t_front, 1.0), (t_front, t_right, 0.8)):
         brick = shade(SUGAR_BRICK, tone)
-        _patch(p, a, b, (0, 1), (0, 0.7 * m), brick)
+        _patch(p, a, b, (0, 1), (0, 0.7 * m), shade(SUGAR_WHITE, tone))
+        _patch(p, a, b, (0, 1), (0.7 * m, 0.85 * m), brick)
         for drop in (5.2, 10.6, 16.0, 21.4):
             _patch(p, a, b, (0, 1), (drop * m, (drop + 0.35) * m), brick)
         for s in (0.03, 0.97):
-            _bar(p, _on_wall(a, b, s, 0.7 * m), _on_wall(a, b, s, 25 * m), 0.4 * m, brick)
+            _bar(p, _on_wall(a, b, s, 0.85 * m), _on_wall(a, b, s, 25 * m), 0.4 * m, brick)
         _patch(p, a, b, (0.2, 0.8), (1.4 * m, 4.4 * m), (52, 48, 52))
         for d in np.arange(1.7, 4.3, 0.45):
             _bar(
@@ -6800,38 +6918,40 @@ def sugar_refinery() -> Sprite:
                 _on_wall(a, b, 0.2, d * m),
                 _on_wall(a, b, 0.8, d * m),
                 0.12 * m,
-                shade(SUGAR_CREAM, 0.85 * tone),
+                shade(SUGAR_WHITE, 0.9 * tone),
             )
         for head in (6.4, 11.8, 17.2):
             for s in (0.34, 0.66):
                 _sugar_window(p, a, b, 7 * m, s, 1.0 * m, (head * m, (head + 2.8) * m))
     _sugar_window(p, t_front, t_right, 7 * m, 0.5, 1.0 * m, (22.6 * m, 24.4 * m))
-    p.polygon(_round_head(t_left, t_front, 7 * m, 0.5, 1.8 * m, 22.6 * m, 26 * m), DOORWAY)
+    p.polygon(_round_head(t_left, t_front, 7 * m, 0.5, 2.2 * m, 22.3 * m, 26 * m), SUGAR_WHITE)
+    p.polygon(_round_head(t_left, t_front, 7 * m, 0.5, 1.8 * m, 22.6 * m, 26 * m), SUGAR_BLUE)
+    _bar(
+        p,
+        _on_wall(t_left, t_front, 0.5, 23.4 * m),
+        _on_wall(t_left, t_front, 0.5, 26 * m),
+        0.05 * m,
+        shade(SUGAR_BLUE, 0.65),
+    )
     apex = ((t_left[0] + t_right[0]) / 2, (t_left[1] + t_right[1]) / 2 - 4.5 * m)
     p.polygon([t_left, t_front, apex], MILL_SLATE, shade(MILL_SLATE, 0.6))
     p.polygon([t_front, t_right, apex], shade(MILL_SLATE, 0.72), shade(MILL_SLATE, 0.5))
     _bar(p, apex, (apex[0], apex[1] - 1.6 * m), 0.12 * m, (50, 50, 56))
     p.blob(apex[0] - 0.3 * m, apex[1] - 1.9 * m, apex[0] + 0.3 * m, apex[1] - 1.3 * m, FOOD_GILT)
-    boiler = p.hall(*at(29.5, 4.5), 5 * m, 6 * m, 6 * m, SUGAR_BRICK, None)
-    b_left, b_front, b_right, _ = boiler
-    _plinth(p, boiler, 6 * m, SUGAR_BRICK, 0.7 * m)
-    _bands(p, b_left, b_front, b_right, 0.3 * m, SUGAR_CREAM, shade(SUGAR_CREAM, 0.8))
-    _sugar_window(p, b_left, b_front, 5 * m, 0.5, 1.4 * m, (1.4 * m, 3.6 * m))
-    p.polygon(_round_head(b_front, b_right, 6 * m, 0.5, 2.2 * m, 2.4 * m, 6 * m), DOORWAY)
-    p.gable(boiler, 2 * m, MILL_SLATE, SUGAR_BRICK)
-    _roof_rows(p, boiler, 2 * m, MILL_SLATE)
-    _sugar_beet(p, *at(5.2, -2.6), 10, 3.4, 2.2)
-    _sugar_bags(p, *at(13.6, -1.0), (3, 2, 1))
-    _sugar_bags(p, *at(17.2, -1.4), (2, 1))
+    _sugar_beet(p, *at(4.6, -2.6), 9, 3.4, 2.2)
+    _sugar_display(p, *at(12.2, -1.6), 3)
+    _sugar_awning(p, left, front, (t - 0.075, t + 0.075), 14.2 * m, 1.7, 1.0)
+    _sugar_bags(p, *at(17.9, -1.2), (2, 1))
+    _sugar_bags(p, *at(19.0, -2.6), (3, 2, 1))
 
     def loaves(on_bed: Callable[[float, float], Point]) -> None:
         for w in (0.42, -0.3):
             for s in np.linspace(-1.2, 1.2, 5):
                 _sugar_loaf(p, *on_bed(s + w * 0.3, w), 1.0 * m)
 
-    _food_cart(p, *at(13.4, -4.0), 3.4, 0.3, SUGAR_GROUND, loaves)
-    _sugar_siding(p, at(0, -6.6), at(14, -6.6))
-    _sugar_wagon(p, *at(5.6, -6.6))
+    _food_cart(p, *at(12.6, -4.6), 3.4, 0.3, SUGAR_GROUND, loaves)
+    _sugar_siding(p, at(0, -6.6), at(9.5, -6.6))
+    _sugar_wagon(p, *at(5.0, -6.6))
     return p.sprite()
 
 
