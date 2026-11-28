@@ -6,6 +6,18 @@ from collections.abc import Callable
 
 import numpy as np
 
+from railroads.ui.pixel.art.collieries import (
+    _beam,
+    _block,
+    _face,
+    _fir,
+    _land,
+    _p,
+    _rails,
+    _speckle,
+    _swell,
+    _yard,
+)
 from railroads.ui.pixel.art.farms import (
     FOOTING,
     WORN,
@@ -45,7 +57,6 @@ from railroads.ui.pixel.art.parts import (
     _patch,
     _ridge,
     _tiles,
-    _turned,
     _window,
 )
 
@@ -996,126 +1007,591 @@ def salt_works() -> Sprite:
     return p.sprite()
 
 
-def limestone_quarry() -> Sprite:
-    """A limestone quarry cut into a grassy hill: a tall pale face of cream rock streaked by
-    rain and split into its beds, a ragged lip of turf and bushes along its top, a lower bench
-    and screes of broken stone at its foot on a dusty floor, a round lime kiln smoking beside
-    it, a derrick crane lowering a block, and cut blocks waiting by a wagon on a track out."""
-    p = Painter(34, 36, (17, 25))
-    stone = (226, 220, 200)
-    dust = (206, 200, 180)
-    grass = (110, 142, 74)
-    p.blob(-16, -3, 16, 9, WORN)
-    floor = [(-14, 3), (-9, -1.5), (6, -4), (14, 0), (10, 6), (-4, 8)]
-    p.polygon(floor, dust, shade(dust, 0.8))
-    _ruts(p, [(-9, 5.6), (-12.5, 7.6), (-16, 9.4)], dust)
-    hill = [
-        (-14, -1),
-        (-12, -10),
-        (-5, -16),
-        (4, -17.5),
-        (12, -14),
-        (16, -6),
-        (14.5, -0.5),
-        (6, -4),
-    ]
-    p.polygon(hill, grass)
-    p.polygon(
-        [(-12, -10), (-5, -16), (4, -17.5), (12, -14), (6, -12.4), (-4, -11.6)], shade(grass, 1.1)
+def _quarry_lumps(p: Painter, spots: list[tuple[float, float, float, float]], rock: RGB) -> None:
+    """Broken stones lying at each (u, v, z, size in metres) of `spots`: angular lumps lit on
+    their upper left and shaded below, in tones of `rock`."""
+    m = METRE
+    for k, (u, v, z, size) in enumerate(spots):
+        x, y = _p(u, v, z)
+        r = size * m
+        tone = (0.92, 1.0, 0.86, 1.04, 0.96)[k % 5]
+        p.polygon(
+            [
+                (x - r, y),
+                (x - r * 0.7, y - r * 0.75),
+                (x + r * 0.2, y - r * 0.95),
+                (x + r, y - r * 0.35),
+                (x + r * 0.7, y + r * 0.25),
+                (x - r * 0.3, y + r * 0.3),
+            ],
+            shade(rock, tone * 0.78),
+        )
+        p.polygon(
+            [
+                (x - r, y),
+                (x - r * 0.7, y - r * 0.75),
+                (x + r * 0.2, y - r * 0.95),
+                (x + r * 0.5, y - r * 0.4),
+                (x - r * 0.2, y - r * 0.1),
+            ],
+            shade(rock, tone * 1.04),
+        )
+
+
+def _quarry_face(
+    p: Painter,
+    height: Callable[[float, float], float],
+    start: tuple[float, float],
+    along: tuple[float, float],
+    long: float,
+    rock: RGB,
+    ledges: tuple[float, ...],
+    drills: tuple[float, ...] = (),
+) -> None:
+    """A sawn face of limestone standing upright where the land shaped by `height` drops
+    sheer, running `long` metres from (u, v) `start` the way `along` points, (1, 0) or (0, 1),
+    with the dug ground before it on its right: column by column in `rock` a shade lighter or
+    darker, crossed by the beds of the stone, streaked grey down from its top by the rain,
+    scored by rows of drill holes at each of `drills` metres along it, damp at its foot with
+    broken stone fallen before it, and lit sharp along its top edge where it stands at one of
+    `ledges`, or capped by a ragged band of soil and grass where the hillside comes down to it."""
+    m = METRE
+    au, av = along
+    fu, fv = av, -au
+    su, sv = start[0] + fu * 0.125, start[1] + fv * 0.125
+    cols = []
+    for k in range(round(long / 0.25) + 1):
+        u, v = su + au * k * 0.25, sv + av * k * 0.25
+        cols.append((u, v, height(u - fu * 0.3, v - fv * 0.3), height(u + fu * 0.3, v + fv * 0.3)))
+    beds = (0.0, 0.8, 1.5, 2.4, 3.6, 4.3, 5.2, 6.1, 7.0, 7.6, 8.5, 9.4, 10.3, 11.1, 99.0)
+    tones = (1.0, 0.93, 1.02, 0.9, 0.97, 1.03, 0.92, 0.99, 0.94, 1.02, 0.91, 0.98, 1.0, 0.95)
+    soil, grass = (116, 96, 70), (96, 126, 62)
+    fallen = []
+    for (ua, va, ta, fa), (ub, vb, tb, fb) in itertools.pairwise(cols):
+        if min(ta - fa, tb - fb) < 0.25:
+            continue
+        broad = 1 + 0.035 * _swell(ua * 0.7 + va * 0.7, 1.9, 3.5)
+        for (z0, z1), tone in zip(itertools.pairwise(beds), tones, strict=False):
+            lo_a, hi_a = max(fa, z0), min(ta, z1)
+            lo_b, hi_b = max(fb, z0), min(tb, z1)
+            if hi_a <= lo_a and hi_b <= lo_b:
+                continue
+            colour = shade(rock, broad * tone)
+            p.polygon(
+                [
+                    _p(ua, va, lo_a),
+                    _p(ub, vb, lo_b),
+                    _p(ub, vb, max(lo_b, hi_b)),
+                    _p(ua, va, max(lo_a, hi_a)),
+                ],
+                colour,
+                colour,
+            )
+        streak = (ta - fa) * max(0.0, 1.6 * _swell(ua * 1.9 + va * 1.9, 3.7, 1.4) - 0.7)
+        if streak > 0.2:
+            p.polygon(
+                [_p(ua, va, ta - streak), _p(ub, vb, tb - streak), _p(ub, vb, tb), _p(ua, va, ta)],
+                shade(rock, broad * 0.84),
+            )
+        for z in beds[1:-1]:
+            if fa + 0.2 < z < ta - 0.2 and fb + 0.2 < z < tb - 0.2:
+                wide = 0.1 if z in (3.6, 7.0) else 0.05
+                _bar(p, _p(ua, va, z), _p(ub, vb, z), wide * m, shade(rock, broad * 0.74))
+        if _speckle(ua * 0.29, va * 0.29) > 0.72:
+            k = int((1 + _speckle(va * 0.41, ua * 0.41)) * 5)
+            z0, z1 = max(fa, beds[k % 12]), min(ta, beds[k % 12 + 2])
+            if z1 - z0 > 0.4:
+                _bar(p, _p(ua, va, z0), _p(ua, va, z1), 0.06 * m, shade(rock, 0.66))
+        _bar(p, _p(ua, va, fa + 0.2), _p(ub, vb, fb + 0.2), 0.4 * m, shade(rock, broad * 0.8))
+        if any(abs(ta - level) < 0.05 for level in ledges):
+            _bar(p, _p(ua, va, ta), _p(ub, vb, tb), 0.14 * m, shade(rock, 1.12))
+        else:
+            cap = 0.35 + 0.3 * (1 + _swell(ua * 2.3, va * 2.3, 1.1))
+            p.polygon(
+                [_p(ua, va, ta), _p(ub, vb, tb), _p(ub, vb, tb - cap), _p(ua, va, ta - cap)], soil
+            )
+            if _speckle(ua * 1.7, va * 1.7) > 0.2:
+                x, y = _p(ua, va, ta)
+                p.blob(x - 0.3 * m, y - 0.25 * m, x + 0.35 * m, y + 0.3 * m, shade(grass, 0.9))
+        if _speckle(ua * 0.71, va * 0.71) > 0.35:
+            out = 0.4 + 0.8 * (1 + _speckle(ua * 1.3, va * 0.9)) / 2
+            size = 0.16 + 0.12 * (1 + _speckle(va * 2.1, ua * 1.7)) / 2
+            fallen.append((ua + fu * out, va + fv * out, fa, size))
+    _quarry_lumps(p, fallen, shade(rock, 0.95))
+    for at in drills:
+        k = round(at / 0.25)
+        if k >= len(cols):
+            continue
+        u, v, top, foot = cols[k]
+        if top - foot < 1:
+            continue
+        for j in range(5):
+            gu, gv = u + au * 0.35 * j, v + av * 0.35 * j
+            _bar(p, _p(gu, gv, foot + 0.15), _p(gu, gv, top - 0.15), 0.06 * m, shade(rock, 0.68))
+
+
+def _quarry_ladder(p: Painter, u: float, face: float, high: float) -> None:
+    """A timber ladder leant against the face standing at `face` along v, at `u`, from the
+    floor up past the ledge `high` metres up: two rails and a rung every 0.3 m."""
+    timber = (150, 112, 74)
+    foot, top = (u, face - 1.0, 0.0), (u, face - 0.2, high + 0.6)
+    for du, tone in ((0.0, 1.0), (0.5, 0.8)):
+        _beam(
+            p, (foot[0] + du, foot[1], 0), (top[0] + du, top[1], top[2]), 0.09, shade(timber, tone)
+        )
+    for k in range(1, int(top[2] / 0.3)):
+        t = k * 0.3 / top[2]
+        rv = foot[1] + (top[1] - foot[1]) * t
+        _beam(p, (u, rv, top[2] * t), (u + 0.5, rv, top[2] * t), 0.06, shade(timber, 0.9))
+
+
+def _quarry_block(
+    p: Painter, u: float, v: float, z: float, size: tuple[float, float, float], stone: RGB
+) -> Top:
+    """A squared block of limestone `size` (along u, along v, high) in metres resting at (u, v)
+    `z` up, its top lit, its lit arris bright and the marks of the drill down its lit side."""
+    m = METRE
+    long, deep, high = size
+    top = _block(p, u, v, long, deep, high, stone, shade(stone, 1.08), z)
+    left, front, right, _ = top
+    for t in (0.3, 0.62):
+        _bar(
+            p,
+            _on_wall(left, front, t, 0.12 * m),
+            _on_wall(left, front, t, high * m - 0.12 * m),
+            0.05 * m,
+            shade(stone, 0.84),
+        )
+    _bar(p, left, front, 0.06 * m, shade(stone, 1.15))
+    _bar(p, front, right, 0.05 * m, shade(stone, 1.0))
+    return top
+
+
+def _quarry_derrick(p: Painter, u: float, v: float, mast: float, stone: RGB) -> None:
+    """A stiff-leg derrick of timber standing at (u, v): an upright mast `mast` metres tall held
+    by two raking stiff legs to the ends of the sills it stands on, a hand winch at its foot, and
+    a long jib slung from its foot out to the right, a squared block hanging on its hook."""
+    timber, iron, rope = (132, 98, 64), (66, 62, 60), (44, 40, 38)
+    back, near = (u - 3.0, v + 2.5), (u - 3.5, v - 3.0)
+    _beam(p, (u, v, 0.15), (*back, 0.15), 0.32, shade(timber, 0.7))
+    _beam(p, (u, v, mast - 0.4), (*back, 0.3), 0.3, shade(timber, 0.82))
+    _beam(p, (u, v, 0), (u, v, mast), 0.42, timber)
+    _beam(p, (u - 0.12, v - 0.12, 0), (u - 0.12, v - 0.12, mast), 0.12, shade(timber, 1.2))
+    _beam(p, (u, v, mast), (u, v, mast + 0.5), 0.16, iron)
+    _beam(p, (u, v, 0.15), (*near, 0.15), 0.32, shade(timber, 0.75))
+    _beam(p, (u, v, mast - 0.4), (*near, 0.3), 0.3, shade(timber, 0.95))
+    for du in (-0.45, 0.45):
+        _beam(p, (u + 0.6 + du, v - 1.0, 0), (u + 0.6 + du, v - 1.0, 0.9), 0.1, iron)
+    _beam(p, (u + 0.1, v - 1.0, 0.65), (u + 1.1, v - 1.0, 0.65), 0.42, shade(rope, 1.2))
+    _beam(p, (u + 0.15, v - 1.0, 0.75), (u + 1.05, v - 1.0, 0.75), 0.08, shade(iron, 1.5))
+    _beam(p, (u + 1.15, v - 1.0, 0.65), (u + 1.25, v - 1.5, 0.95), 0.06, iron)
+    tip = (u + 5.0, v + 2.5, mast * 0.72)
+    _beam(p, (u, v, mast - 0.1), tip, 0.07, rope)
+    _beam(p, (u, v, 0.9), tip, 0.36, shade(timber, 1.02))
+    _beam(p, (u, v - 0.2, 0.9), (tip[0], tip[1] - 0.2, tip[2]), 0.1, shade(timber, 1.25))
+    hang = (tip[0], tip[1], 1.6)
+    _beam(p, tip, (hang[0], hang[1], hang[2] + 1.6), 0.06, rope)
+    for du, dv in ((-0.55, -0.3), (0.55, 0.3)):
+        _beam(
+            p,
+            (hang[0], hang[1], hang[2] + 1.6),
+            (hang[0] + du, hang[1] + dv, hang[2] + 0.9),
+            0.05,
+            rope,
+        )
+    _quarry_block(p, hang[0], hang[1], hang[2], (1.8, 1.1, 0.9), stone)
+
+
+def _quarry_wagon(p: Painter, u: float, v: float, rock: RGB) -> None:
+    """A side-tipping wagon of the tramway at (u, v), running along u: a V-shaped iron body on a
+    cradle over four small wheels, heaped with broken limestone."""
+    m = METRE
+    iron = (92, 86, 82)
+    wheel = (34, 32, 34)
+    for du in (-0.45, 0.45):
+        x, y = _p(u + du, v + 0.3, 0.22)
+        p.blob(x - 0.22 * m, y - 0.22 * m, x + 0.22 * m, y + 0.22 * m, wheel)
+    _block(p, u, v, 1.4, 0.7, 0.2, shade(iron, 0.6), None, 0.3)
+    for du in (-0.45, 0.45):
+        x, y = _p(u + du, v - 0.3, 0.22)
+        p.blob(x - 0.22 * m, y - 0.22 * m, x + 0.22 * m, y + 0.22 * m, wheel)
+        p.blob(x - 0.07 * m, y - 0.07 * m, x + 0.07 * m, y + 0.07 * m, (120, 116, 112))
+    for du in (-0.55, 0.55):
+        _beam(p, (u + du, v - 0.3, 0.5), (u + du, v - 0.5, 0.75), 0.12, shade(iron, 0.7))
+    lo, hi, a, b = 0.6, 1.4, 0.25, 0.65
+    _face(
+        p,
+        [(u - 0.8, v - a, lo), (u + 0.8, v - a, lo), (u + 0.8, v - b, hi), (u - 0.8, v - b, hi)],
+        iron,
     )
-    face = [
-        (-11, -2.2),
-        (-10, -8.5),
-        (-7, -10),
-        (-4, -11.6),
-        (0, -12),
-        (3, -11),
-        (6, -12.4),
-        (9, -11),
-        (11, -8.2),
-        (12, -4.6),
-        (6, -4.2),
-        (-9, -1.8),
-    ]
-    p.polygon(face, stone)
+    _face(
+        p,
+        [(u + 0.8, v - a, lo), (u + 0.8, v + a, lo), (u + 0.8, v + b, hi), (u + 0.8, v - b, hi)],
+        shade(iron, 0.75),
+    )
+    _beam(p, (u - 0.8, v - b, hi), (u + 0.8, v - b, hi), 0.06, shade(iron, 1.4))
     p.polygon(
-        [(-10.6, -4.2), (-3, -5.6), (5, -6), (11.8, -5.2), (12, -4.6), (6, -4.2), (-9, -1.8)],
-        shade(stone, 0.86),
+        [
+            _p(u - 0.8, v - b, hi),
+            _p(u + 0.8, v - b, hi),
+            _p(u + 0.8, v + b, hi),
+            _p(u - 0.8, v + b, hi),
+        ],
+        shade(rock, 0.7),
+    )
+    _quarry_lumps(
+        p,
+        [
+            (u - 0.45, v + 0.25, hi, 0.28),
+            (u + 0.15, v + 0.3, hi + 0.05, 0.3),
+            (u + 0.55, v + 0.05, hi, 0.25),
+            (u - 0.35, v - 0.3, hi + 0.05, 0.28),
+            (u + 0.25, v - 0.3, hi + 0.1, 0.27),
+            (u - 0.05, v, hi + 0.2, 0.3),
+        ],
+        rock,
+    )
+
+
+def _quarry_kiln(p: Painter, u: float, v: float, stone: RGB, lime: RGB) -> None:
+    """A lime kiln at (u, v): a squat tower of coursed rubble limestone 5.6 m square at its
+    foot, battered in to 4.4 m at its top 5 m up, with dressed quoins at its corners and a low
+    parapet round the dark mouth of its pot, a tall arched draw-eye in its lit side spilling
+    white burnt lime out over the ground, and pale smoke drifting off it."""
+    m = METRE
+    a, b, h = 2.8, 2.2, 5.0
+
+    def at(s: float, z: float, side: int) -> tuple[float, float, float]:
+        half = a + (b - a) * z / h
+        if side == 0:
+            return u + s * half, v - half, z
+        return u + half, v + s * half, z
+
+    _face(p, [at(-1, 0, 0), at(1, 0, 0), at(1, h, 0), at(-1, h, 0)], stone)
+    _face(p, [at(-1, 0, 1), at(1, 0, 1), at(1, h, 1), at(-1, h, 1)], shade(stone, 0.76))
+    for side, tone in ((0, 1.0), (1, 0.76)):
+        colour = shade(stone, tone)
+        for k, z in enumerate(np.arange(0.5, h, 0.5)):
+            _bar(p, _p(*at(-1, z, side)), _p(*at(1, z, side)), 0.05 * m, shade(colour, 0.8))
+            for s in np.arange(-0.9 + 0.17 * (k % 2), 0.95, 0.34):
+                _bar(
+                    p, _p(*at(s, z - 0.5, side)), _p(*at(s, z, side)), 0.04 * m, shade(colour, 0.84)
+                )
+        for k, z in enumerate(np.arange(0, h, 0.5)):
+            for s0, s1 in ((-1, -0.86 + 0.06 * (k % 2)), (0.86 - 0.06 * (k % 2), 1)):
+                _face(
+                    p,
+                    [
+                        at(s0, z, side),
+                        at(s1, z, side),
+                        at(s1, z + 0.45, side),
+                        at(s0, z + 0.45, side),
+                    ],
+                    shade(colour, 1.08),
+                )
+    rim, wall = b - 0.45, 0.6
+    p.polygon(
+        [_p(u - b, v - b, h), _p(u + b, v - b, h), _p(u + b, v + b, h), _p(u - b, v + b, h)],
+        shade(stone, 1.08),
+        shade(stone, 0.7),
     )
     p.polygon(
         [
-            (-10, -8.5),
-            (-7, -10),
-            (-4, -11.6),
-            (0, -12),
-            (3, -11),
-            (6, -12.4),
-            (9, -11),
-            (11, -8.2),
-            (10, -9.2),
-            (5, -10.6),
-            (-1, -10.4),
-            (-7, -9),
+            _p(u - rim, v - rim, h),
+            _p(u + rim, v - rim, h),
+            _p(u + rim, v + rim, h),
+            _p(u - rim, v + rim, h),
         ],
-        shade(stone, 1.06),
+        shade(stone, 0.62),
     )
-    side = [(11, -8.2), (12, -4.6), (14.5, -0.6), (14.2, -5.2)]
-    p.polygon(side, shade(stone, 0.66))
-    for x in (-9, -6.5, -3.5, -1, 2, 4.5, 7.5, 10):
-        top = -11.2 if -5 < x < 8 else -8.6
-        p.line([(x, top + 0.6), (x + 0.4, -3.2 + abs(x) * 0.05)], shade(stone, 0.74))
-    for y in (-9.5, -7, -4.8):
-        p.line([(-10.2, y + 0.9), (-3, y - 0.2), (5, y - 0.6), (11.4, y + 0.6)], shade(stone, 0.7))
-    p.polygon(
-        [(-9, -1.8), (6, -4.2), (12, -4.6), (11, -3.4), (5, -2.8), (-8, -0.6)], (150, 144, 124)
+    _face(
+        p,
+        [(u - b, v - b, h), (u + b, v - b, h), (u + b, v - b, h + wall), (u - b, v - b, h + wall)],
+        shade(stone, 1.04),
     )
-    for x, y in ((-6, -8.2), (1, -9.8), (7, -6.2), (-2, -5.4)):
-        p.blob(x - 1.2, y - 0.3, x + 1.2, y + 0.5, shade(stone, 0.86))
-    lip = [
-        (-11, -2.2),
-        (-10, -8.5),
-        (-7, -10),
-        (-4, -11.6),
-        (0, -12),
-        (3, -11),
-        (6, -12.4),
-        (9, -11),
-        (11, -8.2),
+    _face(
+        p,
+        [(u + b, v - b, h), (u + b, v + b, h), (u + b, v + b, h + wall), (u + b, v - b, h + wall)],
+        shade(stone, 0.8),
+    )
+    cx, cy = _p(u, v, h)
+    r = 1.3 * m
+    p.blob(cx - r, cy - r / 2, cx + r, cy + r / 2, (52, 44, 42))
+    p.blob(cx - r * 0.5, cy - r * 0.15, cx + r * 0.4, cy + r * 0.3, (150, 74, 44))
+    arch = [
+        at(-0.34 * math.cos(t), 2.3 + 1.1 * math.sin(t), 0) for t in np.linspace(0, math.pi, 11)
     ]
-    p.line([(x, y - 0.4) for x, y in lip], shade(grass, 0.75))
-    for x, y in ((-8.5, -9.6), (-2.5, -12.8), (4, -12.4), (9.5, -12), (13, -7.5), (-11.5, -6)):
-        p.blob(x - 1.4, y - 1.2, x + 1.4, y + 0.6, shade(grass, 0.7))
-        p.blob(x - 0.9, y - 1.2, x + 0.5, y - 0.2, shade(grass, 0.95))
-    for x, y, half, h in (
-        (-7, -0.4, 3.4, 3),
-        (7.5, -1.6, 3.6, 3.4),
-        (1, -1.4, 2.6, 2),
-        (-1.5, 1.6, 1.8, 1.2),
+    p.polygon([_p(*c) for c in [at(-0.34, 0, 0), *arch, at(0.34, 0, 0)]], shade(stone, 1.12))
+    inner = [
+        at(-0.25 * math.cos(t), 2.2 + 0.8 * math.sin(t), 0) for t in np.linspace(0, math.pi, 9)
+    ]
+    p.polygon([_p(*c) for c in [at(-0.25, 0, 0), *inner, at(0.25, 0, 0)]], (56, 44, 40))
+    gx, gy = _p(*at(0, 0.4, 0))
+    p.blob(gx - 0.45 * m, gy - 0.5 * m, gx + 0.45 * m, gy + 0.15 * m, (150, 70, 40))
+    fx, fy = _p(*at(0, 0, 0))
+    p.polygon(
+        [
+            (fx - 0.9 * m, fy - 0.2 * m),
+            (fx + 0.7 * m, fy - 0.55 * m),
+            (fx + 1.3 * m, fy + 1.3 * m),
+            (fx - 1.9 * m, fy + 1.7 * m),
+        ],
+        shade(lime, 0.92),
+    )
+    p.blob(fx - 1.6 * m, fy - 0.1 * m, fx + 1.0 * m, fy + 1.7 * m, lime)
+    _quarry_lumps(
+        p,
+        [
+            (u - 0.6, v - a - 1.6, 0, 0.2),
+            (u + 0.5, v - a - 1.4, 0, 0.16),
+            (u - 0.1, v - a - 2.1, 0, 0.18),
+            (u + 0.9, v - a - 0.9, 0, 0.15),
+        ],
+        lime,
+    )
+    _wheelbarrow(p, *_p(u + 2.2, v - a - 1.6), lime)
+    p.soft(
+        [
+            (cx - 1.2 * m, cy - 3.0 * m, cx + 1.0 * m, cy - 0.9 * m),
+            (cx - 0.4 * m, cy - 5.0 * m, cx + 2.2 * m, cy - 2.6 * m),
+            (cx + 1.0 * m, cy - 7.0 * m, cx + 4.0 * m, cy - 4.6 * m),
+            (cx + 2.8 * m, cy - 8.6 * m, cx + 5.6 * m, cy - 6.6 * m),
+        ],
+        (238, 236, 230),
+        0.72,
+        0.6 * m,
+    )
+
+
+def _quarry_crusher(p: Painter, u: float, v: float, chips: RGB) -> None:
+    """A stone crusher in a tall boarded house 5 by 4 m on a base of limestone, its boards and
+    corrugated roof whitened by the dust: a flywheel turning on its end, a stove pipe letting off
+    steam from the engine, and a chute down its lit side pouring crushed stone onto a pale heap."""
+    m = METRE
+    wall, base = (164, 148, 124), (200, 192, 170)
+    roof = (148, 150, 150)
+    low = _block(p, u, v, 5, 4, 2.6, base, None)
+    b_left, b_front, b_right, _ = low
+    for a, b, tone in ((b_left, b_front, 0.84), (b_front, b_right, 0.66)):
+        for drop in (0.65, 1.3, 1.95):
+            _bar(
+                p,
+                _on_wall(a, b, 0, drop * m),
+                _on_wall(a, b, 1, drop * m),
+                0.05 * m,
+                shade(base, tone),
+            )
+    _patch(p, b_left, b_front, (0.55, 0.85), (0.6 * m, 2.6 * m), DOORWAY)
+    house = _block(p, u, v, 5, 4, 4.2, wall, None, 2.6)
+    left, front, right, _ = house
+    for a, b, tone in ((left, front, 0.82), (front, right, 0.66)):
+        for t in np.linspace(0.08, 0.92, 9):
+            _bar(p, _on_wall(a, b, t, 0), _on_wall(a, b, t, 4.2 * m), 0.06 * m, shade(wall, tone))
+        _bar(
+            p,
+            _on_wall(a, b, 0, 3.9 * m),
+            _on_wall(a, b, 1, 3.9 * m),
+            0.3 * m,
+            shade(wall, tone * 1.18),
+        )
+    _patch(p, left, front, (0.15, 0.35), (1.0 * m, 2.2 * m), WINDOW)
+    _patch(p, front, right, (0.4, 0.65), (0.8 * m, 2.0 * m), shade(WINDOW, 0.8))
+    p.gable(house, 1.6 * m, roof, wall)
+    _tiles(p, house, 1.6 * m, roof, (0.2, 0.4, 0.6, 0.8))
+    sx, sy = _on_roof(house, 1.6 * m, 0.75, 0.5)
+    _bar(p, (sx, sy), (sx, sy - 2.2 * m), 0.25 * m, (60, 58, 58))
+    p.soft(
+        [
+            (sx - 0.6 * m, sy - 3.6 * m, sx + 0.8 * m, sy - 2.2 * m),
+            (sx + 0.1 * m, sy - 4.8 * m, sx + 1.9 * m, sy - 3.2 * m),
+        ],
+        (240, 240, 238),
+        0.7,
+        0.4 * m,
+    )
+    wx, wy = _p(u + 2.6, v + 0.6, 1.6)
+    r = 1.2 * m
+    p.ellipse(wx - r * 0.45, wy - r, wx + r * 0.45, wy + r, (64, 62, 62))
+    p.ellipse(wx - r * 0.3, wy - r * 0.78, wx + r * 0.3, wy + r * 0.78, shade(base, 0.62))
+    for k in range(3):
+        t = k * math.pi / 3
+        _bar(
+            p,
+            (wx - 0.3 * r * math.cos(t), wy - 0.78 * r * math.sin(t)),
+            (wx + 0.3 * r * math.cos(t), wy + 0.78 * r * math.sin(t)),
+            0.08 * m,
+            (64, 62, 62),
+        )
+    _bar(p, (wx, wy - r), _on_wall(front, right, 0.7, 1.2 * m), 0.07 * m, (40, 36, 34))
+    mouth = _p(u + 0.4, v - 2.0, 3.2)
+    out = _p(u + 1.6, v - 4.2, 1.4)
+    _bar(p, mouth, out, 0.8 * m, (84, 80, 78))
+    _bar(p, mouth, out, 0.45 * m, shade(chips, 0.9))
+    _cone(p, *_p(u + 1.4, v - 5.2), 2.6 * m, 2.2 * m, chips)
+
+
+def _quarry_office(p: Painter, u: float, v: float, stone: RGB) -> None:
+    """The quarry office: a little house of dressed limestone 5 by 4 m under a slate roof, with
+    sash windows in painted frames and a door up a step on its lit side, a dark name board over
+    the door, a window in its end and a chimney."""
+    m = METRE
+    slate, paint = (84, 90, 104), (236, 232, 220)
+    top = _block(p, u, v, 5, 4, 3.4, stone, None)
+    left, front, right, _ = top
+    for a, b, tone in ((left, front, 0.86), (front, right, 0.68)):
+        for drop in (0.85, 1.7, 2.55):
+            _bar(
+                p,
+                _on_wall(a, b, 0, drop * m),
+                _on_wall(a, b, 1, drop * m),
+                0.04 * m,
+                shade(stone, tone),
+            )
+    _patch(p, left, front, (0, 1), (2.9 * m, 3.4 * m), shade(stone, 0.8))
+    _patch(p, front, right, (0, 1), (2.9 * m, 3.4 * m), shade(stone, 0.6))
+    for t in (0.22, 0.78):
+        _patch(p, left, front, (t - 0.11, t + 0.11), (0.8 * m, 2.3 * m), paint)
+        _patch(p, left, front, (t - 0.08, t + 0.08), (0.9 * m, 2.2 * m), WINDOW)
+        _bar(
+            p,
+            _on_wall(left, front, t - 0.08, 1.55 * m),
+            _on_wall(left, front, t + 0.08, 1.55 * m),
+            0.06 * m,
+            paint,
+        )
+    _patch(p, left, front, (0.42, 0.58), (1.0 * m, 3.3 * m), DOOR)
+    _patch(p, left, front, (0.36, 0.64), (0.25 * m, 0.8 * m), (52, 58, 66))
+    for t in (0.42, 0.47, 0.52, 0.57):
+        p.point(*_on_wall(left, front, t, 0.5 * m), paint)
+    _block(p, u - 0.0, v - 2.25, 1.2, 0.5, 0.2, shade(stone, 0.9), shade(stone, 1.05))
+    _patch(p, front, right, (0.3, 0.7), (0.8 * m, 2.3 * m), paint)
+    _patch(p, front, right, (0.35, 0.65), (0.9 * m, 2.2 * m), shade(WINDOW, 0.8))
+    p.gable(top, 1.8 * m, slate, stone)
+    _tiles(p, top, 1.8 * m, slate, (0.33, 0.66))
+    cx, cy = _on_roof(top, 1.8 * m, 0.15, 0.6)
+    p.hall(cx, cy, 0.7 * m, 0.7 * m, 1.6 * m, stone, (50, 46, 46))
+
+
+def limestone_quarry() -> Sprite:
+    """A limestone quarry cut into a green hill in three benches: sheer cream faces sawn square,
+    crossed by the beds of the stone, scored by drill holes and lit sharp along their tops, pale
+    ledges between them, and the hillside's grass and soil coming down ragged to their lip; a
+    stiff-leg derrick swinging a squared block over the dusty floor, blocks stacked by it, side-
+    tipping wagons of broken stone on a tramway to the crusher, a squat stone lime kiln spilling
+    white lime from its draw-eye under pale smoke, and the quarry office."""
+    p = Painter(80, 70, (40, 45))
+    rock = (224, 212, 184)
+    shaded_rock = (178, 174, 162)
+    ledge = (236, 234, 224)
+    dust = (214, 208, 190)
+    grass, scrub, dry = (102, 134, 66), (84, 110, 54), (126, 138, 80)
+    soil = (122, 100, 72)
+    outcrop = (176, 174, 160)
+    stone = (214, 206, 184)
+    lime = (248, 246, 240)
+    peak = 10.4
+    u0, v1, bench, lift, return_ = -9.0, -1.0, 4.5, 3.2, 1.6
+
+    def hill(u: float, v: float) -> float:
+        wob = _swell(u, v, 6)
+        front = (v - (v1 - 3.0 - 1.2 * wob)) / 8.0
+        back = (v1 + 19.0 + 1.5 * wob - v) / 9.0
+        left = (u + 19.0 + 2.0 * wob) / 7.0
+        right = (10.0 + 2.0 * wob - u) / 8.0
+        rise = 1.0
+        for t in (front, back, left, right):
+            t = min(1.0, max(0.0, t))
+            rise *= t * t * (3 - 2 * t)
+        return peak * rise * (1 + 0.06 * _swell(u * 1.3, v * 1.3, 4))
+
+    def cut(u: float, v: float) -> float:
+        d = max(v - v1, (u0 - u) * bench / return_)
+        if d < 0:
+            return 0.0
+        if d >= 2 * bench:
+            return 99.0
+        return lift * (1 + int(d // bench))
+
+    def height(u: float, v: float) -> float:
+        return min(hill(u, v), cut(u, v))
+
+    def paint(u: float, v: float, z: float, slope: float) -> RGB | None:
+        if z < 0.15:
+            return None
+        grain = 1 + 0.025 * _speckle(u, v) + 0.03 * _swell(u, v, 2.2)
+        if cut(u, v) < hill(u, v) - 0.05:
+            return shade(rock if slope > 2 else ledge, grain)
+        reach = 0.7 + 0.5 * _swell(u * 1.7, v * 1.7, 2)
+        if any(
+            cut(u + du, v + dv) < hill(u + du, v + dv) - 0.05
+            for du, dv in ((reach, 0), (0, -reach), (reach * 0.7, -reach * 0.7))
+        ):
+            return shade(soil, grain)
+        if _swell(u * 0.8 + 5, v * 0.9, 2.6) > 0.78 and z > 1.5:
+            return shade(outcrop, grain * (0.92 if _speckle(u * 3, v * 3) > 0.5 else 1.0))
+        if _swell(u * 1.2, v * 1.3, 4) > 0.55:
+            return shade(scrub, grain)
+        if _swell(u * 0.9 + 3, v * 1.1, 5) > 0.6:
+            return shade(dry, grain)
+        return shade(grass, grain)
+
+    _yard(p, [(0, -6, 14, 9), (-8, -9, 7, 5), (9, -4, 6, 6)], dust, 0.92)
+    _yard(
+        p,
+        [(6.0, -9.5, 1.2, 0.8), (8.0, -12.0, 1.2, 0.8), (10.0, -14.5, 1.1, 0.7)],
+        shade(dust, 0.86),
+        0.6,
+    )
+    _land(p, (-22, 13, -6, 21), height, paint, 0.25)
+    ledges = (lift, 2 * lift)
+    for k in (2, 1, 0):
+        back = u0 - k * return_
+        _quarry_face(
+            p,
+            height,
+            (back, v1 + k * bench),
+            (1, 0),
+            22,
+            rock,
+            ledges,
+            (2.5, 9.0) if k == 0 else (5.5,),
+        )
+        _quarry_face(p, height, (back, -6), (0, 1), v1 + k * bench + 6, shaded_rock, ledges)
+    for fu, fv in ((-16.5, 4.0), (-14.0, 9.0), (-6.0, 14.5), (4.0, 13.5), (7.0, 5.5)):
+        _fir(p, fu, fv, height(fu, fv) - 0.2, 5.5 + 1.5 * _speckle(fu, fv))
+    _quarry_lumps(
+        p,
+        [
+            (-1.5, -7.5, 0, 0.3),
+            (-0.6, -9.5, 0, 0.25),
+            (7.5, -8.5, 0, 0.28),
+            (9.0, -11.0, 0, 0.22),
+            (-5.5, -14.0, 0, 0.2),
+            (3.5, -12.5, 0, 0.26),
+        ],
+        stone,
+    )
+    _quarry_ladder(p, -3.0, v1, lift)
+    _cone(p, *_p(6.5, -1.6), 2.0 * METRE, 1.5 * METRE, shade(stone, 0.95))
+    _quarry_lumps(
+        p,
+        [(5.2, -2.0, 0, 0.25), (7.8, -2.4, 0, 0.22), (6.4, -2.9, 0, 0.2), (6.9, -1.0, 1.0, 0.2)],
+        stone,
+    )
+    _rails(p, (-0.5, -3.5), (8.5, -3.5), gauge=0.6, ballast=None)
+    _quarry_crusher(p, 10.5, 0.5, (204, 200, 188))
+    for su in (4.0, 6.0):
+        _quarry_wagon(p, su, -3.5, stone)
+    for bu, bv, z, size in (
+        (1.0, -6.4, 0.0, (1.8, 1.1, 0.9)),
+        (2.9, -6.4, 0.0, (1.8, 1.1, 0.9)),
+        (1.9, -6.4, 0.9, (1.8, 1.1, 0.9)),
+        (2.6, -8.4, 0.0, (1.4, 1.0, 0.8)),
     ):
-        _heap(p, x, y, half, h, shade(stone, 0.9))
-    _strewn(p, 0, 4.4, 7, shade(stone, 0.8), 7)
-    kx, ky = -12, 4.6
-    _turned(p, kx, ky, [(0, 2.6), (3.6, 2.3), (4.6, 1.6)], (176, 162, 140), cap=(70, 64, 60))
-    _patch(p, (kx - 2.4, ky - 0.4), (kx, ky + 0.9), (0.3, 0.75), (2.2, 3.6), (52, 40, 34))
-    p.point(kx - 1.2, ky - 0.6, (240, 150, 60))
-    for k, (dx, dy, r) in enumerate(((0.4, -6.4, 1.2), (1.4, -8, 1.6), (2.8, -9.8, 1.9))):
-        grey = shade((206, 204, 200), 1 - 0.06 * k)
-        p.blob(kx + dx - r, ky + dy - r, kx + dx + r, ky + dy + r, grey)
-    for x, y, h in ((9.5, 3.5, 2), (11.5, 4.6, 2), (10.5, 2.4, 1.6)):
-        block = p.box(x, y, 1.6, h, stone, shade(stone, 1.08))
-        _footing(p, block, h, shade(dust, 0.62))
-    p.blob(-8, 4.6, -1, 8, shade(dust, 0.72))
-    p.hall(-4.5, 5.4, 4, 2, 0.9, TIMBER, shade(TIMBER, 1.15))
-    p.box(-4.5, 4.6, 1.3, 1.4, stone, shade(stone, 1.08))
-    for x, y in ((-6.6, 5.9), (-3, 7.6)):
-        p.ellipse(x - 0.8, y - 0.8, x + 0.8, y + 0.8, (66, 60, 56))
-    p.line([(-7.6, 5), (-9.6, 4)], TRUNK)
-    p.line([(4, -2), (4, -15)], TRUNK)
-    p.line([(4, -15), (8, -4)], (110, 104, 96))
-    p.line([(4, -14), (-3, -10)], TRUNK)
-    p.line([(4, -8), (-2, -10.2)], shade(TRUNK, 1.2))
-    p.line([(-3, -10), (-3, -6)], (60, 56, 54))
-    p.rect(-4, -6, -2, -4.6, stone)
+        _quarry_block(p, bu, bv, z, size, stone)
+    _quarry_derrick(p, -5, -5, 9, stone)
+    _quarry_kiln(p, -8.5, -10.5, stone, lime)
+    _quarry_office(p, 3, -14, stone)
     return p.sprite()
 
 
