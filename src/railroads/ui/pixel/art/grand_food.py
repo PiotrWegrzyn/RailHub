@@ -6,19 +6,31 @@ a brick slaughterhouse with a white cold store, a half-timbered sausage works wi
 a timber cooperage with barrels firing over the coals."""
 
 from railroads.ui.pixel.art.industry import (
+    COLD_TILE,
+    DRESSING,
+    GILT,
     GLAZING,
+    MILL_GLASS,
+    MILL_SLATE,
+    PUDDLE,
     STILL_SLATE,
+    STRAW,
     _bed,
+    _butcher_sign,
+    _cold_door,
     _crate,
     _door,
     _footing,
     _heap,
+    _meat_wagon,
+    _mill_window,
     _on_roof,
     _pagoda,
     _pipe,
     _puddle,
     _ring,
     _roof_rows,
+    _round_head,
     _smoke,
     _smoking_chimney,
     _spill,
@@ -26,6 +38,7 @@ from railroads.ui.pixel.art.industry import (
     _stains,
     _track,
     _window,
+    _works_siding,
 )
 from railroads.ui.pixel.art.painter import (
     BARREL,
@@ -48,12 +61,16 @@ from railroads.ui.pixel.art.painter import (
 )
 from railroads.ui.pixel.art.parts import (
     BEAST,
+    DOOR,
     METRE,
     _band,
     _bands,
+    _bar,
     _barrel,
     _cow,
     _fence,
+    _gable_across,
+    _iso,
     _on_wall,
     _paddock,
     _patch,
@@ -986,53 +1003,475 @@ def _cold_store(p: Painter, x: float, y: float, length: float, depth: float, hei
     return top
 
 
+MEAT_VAN: RGB = (238, 238, 232)
+MEAT_STRIPE: RGB = (176, 40, 44)
+
+
+def _meat_hall(
+    p: Painter, x: float, y: float, size: tuple[float, float, float], doors: tuple[int, ...]
+) -> Top:
+    """A red-brick slaughter hall `size` (length, depth and wall height) standing on (x, y): two
+    tidy rows of round-headed windows under cream arches between pilasters, cream bands at its
+    eaves and between its floors, arched timber doors in the bays `doors` of its lit side, and a
+    slate roof with a louvred vent along its ridge."""
+    m = METRE
+    length, depth, high = size
+    top = p.hall(x, y, length, depth, high, BRICK, None)
+    left, front, right, _ = top
+    _plinth(p, top, high, BRICK, 0.6 * m)
+    _stains(p, left, front, high, (0.04, 0.37, 0.63, 0.97), shade(BRICK, 0.66), 1.2 * m)
+    for a, b in ((left, front), (front, right)):
+        for drop, wide in ((0, 0.45 * m), (high * 0.48, 0.25 * m)):
+            _bar(
+                p,
+                _on_wall(a, b, 0, drop + wide / 2),
+                _on_wall(a, b, 1, drop + wide / 2),
+                wide,
+                DRESSING,
+            )
+    bays = max(3, round(length / (3 * m)))
+    for k in range(bays + 1):
+        _bar(
+            p,
+            _on_wall(left, front, k / bays, 0.45 * m),
+            _on_wall(left, front, k / bays, high - 0.6 * m),
+            0.45 * m,
+            shade(BRICK, 0.86),
+        )
+    upper, lower = (high * 0.14, high * 0.41), (high * 0.59, high * 0.86)
+    for k in range(bays):
+        t = (k + 0.5) / bays
+        _mill_window(p, left, front, length, t, 1.2 * m, upper)
+        if k in doors:
+            p.polygon(_round_head(left, front, length, t, 2.6 * m, high * 0.55, high), DRESSING)
+            p.polygon(_round_head(left, front, length, t, 2.2 * m, high * 0.58, high), DOORWAY)
+            _patch(
+                p,
+                left,
+                front,
+                (t - 1.1 * m / length, t - 0.04 * m / length),
+                (high * 0.68, high),
+                DOOR,
+            )
+        else:
+            _mill_window(p, left, front, length, t, 1.3 * m, lower)
+    side = max(2, round(depth / (3.5 * m)))
+    for k in range(side):
+        t = (k + 0.5) / side
+        _mill_window(p, front, right, depth, t, 1.2 * m, upper, shade(MILL_GLASS, 0.85))
+        _mill_window(p, front, right, depth, t, 1.3 * m, lower, shade(MILL_GLASS, 0.85))
+    p.gable(top, 3 * m, MILL_SLATE, BRICK)
+    _roof_rows(p, top, 3 * m, MILL_SLATE)
+    ridge_back, ridge_front = _ridge(top, 3 * m)
+    vx, vy = _on_wall(ridge_back, ridge_front, 0.5, 0)
+    vent = p.hall(vx, vy + 0.4 * m, length * 0.5, 1.4 * m, 1.3 * m, (178, 172, 164), None)
+    for k in range(1, 4):
+        drop = 1.3 * m * k / 4
+        _bar(
+            p,
+            _on_wall(vent[0], vent[1], 0, drop),
+            _on_wall(vent[0], vent[1], 1, drop),
+            0.1 * m,
+            (100, 96, 94),
+        )
+    p.gable(vent, 0.7 * m, MILL_SLATE, (178, 172, 164))
+    return top
+
+
+def _meat_cold_store(
+    p: Painter, x: float, y: float, size: tuple[float, float, float], plants: int
+) -> Top:
+    """A white-tiled cold store `size` (length, depth and height) standing on (x, y): glazed
+    tiles on a red-brick plinth under a red-brick cornice, a few small windows, insulated doors
+    on both its faces, and on its flat roof `plants` refrigerating plants with their fans and a
+    vent pipe."""
+    m = METRE
+    length, depth, high = size
+    top = p.hall(x, y, length, depth, high, COLD_TILE, shade(COLD_TILE, 0.86))
+    left, front, right, back = top
+    for a, b, span, tone in ((left, front, length, 0.9), (front, right, depth, 0.72)):
+        rows = int((high - 1.6 * m) / (0.45 * m))
+        for k in range(rows):
+            drop = 0.9 * m + k * 0.45 * m
+            _bar(
+                p,
+                _on_wall(a, b, 0, drop),
+                _on_wall(a, b, 1, drop),
+                0.03 * m,
+                shade(COLD_TILE, tone),
+            )
+        cols = max(4, round(span / m * 1.2))
+        for k in range(1, cols):
+            _bar(
+                p,
+                _on_wall(a, b, k / cols, 0.9 * m),
+                _on_wall(a, b, k / cols, high - 0.7 * m),
+                0.03 * m,
+                shade(COLD_TILE, tone),
+            )
+        _patch(p, a, b, (0, 1), (0, 0.8 * m), shade(BRICK, 1.0 if tone > 0.8 else 0.8))
+        _patch(p, a, b, (0, 1), (high - 0.7 * m, high), shade(BRICK, 0.9 if tone > 0.8 else 0.72))
+        floors = max(1, round((high - 4 * m) / (3.6 * m)))
+        for f in range(floors):
+            drop = 1.6 * m + f * 3.6 * m
+            for t in (0.2, 0.8) if span > 6 * m else (0.5,):
+                _patch(
+                    p,
+                    a,
+                    b,
+                    (t - 0.5 * m / span, t + 0.5 * m / span),
+                    (drop, drop + 1.1 * m),
+                    shade(MILL_GLASS, tone * 1.1),
+                )
+    _cold_door(p, left, front, (0.42, 0.58), high - 3.3 * m, high - 1.1 * m)
+    _cold_door(p, front, right, (0.32, 0.62), high - 3.3 * m, high)
+    for k in range(plants):
+        ux, uy = _on_wall(
+            _on_wall(left, back, 0.5, 0), _on_wall(front, right, 0.5, 0), (k + 0.5) / plants, 0
+        )
+        plant = p.hall(ux, uy, 2.4 * m, 1.6 * m, 1.3 * m, METAL, shade(METAL, 1.1))
+        fx, fy = _on_wall(plant[3], plant[1], 0.5, 0)
+        p.ellipse(fx - 0.7 * m, fy - 0.35 * m, fx + 0.7 * m, fy + 0.35 * m, (60, 62, 70))
+    vx, vy = _on_wall(back, right, 0.8, 0)
+    _bar(p, (vx - 1 * m, vy), (vx - 1 * m, vy - 2.4 * m), 0.25 * m, METAL)
+    return top
+
+
+def _meat_lairs(p: Painter, x: float, y: float, pens: int, beasts: tuple[int, ...]) -> None:
+    """Cattle lairs on (x, y): a row of `pens` fenced pens 6 m square along the lit walls,
+    trampled to mud and strewn with straw, a water trough in each, with `beasts` brown steers
+    standing in each pen in turn, under a long open lair roof on posts along their backs."""
+    m = METRE
+
+    def at(u: float, v: float) -> Point:
+        return _iso(x, y, u * m, v * m)
+
+    width = pens * 6
+    p.polygon([at(0, 0), at(width, 0), at(width, 8), at(0, 8)], MUD)
+    for k in range(pens * 3):
+        u, v = 1 + (k * 2.3) % (width - 1.5), 1.2 + (k * 1.7) % 4.6
+        sx, sy = at(u, v)
+        p.blob(sx - 0.8 * m, sy - 0.4 * m, sx + 0.8 * m, sy + 0.4 * m, STRAW, 160)
+    roof_lo, roof_hi = 2.6 * m, 3.4 * m
+    for u in range(0, width + 1, 3):
+        bx, by = at(u, 8)
+        _bar(p, (bx, by), (bx, by - roof_hi), 0.18 * m, shade(TIMBER, 0.7))
+    for k in range(pens + 1):
+        _fence(p, at(k * 6, 6), at(k * 6, 0), 1.3 * METRE)
+    _fence(p, at(0, 6), at(width, 6), 1.3 * METRE)
+    for k in range(pens):
+        tx, ty = at(k * 6 + 3, 5.2)
+        trough = p.hall(tx, ty, 2.4 * m, 0.7 * m, 0.6 * m, shade(TIMBER, 0.85), PUDDLE)
+        _bar(
+            p,
+            _on_wall(trough[3], trough[2], 0.2, 0),
+            _on_wall(trough[3], trough[2], 0.6, 0),
+            0.06 * m,
+            shade(PUDDLE, 1.4),
+        )
+        for j in range(beasts[k % len(beasts)]):
+            cx, cy = at(k * 6 + 1.8 + 2.4 * j, 2.4 + 1.4 * (j % 2))
+            _cow(p, cx, cy, *STEER, BEAST, 1 if (j + k) % 2 else -1)
+    for u in range(0, width + 1, 3):
+        fx, fy = at(u, 6)
+        _bar(p, (fx, fy), (fx, fy - roof_lo), 0.18 * m, shade(TIMBER, 0.85))
+    roof = [at(0, 6), at(width, 6), at(width, 8), at(0, 8)]
+    lo = [(px, py - roof_lo) for px, py in roof[:2]]
+    hi = [(px, py - roof_hi) for px, py in roof[2:]]
+    p.polygon([lo[0], lo[1], hi[0], hi[1]], MILL_SLATE, shade(MILL_SLATE, 0.6))
+    for k in range(1, 3):
+        f = k / 3
+        _bar(
+            p,
+            (lo[0][0] + (hi[1][0] - lo[0][0]) * f, lo[0][1] + (hi[1][1] - lo[0][1]) * f),
+            (lo[1][0] + (hi[0][0] - lo[1][0]) * f, lo[1][1] + (hi[0][1] - lo[1][1]) * f),
+            0.06 * m,
+            shade(MILL_SLATE, 0.8),
+        )
+    for k in range(pens):
+        _fence(p, at(k * 6, 0), at(k * 6 + 6, 0), 1.3 * METRE)
+
+
+def _meat_van(p: Painter, x: float, y: float) -> None:
+    """A white refrigerator van 7.5 m long standing on a siding at (x, y) along the lit walls:
+    insulated walls with a red band lettered in white, a door, ice hatches on its pale roof,
+    spoked wheels and buffers."""
+    m = METRE
+    for t in (0.22, 0.78):
+        wx, wy = _iso(x, y, (t - 0.5) * 7.5 * m, 0.7 * m)
+        p.ellipse(wx - 0.5 * m, wy - 1 * m, wx + 0.5 * m, wy, (40, 38, 40))
+    p.hall(x, y - 0.6 * m, 7.5 * m, 2.2 * m, 0.4 * m, (44, 42, 44), None)
+    for t in (0.22, 0.78):
+        wx, wy = _iso(x, y, (t - 0.5) * 7.5 * m, -0.7 * m)
+        p.ellipse(wx - 0.5 * m, wy - 1 * m, wx + 0.5 * m, wy, (36, 34, 36))
+        p.blob(wx - 0.15 * m, wy - 0.65 * m, wx + 0.15 * m, wy - 0.35 * m, (120, 118, 120))
+    for u in (-3.95, 3.95):
+        bx, by = _iso(x, y, u * m, 0)
+        _bar(
+            p,
+            (bx, by - 1.1 * m),
+            _iso(bx, by - 1.1 * m, 0.3 * m if u > 0 else -0.3 * m, 0),
+            0.25 * m,
+            (40, 38, 40),
+        )
+    body = p.hall(x, y - 1 * m, 7.5 * m, 2.6 * m, 2.4 * m, MEAT_VAN, None)
+    left, front, _, _ = body
+    for t in [k / 14 for k in range(1, 14)]:
+        _bar(
+            p,
+            _on_wall(left, front, t, 0),
+            _on_wall(left, front, t, 2.4 * m),
+            0.03 * m,
+            shade(MEAT_VAN, 0.86),
+        )
+    _patch(p, left, front, (0, 1), (0.7 * m, 1.2 * m), MEAT_STRIPE)
+    for t0, t1 in ((0.08, 0.2), (0.24, 0.3), (0.62, 0.74), (0.78, 0.9)):
+        _bar(
+            p,
+            _on_wall(left, front, t0, 0.95 * m),
+            _on_wall(left, front, t1, 0.95 * m),
+            0.18 * m,
+            MEAT_VAN,
+        )
+    _patch(p, left, front, (0.38, 0.58), (0.3 * m, 2.3 * m), shade(MEAT_VAN, 0.9))
+    _bar(
+        p,
+        _on_wall(left, front, 0.48, 0.3 * m),
+        _on_wall(left, front, 0.48, 2.3 * m),
+        0.05 * m,
+        shade(MEAT_VAN, 0.6),
+    )
+    p.gable(body, 0.4 * m, (214, 212, 206), MEAT_VAN)
+    for t in (0.15, 0.85):
+        hx, hy = _on_wall(
+            _on_wall(body[0], body[3], 0.5, -0.4 * m),
+            _on_wall(body[1], body[2], 0.5, -0.4 * m),
+            t,
+            0,
+        )
+        p.hall(hx, hy + 0.15 * m, 0.7 * m, 0.7 * m, 0.25 * m, (150, 150, 146), (170, 170, 166))
+
+
+def _meat_dock(p: Painter, x: float, y: float, length: float) -> Top:
+    """A loading dock `length` metres long and 1.2 m high on (x, y) along the lit walls: a
+    brick face under a deck of planks."""
+    m = METRE
+    deck = p.hall(x, y, length * m, 2.4 * m, 1.2 * m, shade(BRICK, 0.9), shade(TIMBER, 1.1))
+    for k in range(1, round(length * 1.2)):
+        t = k / round(length * 1.2)
+        _bar(
+            p,
+            _on_wall(deck[0], deck[3], t, 0),
+            _on_wall(deck[1], deck[2], t, 0),
+            0.05 * m,
+            shade(TIMBER, 0.8),
+        )
+    return deck
+
+
+def _meat_gilt_ox(p: Painter, x: float, y: float, size: float) -> None:
+    """A gilt ox head in relief seen from the front, its forehead at (x, y) and `size` units from
+    its brow to its muzzle: long face, short ears and curving horns, all in gold lit on the
+    left."""
+
+    def at(points: list[tuple[float, float]]) -> list[Point]:
+        return [(x + u * size, y + v * size) for u, v in points]
+
+    for side in (-1, 1):
+        p.polygon(
+            at(
+                [
+                    (side * 0.28, -0.3),
+                    (side * 0.6, -0.42),
+                    (side * 0.84, -0.72),
+                    (side * 0.8, -0.48),
+                    (side * 0.58, -0.26),
+                    (side * 0.3, -0.16),
+                ]
+            ),
+            shade(GILT, 1.12 if side < 0 else 0.86),
+        )
+        ex, ey = x + side * 0.48 * size, y - 0.08 * size
+        p.blob(
+            ex - 0.16 * size, ey - 0.08 * size, ex + 0.16 * size, ey + 0.09 * size, shade(GILT, 0.8)
+        )
+    p.polygon(
+        at(
+            [
+                (-0.36, -0.36),
+                (0.36, -0.36),
+                (0.38, -0.1),
+                (0.26, 0.3),
+                (0.2, 0.56),
+                (-0.2, 0.56),
+                (-0.26, 0.3),
+                (-0.38, -0.1),
+            ]
+        ),
+        GILT,
+    )
+    p.polygon(
+        at([(0.06, -0.36), (0.36, -0.36), (0.38, -0.1), (0.26, 0.3), (0.2, 0.56), (0.06, 0.56)]),
+        shade(GILT, 0.82),
+    )
+    for side in (-1, 1):
+        ex = x + side * 0.17 * size
+        p.blob(ex - 0.05 * size, y - 0.09 * size, ex + 0.05 * size, y, shade(GILT, 0.55))
+    p.blob(x - 0.22 * size, y + 0.38 * size, x + 0.22 * size, y + 0.6 * size, shade(GILT, 0.92))
+    _bar(
+        p,
+        (x - 0.2 * size, y - 0.25 * size),
+        (x - 0.12 * size, y + 0.2 * size),
+        0.05 * size,
+        (255, 236, 160),
+    )
+
+
+def _meat_office(p: Painter, x: float, y: float, length: float, depth: float) -> None:
+    """A meat company's office block three storeys high, `length` by `depth`, on (x, y): red
+    brick on a stone plinth with cream quoins and string courses, rows of round-headed windows,
+    a slate roof, and a central bay standing forward under a pediment bearing a gilt ox head,
+    over an arched entrance up stone steps."""
+    m = METRE
+    storey, storeys = 3.8 * m, 3
+    high = storey * storeys
+    top = p.hall(x, y, length, depth, high, BRICK, None)
+    left, front, right, _ = top
+    for a, b, span, tone, skip in (
+        (left, front, length, 1.0, (0.36, 0.64)),
+        (front, right, depth, 0.85, (2, 2)),
+    ):
+        _patch(p, a, b, (0, 1), (high - 1 * m, high), shade(STONE, tone * 1.1))
+        _patch(p, a, b, (0, 1), (0, 0.6 * m), shade(DRESSING, tone))
+        for k in range(1, storeys):
+            _bar(
+                p,
+                _on_wall(a, b, 0, k * storey),
+                _on_wall(a, b, 1, k * storey),
+                0.25 * m,
+                shade(DRESSING, tone),
+            )
+        for t in (0.015, 0.985):
+            _bar(
+                p,
+                _on_wall(a, b, t, 0.6 * m),
+                _on_wall(a, b, t, high - 1 * m),
+                0.55 * m,
+                shade(DRESSING, tone),
+            )
+        bays = max(2, round(span / (2.8 * m)))
+        for k in range(bays):
+            t = (k + 0.5) / bays
+            if skip[0] < t < skip[1]:
+                continue
+            for s in range(storeys):
+                head = s * storey + 0.9 * m
+                _mill_window(
+                    p, a, b, span, t, 1.1 * m, (head, head + 2.2 * m), shade(MILL_GLASS, tone)
+                )
+    p.gable(top, 3 * m, MILL_SLATE, BRICK)
+    _roof_rows(p, top, 3 * m, MILL_SLATE)
+    cx, cy = _iso(x, y, 0, -(depth / 2 + 0.5 * m))
+    span = length * 0.3
+    bay = p.hall(cx, cy, span, 1.6 * m, high + 0.6 * m, shade(BRICK, 1.04), None)
+    b_left, b_front, b_right, _ = bay
+    _patch(p, b_left, b_front, (0, 1), (high - 0.4 * m, high + 0.6 * m), STONE)
+    _patch(p, b_front, b_right, (0, 1), (high - 0.4 * m, high + 0.6 * m), shade(STONE, 0.8))
+    for k in range(1, storeys):
+        _bar(
+            p,
+            _on_wall(b_left, b_front, 0, k * storey + 0.6 * m),
+            _on_wall(b_left, b_front, 1, k * storey + 0.6 * m),
+            0.25 * m,
+            DRESSING,
+        )
+    for t in (0.05, 0.95):
+        _bar(
+            p,
+            _on_wall(b_left, b_front, t, 0),
+            _on_wall(b_left, b_front, t, high),
+            0.55 * m,
+            DRESSING,
+        )
+    for s in range(storeys - 1):
+        head = s * storey + 1.5 * m
+        _mill_window(p, b_left, b_front, span, 0.5, 1.2 * m, (head, head + 2.2 * m))
+    p.polygon(
+        _round_head(b_left, b_front, span, 0.5, 2.8 * m, high - 3.6 * m, high + 0.6 * m), DRESSING
+    )
+    p.polygon(
+        _round_head(b_left, b_front, span, 0.5, 2.2 * m, high - 3.3 * m, high + 0.6 * m), DOOR
+    )
+    for k in range(3):
+        sx, sy = _iso(cx, cy, 0, -(1.2 + 0.5 * k) * m)
+        p.hall(sx, sy, 4 * m + k * 0.8 * m, 0.5 * m, (0.6 - 0.2 * k) * m, STONE, shade(STONE, 1.1))
+    _bands(p, b_left, b_front, b_right, 0.3 * m, DRESSING, shade(DRESSING, 0.78))
+    _gable_across(p, bay, 2.8 * m, MILL_SLATE, shade(BRICK, 1.04))
+    ox, oy = _on_wall(b_left, b_front, 0.5, -1.3 * m)
+    _meat_gilt_ox(p, ox, oy, 1.9 * m)
+
+
 def big_meat_factory() -> Sprite:
-    """A big meat works: a long brick slaughterhouse with two rows of arched windows, a louvred
-    vent along its ridge, a chimney smoking and a ham hung out as its sign, a timber ramp down to
-    a cattle pen trampled to mud with three steers in it, and a white cold store with insulated
-    doors and refrigeration units on its roof, a track worn out of it past a puddle of melt
-    water."""
-    p = Painter(53, 55, (26, 42))
-    foot = _footing(-2, -4, 18, 9)
-    store_foot = _footing(15, 4, 8, 7)
-    _bed(p, foot)
-    _bed(p, store_foot, margin=1)
-    p.shadow(20, 5)
-    _track(p, store_foot[1], store_foot[2], (0.3, 0.7), 3.5)
-    _puddle(p, 21, 9.5, 1.5)
-    top = _slaughterhouse(p, -2, -4, 18, 9)
-    left, front, _, _ = top
-    _smoking_chimney(p, -6, -18, -30, smoke=(200, 200, 204), close=True)
-    _ham(p, *_on_wall(left, front, 0.04, 2), 1)
-    _pen(p, -17, 5, 6, ((-19, 4), (-15, 6.5), (-15, 2.5)))
-    _cold_store(p, 15, 4, 8, 7, 8)
+    """A big meat works round a yard: two red-brick slaughter halls with tidy rows of
+    round-headed windows under cream arches and slate roofs with louvred vents, the butcher's
+    sign of a white ox head on an oxblood board hung from a bracket, cattle lairs of four pens of
+    brown steers under a long lair roof, a larger white-tiled cold store with insulated doors and
+    two refrigerating plants on its roof, a loading dock with a meat wagon at it, and a siding
+    with white refrigerator vans."""
+    m = METRE
+    p = Painter(60, 50, (31, 34))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 18) * m, (v - 4) * m)
+
+    p.polygon([at(18, -9), at(44, -9), at(44, 0), at(18, 0)], (150, 140, 126))
+    for (u, v), length, depth in (((9, 4.5), 20, 9), ((26, 11), 8, 18), ((37, 6), 10, 9)):
+        _bed(p, _footing(*at(u, v), length * m, depth * m), margin=0.6)
+    p.shadow(22, 5.5, 2)
+    _meat_hall(p, *at(26, 11), (8 * m, 18 * m, 9 * m), (1,))
+    hall = _meat_hall(p, *at(9, 4.5), (20 * m, 9 * m, 9 * m), (1, 4))
+    _butcher_sign(p, *_on_wall(hall[0], hall[1], 0.02, 1.6 * m))
+    _meat_cold_store(p, *at(37, 6), (10 * m, 9 * m, 9 * m), 2)
+    _meat_lairs(p, *at(-3, -12), 4, (2, 1))
+    _meat_dock(p, *at(31.5, -1.2), 21)
+    _meat_wagon(p, *at(24, -4))
+    _works_siding(p, at(20, -7.5), at(44, -7.5))
+    for u in (30, 38.5):
+        _meat_van(p, *at(u, -7.5))
     return p.sprite()
 
 
 def mega_meat_factory() -> Sprite:
-    """A great meat-packing works: a long two-storey brick slaughterhouse with rows of arched
-    windows, a long louvred vent along its ridge and a big ham hung out as its sign, a tall chimney
-    smoking, timber ramps down to two cattle pens full of steers, a big white cold store with
-    insulated doors and a row of refrigeration units on its roof, and a white refrigerated van on
-    a rail siding at its door."""
-    p = Painter(64, 78, (32, 59))
-    foot = _footing(-4, -6, 26, 10)
-    store_foot = _footing(16, 0, 13, 9)
-    _bed(p, foot)
-    _bed(p, store_foot, margin=1)
-    p.shadow(25, 5.5)
-    _smoking_chimney(p, -14, -18, -44, smoke=(200, 200, 204), puffs=4, close=True)
-    top = _slaughterhouse(p, -4, -6, 26, 12)
-    left, front, _, _ = top
-    _ham(p, *_on_wall(left, front, 0.03, 2), 1.4)
-    _cold_store(p, 16, 0, 13, 9, 12)
-    _rails(p, (5, 15), (26, 4.5))
-    van = _wagon(p, 18, 9, 11, COLD, shade(COLD, 0.88))
-    for t in (0.25, 0.75):
-        _patch(p, van[1], van[2], (t - 0.08, t + 0.08), (0.8, 1.8), COLD_DOOR)
-    _pen(p, -19, 6, 7, ((-21, 5), (-17, 3), (-17, 8), (-23, 7.5)))
-    _pen(p, -6, 11, 5, ((-7, 11), (-4, 12.5)))
-    _puddle(p, 25, 11, 1.5)
+    """A meat-packing quarter: a three-storey red-brick office block whose pediment bears a gilt
+    ox head, long cattle lairs of pens full of brown steers under a lair roof before it, a long
+    red-brick slaughter hall with tidy rows of round-headed windows and a louvred ridge vent, a
+    tall white-tiled cold-store block of five floors with refrigerating plants on its roof beside
+    a lower one, a loading dock along them, and a rail dock where refrigerator vans wait on the
+    siding."""
+    m = METRE
+    p = Painter(64, 62, (32, 42))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 22) * m, (v - 4) * m)
+
+    p.polygon([at(17, -10), at(54, -10), at(54, 0), at(17, 0)], (150, 140, 126))
+    for (u, v), length, depth in (
+        ((7, 5), 14, 10),
+        ((25, 5), 18, 10),
+        ((41, 6), 10, 12),
+        ((49.5, 5), 5, 10),
+    ):
+        _bed(p, _footing(*at(u, v), length * m, depth * m), margin=0.6)
+    p.shadow(25, 6, 2)
+    _meat_cold_store(p, *at(49.5, 5), (5 * m, 10 * m, 7 * m), 1)
+    _meat_cold_store(p, *at(41, 6), (10 * m, 12 * m, 18 * m), 2)
+    _meat_hall(p, *at(25, 5), (18 * m, 10 * m, 10 * m), (1, 4))
+    _meat_office(p, *at(7, 5), 14 * m, 10 * m)
+    _meat_lairs(p, *at(-1.5, -13), 3, (2, 3, 2))
+    _meat_dock(p, *at(34.5, -1.2), 35)
+    _works_siding(p, at(18, -7.5), at(54, -7.5))
+    for u in (22, 30.5, 39, 47.5):
+        _meat_van(p, *at(u, -7.5))
     return p.sprite()
 
 
