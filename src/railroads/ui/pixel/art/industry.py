@@ -2727,13 +2727,13 @@ def _food_conveyor(p: Painter, x: float, y: float, run: float, top: float, foot:
         )
 
 
-def _food_tank(p: Painter, x: float, y: float) -> None:
-    """The works' water tank on a braced steel trestle 8 m high standing on (x, y), made and
-    painted like a giant tin can: a silver drum 3.2 m across and 3.4 m high with rolled rims and
-    beaded ribs, a lid with its seam, and a bright red label banded in yellow with a ripe peach
+def _food_tank(p: Painter, x: float, y: float, size: float = 1, legs: float = 8) -> None:
+    """The works' water tank on a braced steel trestle `legs` m high standing on (x, y), made and
+    painted like a giant tin can: a silver drum 3.2 m across and 3.4 m high times `size`, with
+    rolled rims and beaded ribs, a lid with its seam, and a bright red label banded in yellow with a ripe peach
     painted on it; a ladder climbs one leg."""
     m = METRE
-    r, legs, tall = 1.6, 8.0, 3.4
+    r, tall, spread = 1.6 * size, 3.4 * size, 1.1 * size
     rs = r * math.sqrt(2) * m
     steel = (64, 70, 80)
 
@@ -2744,7 +2744,7 @@ def _food_tank(p: Painter, x: float, y: float) -> None:
     def leg(u: float, v: float) -> tuple[Point, Point]:
         return at(u * 1.3, v * 1.3, 0), at(u, v, legs)
 
-    feet = {(du, dv): leg(du, dv) for du in (-1.1, 1.1) for dv in (-1.1, 1.1)}
+    feet = {(du, dv): leg(du, dv) for du in (-spread, spread) for dv in (-spread, spread)}
     order = sorted(feet, key=lambda k: k[0] - k[1])
 
     def brace(k0: tuple[float, float], k1: tuple[float, float], tone: float) -> None:
@@ -2753,12 +2753,12 @@ def _food_tank(p: Painter, x: float, y: float) -> None:
         for a, b in ((f0, mid1), (mid0, f1), (mid0, t1), (t0, mid1), (mid0, mid1)):
             _bar(p, a, b, 0.07 * m, shade(steel, tone))
 
-    brace((-1.1, 1.1), (-1.1, -1.1), 1.2)
-    brace((-1.1, 1.1), (1.1, 1.1), 1.0)
+    brace((-spread, spread), (-spread, -spread), 1.2)
+    brace((-spread, spread), (spread, spread), 1.0)
     for k in order[:-1]:
         _bar(p, *feet[k], 0.22 * m, steel)
-    brace((-1.1, -1.1), (1.1, -1.1), 1.5)
-    brace((1.1, -1.1), (1.1, 1.1), 1.25)
+    brace((-spread, -spread), (spread, -spread), 1.5)
+    brace((spread, -spread), (spread, spread), 1.25)
     foot, head = feet[order[-1]]
     _bar(p, foot, head, 0.22 * m, steel)
     for side in (-0.25, 0.25):
@@ -2769,8 +2769,9 @@ def _food_tank(p: Painter, x: float, y: float) -> None:
             0.05 * m,
             (40, 42, 48),
         )
-    for k in range(1, 16):
-        rx, ry = _on_wall(foot, head, k / 16, 0)
+    rungs = round(legs * 2)
+    for k in range(1, rungs):
+        rx, ry = _on_wall(foot, head, k / rungs, 0)
         _bar(p, (rx - 0.45 * m, ry), (rx + 0.05 * m, ry), 0.05 * m, (40, 42, 48))
     cx, cy = at(0, 0, legs)
     p.blob(
@@ -2778,12 +2779,13 @@ def _food_tank(p: Painter, x: float, y: float) -> None:
     )
     _turned(p, cx, cy, [(0, rs), (tall * m, rs)], FOOD_TIN)
     split = math.acos(1 / 3)
+    k = m * size
 
     def band(h0: float, h1: float, colour: RGB) -> None:
         for a0, a1, tone in ((split, math.pi, 1.0), (0, split, 0.76)):
             turns = np.linspace(a0, a1, 8)
-            low = [(cx + rs * math.cos(a), cy - h0 * m + rs / 2 * math.sin(a)) for a in turns]
-            high = [(cx + rs * math.cos(a), cy - h1 * m + rs / 2 * math.sin(a)) for a in turns]
+            low = [(cx + rs * math.cos(a), cy - h0 * k + rs / 2 * math.sin(a)) for a in turns]
+            high = [(cx + rs * math.cos(a), cy - h1 * k + rs / 2 * math.sin(a)) for a in turns]
             p.polygon(low + high[::-1], shade(colour, tone))
 
     band(0, 0.22, shade(FOOD_TIN, 0.8))
@@ -2791,16 +2793,16 @@ def _food_tank(p: Painter, x: float, y: float) -> None:
     band(1.55, 1.85, FOOD_LABELS[1])
     for h in (0.5, 2.95):
         band(h, h + 0.08, shade(FOOD_TIN, 0.78))
-    band(tall - 0.22, tall, shade(FOOD_TIN, 0.86))
+    band(3.18, 3.4, shade(FOOD_TIN, 0.86))
     a = 2.3
-    px, py = cx + rs * 0.78 * math.cos(a), cy - 1.72 * m + rs / 2 * 0.9 * math.sin(a)
-    p.blob(px - 0.5 * m, py - 0.5 * m, px + 0.5 * m, py + 0.5 * m, FOOD_PEACH)
-    p.blob(px - 0.42 * m, py - 0.42 * m, px + 0.05 * m, py + 0.1 * m, shade(FOOD_PEACH, 1.12))
+    px, py = cx + rs * 0.78 * math.cos(a), cy - 1.72 * k + rs / 2 * 0.9 * math.sin(a)
+    p.blob(px - 0.5 * k, py - 0.5 * k, px + 0.5 * k, py + 0.5 * k, FOOD_PEACH)
+    p.blob(px - 0.42 * k, py - 0.42 * k, px + 0.05 * k, py + 0.1 * k, shade(FOOD_PEACH, 1.12))
     p.polygon(
         [
-            (px + 0.05 * m, py - 0.45 * m),
-            (px + 0.6 * m, py - 0.85 * m),
-            (px + 0.35 * m, py - 0.35 * m),
+            (px + 0.05 * k, py - 0.45 * k),
+            (px + 0.6 * k, py - 0.85 * k),
+            (px + 0.35 * k, py - 0.35 * k),
         ],
         (70, 140, 54),
     )
@@ -6616,9 +6618,10 @@ def _sugar_siding(p: Painter, a: Point, b: Point) -> None:
     )
 
 
-def _sugar_wagon(p: Painter, x: float, y: float) -> None:
+def _sugar_wagon(p: Painter, x: float, y: float, load: tuple[RGB, ...] = (SUGAR_BEET,)) -> None:
     """An open wooden goods wagon 6 m long on the siding at (x, y), its red-oxide planked sides a
-    metre high on a dark underframe and four spoked wheels, heaped with sugar beet."""
+    metre high on a dark underframe and four spoked wheels, heaped with sugar beet, or with
+    whatever `load` gives the colours of, mixed."""
     m = METRE
 
     def at(s: float, z: float, w: float = 0) -> Point:
@@ -6628,7 +6631,7 @@ def _sugar_wagon(p: Painter, x: float, y: float) -> None:
     for s in (-1.8, 1.8):
         _food_wheel(p, *at(s, 0.48, 0.72), 0.48 * m, (70, 66, 66))
     left, front, right, back = p.hall(*at(0, 0.9), 6 * m, 2.4 * m, 1 * m, SUGAR_WAGON, None)
-    p.polygon([left, front, right, back], shade(SUGAR_BEET, 0.7))
+    p.polygon([left, front, right, back], shade(load[0], 0.7))
     for d in (0.34, 0.67):
         _bar(
             p,
@@ -6649,9 +6652,8 @@ def _sugar_wagon(p: Painter, x: float, y: float) -> None:
             lift = 0.4 * (1 - abs(w + 0.05) / 0.8) * (1 - abs(s) / 3.4)
             cx, cy = at(s + w * 0.25, 1.95 + lift, w)
             tone = 1.12 if (round(s * 3) + round(w * 5)) % 2 else 0.9
-            p.blob(
-                cx - 0.28 * m, cy - 0.2 * m, cx + 0.28 * m, cy + 0.18 * m, shade(SUGAR_BEET, tone)
-            )
+            colour = load[(round(s * 3) + round(w * 4)) % len(load)]
+            p.blob(cx - 0.28 * m, cy - 0.2 * m, cx + 0.28 * m, cy + 0.18 * m, shade(colour, tone))
     for s in (-1.8, 1.8):
         _food_wheel(p, *at(s, 0.48, -0.85), 0.48 * m, (70, 66, 66))
 
