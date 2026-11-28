@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from railroads.ui.pixel.art.commerce import _glass_rack, _planks
+from railroads.ui.pixel.art.commerce import _planks
 from railroads.ui.pixel.art.painter import (
     BRICK,
     CAR_COLOURS,
@@ -3781,17 +3781,56 @@ GLASS_HOT: RGB = (255, 218, 128)
 GLASS_AQUA: RGB = (150, 214, 212)
 GLASS_GREEN: RGB = (62, 148, 92)
 GLASS_AMBER: RGB = (206, 130, 42)
-GLASS_SAND: RGB = (228, 210, 160)
-GLASS_SODA: RGB = (242, 242, 238)
 GLASS_YARD: RGB = (150, 140, 126)
 GLASS_SLATE: RGB = (78, 82, 94)
+GLASS_COBALT: RGB = (46, 86, 178)
+GLASS_SEA: RGB = (72, 168, 148)
+GLASS_RUBY: RGB = (180, 42, 66)
+GLASS_WICKER: RGB = (180, 140, 84)
+GLASS_GLINT: RGB = (244, 252, 252)
+
+
+def _glass_gathers(p: Painter, x: float, y: float) -> None:
+    """Two blowpipes drawn out of a furnace mouth whose sill is at (x, y), each with a gather
+    of molten glass glowing white-hot on its end."""
+    m = METRE
+    for k, (dx, dy) in enumerate(((-2.8, 0.6), (-2.3, -0.5))):
+        end = (x + dx * m, y + dy * m)
+        _bar(p, (x - 0.2 * m, y - (1.4 - 0.5 * k) * m), end, 0.1 * m, (50, 46, 46))
+        p.blob(
+            end[0] - 0.32 * m, end[1] - 0.26 * m, end[0] + 0.32 * m, end[1] + 0.26 * m, GLASS_GLOW
+        )
+        p.blob(end[0] - 0.18 * m, end[1] - 0.16 * m, end[0] + 0.12 * m, end[1] + 0.1 * m, GLASS_HOT)
+
+
+def _glass_roof(p: Painter, top: Top, rise: float, ribs: int) -> None:
+    """A pitched roof glazed in aqua panes on a block's top, `rise` high, its glazing bars
+    running down it `ribs` times along, a purlin across them and long glints of light."""
+    m = METRE
+    p.gable(top, rise, shade(GLASS_AQUA, 0.9), GLASS_BRICK)
+    for k in range(1, ribs):
+        t = k / ribs
+        _bar(
+            p, _on_roof(top, rise, t, 0), _on_roof(top, rise, t, 1), 0.08 * m, shade(GLASS_SEA, 0.7)
+        )
+    _bar(
+        p, _on_roof(top, rise, 0, 0.5), _on_roof(top, rise, 1, 0.5), 0.08 * m, shade(GLASS_SEA, 0.7)
+    )
+    for t0, t1, up in ((0.05, 0.4, 0.7), (0.5, 0.75, 0.3), (0.12, 0.3, 0.25)):
+        _bar(
+            p,
+            _on_roof(top, rise, t0, up),
+            _on_roof(top, rise, t1, up + 0.15),
+            0.12 * m,
+            GLASS_GLINT,
+        )
 
 
 def _glass_cone(p: Painter, x: float, y: float, r: float, tall: float) -> None:
     """An English glass cone of brick `r` across its foot and `tall` high standing on (x, y):
     its walls curving in as they rise, bound with iron hoops, sooted black towards its open top
-    and smoking, the furnace mouth glowing in a deep arch at its foot and its light spilling
-    over the ground before it."""
+    and smoking, the furnace mouth glowing in a deep arch at its foot with gathers of molten glass
+    drawn out of it on blowpipes, and its light spilling over the ground before it."""
     m = METRE
     shape = ((0, 1.0), (0.1, 0.97), (0.3, 0.82), (0.55, 0.6), (0.8, 0.42), (1.0, 0.32))
 
@@ -3847,6 +3886,7 @@ def _glass_cone(p: Painter, x: float, y: float, r: float, tall: float) -> None:
     ]
     p.polygon(inner, GLASS_GLOW)
     p.blob(mx - 0.7 * m, my - 2.4 * m, mx + 0.5 * m, my - 0.3 * m, GLASS_HOT)
+    _glass_gathers(p, mx, my)
     for dx, dy in ((-2, 0.9), (-0.6, 1.4), (-2.8, 1.8)):
         p.blob(
             mx + (dx - 0.12) * m,
@@ -3857,17 +3897,11 @@ def _glass_cone(p: Painter, x: float, y: float, r: float, tall: float) -> None:
         )
 
 
-def _glass_house(
-    p: Painter,
-    x: float,
-    y: float,
-    size: tuple[float, float, float],
-    glazed: bool = False,
-) -> Top:
+def _glass_house(p: Painter, x: float, y: float, size: tuple[float, float, float]) -> Top:
     """A brick glasshouse where the glass is blown, `size` (length, depth and height to its eaves)
-    on (x, y): tall arched windows glowing orange from the furnaces inside, cream dressings, and
-    a slate roof, or one glazed in aqua panes if `glazed`, with a louvred vent along its ridge
-    letting out the heat in a glow."""
+    on (x, y): tall arched windows glowing orange from the furnaces inside under cream
+    dressings, a roof glazed in aqua panes catching the light, and a glass lantern along its
+    ridge, its panes lit warm by the furnaces under a little glazed roof."""
     m = METRE
     length, depth, high = size
     top = p.hall(x, y, length, depth, high, GLASS_BRICK, None)
@@ -3887,47 +3921,39 @@ def _glass_house(
                 (1 * m, high - 1.3 * m),
                 shade(GLASS_GLOW, 0.9 * tone),
             )
-    roof = shade(GLASS_AQUA, 0.86) if glazed else GLASS_SLATE
-    p.gable(top, 2.2 * m, roof, GLASS_BRICK)
-    if glazed:
-        for k in range(1, 12):
-            t = k / 12
-            _bar(
-                p,
-                _on_roof(top, 2.2 * m, t, 0),
-                _on_roof(top, 2.2 * m, t, 1),
-                0.08 * m,
-                shade(GLASS_AQUA, 0.6),
-            )
-        _bar(
-            p,
-            _on_roof(top, 2.2 * m, 0.05, 0.6),
-            _on_roof(top, 2.2 * m, 0.45, 0.6),
-            0.12 * m,
-            (240, 252, 250),
-        )
-    else:
-        _roof_rows(p, top, 2.2 * m, GLASS_SLATE, (0.5,))
+    _glass_roof(p, top, 2.2 * m, max(6, round(length / m)))
     ridge_back, ridge_front = _ridge(top, 2.2 * m)
     vx, vy = _on_wall(ridge_back, ridge_front, 0.5, 0)
-    vent = p.hall(vx, vy + 0.4 * m, length * 0.6, 1.4 * m, 1 * m, shade(GLASS_GLOW, 0.8), None)
-    for k in range(1, 4):
-        drop = 1 * m * k / 4
+    lantern = p.hall(vx, vy + 0.5 * m, length * 0.6, 1.8 * m, 1.3 * m, GLASS_AQUA, None)
+    l_left, l_front, l_right, _ = lantern
+    panes = max(4, round(length * 0.6 / m))
+    for k in range(panes):
+        t0, t1 = k / panes, (k + 1) / panes
+        if k % 3 == 1:
+            _patch(p, l_left, l_front, (t0, t1), (0, 1.3 * m), shade(GLASS_HOT, 0.95))
         _bar(
             p,
-            _on_wall(vent[0], vent[1], 0, drop),
-            _on_wall(vent[0], vent[1], 1, drop),
-            0.12 * m,
-            GLASS_SOOT,
+            _on_wall(l_left, l_front, t0, 0),
+            _on_wall(l_left, l_front, t0, 1.3 * m),
+            0.07 * m,
+            shade(GLASS_SEA, 0.6),
         )
-    p.gable(vent, 0.6 * m, GLASS_SLATE, shade(GLASS_GLOW, 0.8))
+    _patch(p, l_front, l_right, (0, 1), (0, 1.3 * m), shade(GLASS_AQUA, 0.78))
+    _bar(
+        p,
+        _on_wall(l_left, l_front, 0.1, 0.3 * m),
+        _on_wall(l_left, l_front, 0.3, 0.3 * m),
+        0.1 * m,
+        GLASS_GLINT,
+    )
+    _glass_roof(p, lantern, 0.7 * m, panes)
     return top
 
 
 def _glass_lehr(p: Painter, x: float, y: float, length: float, depth: float) -> None:
     """A long low lehr shed `length` by `depth` on (x, y) where new glass cools slowly: brick
-    walls with small windows glowing amber, a slate roof and a row of short flues along its
-    ridge."""
+    walls with small windows glowing amber, a slate roof with a long aqua skylight glinting in
+    it and a row of short flues along its ridge."""
     m = METRE
     high = 3.2 * m
     top = p.hall(x, y, length, depth, high, shade(GLASS_BRICK, 1.08), None)
@@ -3946,7 +3972,29 @@ def _glass_lehr(p: Painter, x: float, y: float, length: float, depth: float) -> 
         )
     _patch(p, front, right, (0.3, 0.7), (1 * m, high), DOORWAY)
     p.gable(top, 1.4 * m, GLASS_SLATE, shade(GLASS_BRICK, 1.08))
-    _roof_rows(p, top, 1.4 * m, GLASS_SLATE, (0.5,))
+    sky = [
+        _on_roof(top, 1.4 * m, 0.06, 0.25),
+        _on_roof(top, 1.4 * m, 0.94, 0.25),
+        _on_roof(top, 1.4 * m, 0.94, 0.8),
+        _on_roof(top, 1.4 * m, 0.06, 0.8),
+    ]
+    p.polygon(sky, GLASS_AQUA, shade(GLASS_SEA, 0.6))
+    for k in range(1, bays * 2):
+        t = 0.06 + 0.88 * k / (bays * 2)
+        _bar(
+            p,
+            _on_roof(top, 1.4 * m, t, 0.25),
+            _on_roof(top, 1.4 * m, t, 0.8),
+            0.06 * m,
+            shade(GLASS_SEA, 0.7),
+        )
+    _bar(
+        p,
+        _on_roof(top, 1.4 * m, 0.1, 0.55),
+        _on_roof(top, 1.4 * m, 0.35, 0.65),
+        0.1 * m,
+        GLASS_GLINT,
+    )
     ridge_back, ridge_front = _ridge(top, 1.4 * m)
     for k in range(max(2, bays // 2)):
         fx, fy = _on_wall(ridge_back, ridge_front, (k + 0.5) / max(2, bays // 2), 0)
@@ -3954,8 +4002,10 @@ def _glass_lehr(p: Painter, x: float, y: float, length: float, depth: float) -> 
 
 
 def _glass_packing(p: Painter, x: float, y: float, length: float, depth: float) -> None:
-    """A boarded packing house `length` by `depth` on (x, y), its wide door open on straw and
-    crates, under a felted roof."""
+    """A boarded packing house and office `length` by `depth` on (x, y): a show window of
+    coloured glass on two shelves, vases and bottles in cobalt, ruby, amber, green and aqua
+    glowing in the light, a blue glass globe lamp hung out from its corner, its wide door open on
+    straw and crates, under a felted roof."""
     m = METRE
     wall, high = (150, 118, 84), 4 * m
     top = p.hall(x, y, length, depth, high, wall, None)
@@ -3964,12 +4014,44 @@ def _glass_packing(p: Painter, x: float, y: float, length: float, depth: float) 
     for a, b, tone in ((left, front, 0.8), (front, right, 0.62)):
         for t in np.linspace(0.04, 0.96, 12):
             _bar(p, _on_wall(a, b, t, 0), _on_wall(a, b, t, high), 0.04 * m, shade(wall, tone))
-    _patch(p, left, front, (0.3, 0.7), (1.2 * m, high), (52, 44, 40))
-    _patch(p, left, front, (0.32, 0.68), (high - 0.7 * m, high), (226, 196, 120))
-    _patch(p, left, front, (0.36, 0.5), (high - 1.5 * m, high - 0.5 * m), GOODS_CRATE)
+    _patch(p, left, front, (0.05, 0.47), (0.7 * m, 3 * m), (240, 236, 226))
+    _patch(p, left, front, (0.07, 0.45), (0.9 * m, 2.85 * m), (232, 226, 206))
+    colours = (GLASS_COBALT, GLASS_RUBY, GLASS_AMBER, GLASS_GREEN, GLASS_AQUA, GLASS_SEA)
+    for row, shelf in enumerate((1.75 * m, 2.75 * m)):
+        _bar(
+            p,
+            _on_wall(left, front, 0.07, shelf),
+            _on_wall(left, front, 0.45, shelf),
+            0.08 * m,
+            (120, 92, 66),
+        )
+        for k in range(5):
+            t = 0.1 + 0.33 * (k + 0.5) / 5
+            vx, vy = _on_wall(left, front, t, shelf)
+            colour = colours[(k + 2 * row) % len(colours)]
+            tall = (0.55 + 0.2 * ((k + row) % 2)) * m
+            p.blob(vx - 0.16 * m, vy - tall, vx + 0.16 * m, vy, colour)
+            _bar(p, (vx, vy - tall), (vx, vy - tall - 0.15 * m), 0.1 * m, colour)
+            _bar(
+                p,
+                (vx - 0.06 * m, vy - tall * 0.8),
+                (vx - 0.06 * m, vy - tall * 0.5),
+                0.04 * m,
+                GLASS_GLINT,
+            )
+    _patch(p, left, front, (0.55, 0.92), (1.2 * m, high), (52, 44, 40))
+    _patch(p, left, front, (0.57, 0.9), (high - 0.7 * m, high), (226, 196, 120))
+    _patch(p, left, front, (0.6, 0.74), (high - 1.5 * m, high - 0.5 * m), GOODS_CRATE)
     _patch(p, front, right, (0.35, 0.65), (1 * m, 2 * m), shade(WINDOW, 0.8))
     p.gable(top, 1.6 * m, (70, 66, 64), wall)
     _roof_rows(p, top, 1.6 * m, (70, 66, 64), (0.5,))
+    bx, by = _on_wall(left, front, 0.01, 0.4 * m)
+    end = (bx - 1.2 * m, by + 0.6 * m)
+    _bar(p, (bx, by), end, 0.1 * m, (44, 40, 40))
+    _bar(p, end, (end[0], end[1] + 0.5 * m), 0.05 * m, (44, 40, 40))
+    gx, gy = end[0], end[1] + 1 * m
+    p.blob(gx - 0.45 * m, gy - 0.45 * m, gx + 0.45 * m, gy + 0.45 * m, GLASS_COBALT)
+    p.blob(gx - 0.3 * m, gy - 0.32 * m, gx - 0.02 * m, gy - 0.06 * m, shade(GLASS_COBALT, 1.6))
 
 
 def _glass_crates(p: Painter, x: float, y: float, bottles: tuple[RGB, ...]) -> None:
@@ -3996,17 +4078,147 @@ def _glass_crates(p: Painter, x: float, y: float, bottles: tuple[RGB, ...]) -> N
                 p.blob(bx - 0.13 * m, by - 0.3 * m, bx + 0.13 * m, by + 0.05 * m, colour)
         gx, gy = _on_wall(_on_wall(left, back, 0.3, 0), _on_wall(front, right, 0.3, 0), 0.2, 0)
         _bar(
-            p,
-            (gx - 0.05 * m, gy - 0.25 * m),
-            (gx - 0.05 * m, gy - 0.1 * m),
-            0.06 * m,
-            (240, 252, 246),
+            p, (gx - 0.05 * m, gy - 0.25 * m), (gx - 0.05 * m, gy - 0.1 * m), 0.06 * m, GLASS_GLINT
         )
 
 
+def _glass_baskets(p: Painter, x: float, y: float, bottles: tuple[RGB, ...]) -> None:
+    """Round wicker baskets heaped with new bottles along the lit walls from (x, y), one basket
+    for each of `bottles`, the bottles of its colour glinting."""
+    m = METRE
+    for k, colour in enumerate(bottles):
+        bx, by = _iso(x, y, k * 1.2 * m, 0)
+        r, tall = 0.5 * m, 0.5 * m
+        p.polygon(
+            [(bx - r, by - tall), (bx + r, by - tall), (bx + 0.8 * r, by), (bx - 0.8 * r, by)],
+            GLASS_WICKER,
+        )
+        p.polygon(
+            [
+                (bx + 0.3 * r, by - tall),
+                (bx + r, by - tall),
+                (bx + 0.8 * r, by),
+                (bx + 0.25 * r, by),
+            ],
+            shade(GLASS_WICKER, 0.78),
+        )
+        for f in (0.3, 0.65):
+            _bar(
+                p,
+                (bx - r * (0.8 + 0.2 * f), by - tall * f),
+                (bx + r * (0.8 + 0.2 * f), by - tall * f),
+                0.05 * m,
+                shade(GLASS_WICKER, 0.66),
+            )
+        p.blob(bx - r, by - tall - r * 0.45, bx + r, by - tall + r * 0.45, shade(colour, 0.7))
+        for dx, dy in ((-0.45, -0.1), (0.05, -0.25), (0.4, 0.0), (-0.1, 0.15)):
+            cx, cy = bx + dx * r, by - tall + dy * r - 0.1 * m
+            _bar(p, (cx - 0.22 * m, cy + 0.05 * m), (cx + 0.22 * m, cy - 0.05 * m), 0.2 * m, colour)
+        _bar(
+            p,
+            (bx - 0.25 * r, by - tall - 0.2 * m),
+            (bx + 0.05 * r, by - tall - 0.25 * m),
+            0.05 * m,
+            GLASS_GLINT,
+        )
+
+
+def _glass_carboys(p: Painter, x: float, y: float, colours: tuple[RGB, ...]) -> None:
+    """A row of carboys along the lit walls from (x, y), one for each of `colours`: a round
+    bottle 1.3 m tall in that glass sitting in a low woven wicker jacket, its shoulder and neck
+    showing above and glinting."""
+    m = METRE
+    for k, colour in enumerate(colours):
+        cx, cy = _iso(x, y, k * 1.1 * m, 0)
+        p.blob(cx - 0.48 * m, cy - 1.15 * m, cx + 0.48 * m, cy - 0.1 * m, colour)
+        p.blob(cx - 0.34 * m, cy - 1.05 * m, cx - 0.02 * m, cy - 0.7 * m, shade(colour, 1.4))
+        _bar(p, (cx, cy - 1.05 * m), (cx, cy - 1.38 * m), 0.2 * m, shade(colour, 0.9))
+        p.blob(cx - 0.13 * m, cy - 1.46 * m, cx + 0.13 * m, cy - 1.33 * m, shade(colour, 0.75))
+        p.polygon(
+            [
+                (cx - 0.5 * m, cy - 0.45 * m),
+                (cx + 0.5 * m, cy - 0.45 * m),
+                (cx + 0.42 * m, cy),
+                (cx - 0.42 * m, cy),
+            ],
+            GLASS_WICKER,
+        )
+        p.polygon(
+            [
+                (cx + 0.16 * m, cy - 0.45 * m),
+                (cx + 0.5 * m, cy - 0.45 * m),
+                (cx + 0.42 * m, cy),
+                (cx + 0.14 * m, cy),
+            ],
+            shade(GLASS_WICKER, 0.78),
+        )
+        _bar(
+            p,
+            (cx - 0.47 * m, cy - 0.22 * m),
+            (cx + 0.47 * m, cy - 0.22 * m),
+            0.05 * m,
+            shade(GLASS_WICKER, 0.66),
+        )
+        _bar(p, (cx - 0.24 * m, cy - 1.0 * m), (cx - 0.14 * m, cy - 0.8 * m), 0.07 * m, GLASS_GLINT)
+
+
+def _glass_panes(p: Painter, x: float, y: float, long: float, tall: float) -> None:
+    """A big A-frame rack `long` metres along the lit walls and `tall` high standing on (x, y),
+    stacked on both sides with sheets of new window glass: cool aqua faces, sea-green edges
+    showing where they lie one on another, and long glints of light."""
+    m = METRE
+    half = long * m / 2
+    a, b = (x - half, y - half / 2), (x + half, y + half / 2)
+    top = tall * m
+    _bar(p, (a[0] + 0.5 * m, a[1] - 0.25 * m), (a[0], a[1] - top), 0.16 * m, shade(TIMBER, 0.85))
+    for lean, tone in ((0.5, 0.78), (-0.5, 1.0)):
+        for k in range(3):
+            off = (lean - 0.12 * k * (1 if lean > 0 else -1)) * m
+            sheet = [
+                (a[0] + off, a[1]),
+                (b[0] + off, b[1]),
+                (b[0], b[1] - top * (0.96 - 0.03 * k)),
+                (a[0], a[1] - top * (0.96 - 0.03 * k)),
+            ]
+            p.polygon(sheet, shade(GLASS_AQUA, tone - 0.05 * k), shade(GLASS_SEA, 0.7))
+            _bar(p, sheet[3], sheet[2], 0.12 * m, shade(GLASS_SEA, tone))
+    for t in (0.15, 0.45, 0.7):
+        sx, sy = a[0] + 2 * half * t - 0.3 * m, a[1] + half * t
+        _bar(p, (sx, sy - top * 0.2), (sx + 0.6 * m, sy - top * 0.75), 0.1 * m, GLASS_GLINT)
+    _bar(p, (b[0] - 0.5 * m, b[1] - 0.25 * m), (b[0], b[1] - top), 0.16 * m, TIMBER)
+    _bar(p, (b[0] + 0.5 * m, b[1] - 0.25 * m), (b[0], b[1] - top), 0.16 * m, shade(TIMBER, 0.8))
+    _bar(p, (a[0], a[1] - top), (b[0], b[1] - top), 0.12 * m, shade(TIMBER, 0.9))
+
+
+def _glass_cullet(
+    p: Painter, x: float, y: float, r: float, tall: float, colours: tuple[RGB, ...]
+) -> None:
+    """A heap of cullet, broken glass waiting to be melted again, `r` across its foot and `tall`
+    high on (x, y): shards in each of `colours` heaped over a darker mass of the first,
+    glinting."""
+    m = METRE
+    _glass_heap(p, x, y, r, tall, shade(colours[0], 0.88))
+    rng = np.random.default_rng(len(colours) * 7 + round(r * 10))
+    for k in range(int(r / m * 14)):
+        f = math.sqrt(rng.uniform(0, 1))
+        side = rng.uniform(-1, 1)
+        sx = x + side * r * f
+        sy = y - tall * (1 - f) + r * 0.3 * f * rng.uniform(-0.6, 0.6)
+        s = rng.uniform(0.15, 0.3) * m
+        colour = colours[k % len(colours)]
+        p.polygon(
+            [(sx - s, sy), (sx, sy - s * 1.2), (sx + s, sy + s * 0.2)],
+            shade(colour, 1.0 if side < 0.3 else 0.8),
+        )
+    for _ in range(5):
+        f = rng.uniform(0.2, 0.9)
+        gx, gy = x + rng.uniform(-0.6, 0.3) * r * f, y - tall * (1 - f)
+        _bar(p, (gx - 0.12 * m, gy), (gx + 0.12 * m, gy), 0.06 * m, GLASS_GLINT)
+        _bar(p, (gx, gy - 0.12 * m), (gx, gy + 0.12 * m), 0.06 * m, GLASS_GLINT)
+
+
 def _glass_heap(p: Painter, x: float, y: float, r: float, tall: float, colour: RGB) -> None:
-    """A cone of loose sand or soda `r` across its foot and `tall` high on (x, y), lit on its
-    left."""
+    """A cone of loose stuff `r` across its foot and `tall` high on (x, y), lit on its left."""
     split = math.radians(65)
     apex = (x + r * 0.05, y - tall)
     lit = [(x + r * math.cos(a), y + r / 2 * math.sin(a)) for a in np.linspace(math.pi, split, 9)]
@@ -4032,30 +4244,36 @@ def _glass_yard(p: Painter, spots: list[tuple[Point, float]]) -> None:
 
 def glassworks() -> Sprite:
     """A glassworks round an English glass cone of brick 24 m high and 14 m across, hooped with
-    iron and sooted at its smoking top, its furnace mouth glowing in a deep arch and lighting the
-    ground; joined to it a brick glasshouse whose tall arched windows and ridge vent glow with
-    the furnaces, then a long low lehr shed with amber windows and flues; a boarded packing
-    house; and a yard of crates of bottles in green and amber glass, racks of window panes
-    glinting aqua, and heaps of sand and soda."""
+    iron and sooted at its smoking top, its furnace mouth glowing in a deep arch with gathers of
+    molten glass drawn out on blowpipes; joined to it a brick glasshouse whose arched windows
+    glow with the furnaces under a roof glazed in aqua and a glass lantern; a long lehr shed with
+    amber windows and an aqua skylight; a packing house with a show window of coloured glass and
+    a blue glass globe lamp; and a yard of big racks of window panes glinting aqua and sea green,
+    crates and baskets of bottles in green, amber and cobalt, carboys in wicker, and heaps of
+    coloured cullet."""
     m = METRE
     p = Painter(44, 45, (21, 32))
 
     def at(u: float, v: float) -> Point:
         return _iso(0, 0, (u - 16) * m, (v - 6) * m)
 
-    _glass_yard(p, [(at(14, 5), 13), (at(5, -1), 7), (at(26, 2), 8), (at(31, 7), 6)])
+    _glass_yard(
+        p, [(at(14, 5), 13), (at(5, -1), 7), (at(26, 2), 8), (at(31, 7), 6), (at(20, -4), 7)]
+    )
     for u, v, length, depth in ((19, 8.5, 10, 9), (30, 8, 12, 5), (31, -1, 7, 5)):
         _bed(p, _footing(*at(u, v), length * m, depth * m), margin=0.8)
     _glass_cone(p, *at(8, 8), 7 * m, 24 * m)
     _glass_house(p, *at(19, 8.5), (10 * m, 9 * m, 6.5 * m))
     _glass_lehr(p, *at(30, 8), 12 * m, 5 * m)
     _glass_packing(p, *at(31, -1), 7 * m, 5 * m)
-    _glass_heap(p, *at(-1, 2), 2.8 * m, 2.4 * m, GLASS_SAND)
-    _glass_heap(p, *at(1.5, -1.5), 1.8 * m, 1.6 * m, GLASS_SODA)
-    _glass_rack(p, *at(11, -3.5))
-    _glass_rack(p, *at(15.5, -4))
-    _glass_crates(p, *at(21, -2), (GLASS_GREEN, GLASS_AMBER, GLASS_GREEN))
-    _glass_crates(p, *at(21.6, -3.6), (GLASS_AMBER, GLASS_GREEN))
+    _glass_cullet(p, *at(-1, 2), 2.8 * m, 2.2 * m, (GLASS_AQUA, GLASS_SEA, GLASS_GREEN))
+    _glass_cullet(p, *at(1.5, -2), 2 * m, 1.6 * m, (GLASS_COBALT, GLASS_AMBER, GLASS_AQUA))
+    _glass_panes(p, *at(9.5, -3.4), 4.5, 2.6)
+    _glass_panes(p, *at(15, -4.2), 4.5, 2.6)
+    _glass_crates(p, *at(21, -1.8), (GLASS_GREEN, GLASS_AMBER, GLASS_COBALT))
+    _glass_crates(p, *at(21.6, -3.4), (GLASS_COBALT, GLASS_GREEN, GLASS_AMBER))
+    _glass_carboys(p, *at(18.5, -5.2), (GLASS_GREEN, GLASS_AMBER, GLASS_GREEN, GLASS_COBALT))
+    _glass_baskets(p, *at(24, -5.4), (GLASS_AMBER, GLASS_GREEN, GLASS_COBALT))
     return p.sprite()
 
 

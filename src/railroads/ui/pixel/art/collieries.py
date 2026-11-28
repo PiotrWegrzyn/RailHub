@@ -294,12 +294,21 @@ def _cone(
 
 
 def _sheave(
-    p: Painter, u: float, v: float, z: float, radius: float, colour: RGB, spokes: int = 8
+    p: Painter,
+    u: float,
+    v: float,
+    z: float,
+    radius: float,
+    colour: RGB,
+    spokes: int = 8,
+    along_v: bool = False,
 ) -> None:
-    """A spoked winding wheel standing upright on its axle across `v` at (u, v, z), its rim
-    turning along `u`, so the rope runs off it along the ground."""
+    """A spoked winding wheel standing upright on its axle at (u, v, z), its rim turning along
+    `u`, or along `v` if `along_v`, so the rope runs off it that way."""
 
     def rim(t: float, r: float) -> tuple[float, float, float]:
+        if along_v:
+            return u, v + r * math.cos(t), z + r * math.sin(t)
         return u + r * math.cos(t), v, z + r * math.sin(t)
 
     turns = np.linspace(0, 2 * math.pi, 25)
@@ -705,21 +714,22 @@ def _kiln(p: Painter, u: float, v: float, high: float, stone: RGB, ore: RGB) -> 
 
 
 def iron_mine() -> Sprite:
-    """An iron mine painted red as its ore: a shaft tower boarded and painted rust red with white
-    trim, open at its top round the winding wheel under a pyramid roof, a red winding house joined
-    to it by a sloping rope gallery, a battery of three round stone roasting kilns glowing at
-    their draw-holes under a charging deck where a tub of ore waits, a boarded ore bin on stone
-    piers with a chute over the siding filling a wagon with red ore, rust-red heaps of ore, tubs of it on a tramway,
-    and a corrugated shed streaked with rust, all on ground stained red by the ore."""
+    """An iron mine in the rusty browns of its ore: a shaft tower of weathered brown-red boards
+    with cream trim, open at its top round the winding wheel under a pyramid roof, a winding
+    house of the same boards joined to it by a sloping rope gallery, a battery of three round
+    stone roasting kilns glowing at their draw-holes under a charging deck where a tub of ore
+    waits, a boarded ore bin on stone piers with a chute over the siding filling a wagon with
+    ore, heaps and tubs of the brown ore in the two tones it has on the game's wagons, and a
+    corrugated shed streaked with rust, all on ground stained by the ore."""
     m = METRE
     p = Painter(48, 56, (24, 38))
-    ore, glint = (150, 64, 44), (204, 118, 82)
-    red, trim = (154, 54, 40), (234, 228, 214)
+    ore, dark_ore, glint = (146, 88, 68), (96, 72, 62), (176, 160, 152)
+    red, trim = (118, 70, 58), (228, 218, 194)
     stone = (184, 160, 120)
     iron = (98, 102, 110)
-    rust = (150, 84, 50)
-    _yard(p, [(-6, 2, 18, 14), (6, -6, 16, 12), (-2, 14, 10, 8)], (156, 116, 86), 0.88)
-    _yard(p, [(4, -10, 7, 5), (13, -2, 4, 10), (-2, 13, 5, 6)], (136, 70, 50), 0.55)
+    rust = (138, 92, 70)
+    _yard(p, [(-6, 2, 18, 14), (6, -6, 16, 12), (-2, 14, 10, 8)], (150, 126, 102), 0.88)
+    _yard(p, [(4, -10, 7, 5), (13, -2, 4, 10), (-2, 13, 5, 6)], (118, 90, 76), 0.55)
     deck = (112, 86, 60)
     for dv in (6, 11, 17, 21):
         _beam(p, (-4.6, dv, 0), (-4.6, dv, 8.6), 0.35, shade(deck, 0.8))
@@ -730,7 +740,7 @@ def iron_mine() -> Sprite:
     _beam(p, (-3.4, 4.6, 10.1), (-3.4, 21.4, 10.1), 0.08, shade(deck, 1.3))
     _tub(p, -4.6, 16.5, ore, along_u=False, z=9.1, glint=glint)
     for kv in (20, 14, 8):
-        _kiln(p, -1.6, kv, 8.6, stone, ore)
+        _kiln(p, -1.6, kv, 8.6, stone, dark_ore)
     house = _block(p, -15, 2, 8, 7, 5.5, red, None)
     h_left, h_front, h_right, _ = house
     _boards(p, house, 5.5, red)
@@ -824,7 +834,7 @@ def iron_mine() -> Sprite:
     p.gable(shed, 1.4 * m, rust, iron)
     _roof_rows(p, shed, 1.4 * m, shade(rust, 1.1), (0.33, 0.66))
     _rails(p, (13, 8), (13, -16))
-    _wagon(p, 13, 3, ore, (86, 78, 74))
+    _wagon(p, 13, 3, dark_ore, (86, 78, 74))
     bin_stone = shade(stone, 0.92)
     for sv in (-6.4, -1.6):
         _block(p, 9.6, sv, 3.2, 1.2, 5.0, bin_stone, shade(bin_stone, 1.1))
@@ -834,13 +844,13 @@ def iron_mine() -> Sprite:
     chute = _p(11.8, -4, 5.2)
     _bar(p, chute, _p(13.4, -4, 2.8), 1.0 * m, (70, 66, 66))
     _bar(p, _p(13.4, -4, 2.8), _p(13.4, -4, 2.6), 0.6 * m, ore)
-    _wagon(p, 13, -6, ore, (122, 56, 42))
-    _cone(p, 5, -9, 4.6, 4.2, ore, shade(ore, 1.25))
-    _cone(p, 9, -13, 3.2, 2.8, shade(ore, 0.92))
-    _cone(p, 1, -12, 2.4, 2.0, shade(ore, 1.1))
+    _wagon(p, 13, -6, ore, (104, 80, 68))
+    _cone(p, 5, -9, 4.6, 4.2, ore, dark_ore)
+    _cone(p, 9, -13, 3.2, 2.8, dark_ore, ore)
+    _cone(p, 1, -12, 2.4, 2.0, ore)
     _rails(p, (-0.2, -2.6), (5.6, -2.6), gauge=0.6, ballast=None)
     for k, tu in enumerate((1.2, 3.0, 4.8)):
-        _tub(p, tu, -2.6, ore, glint=glint if k == 1 else None)
+        _tub(p, tu, -2.6, dark_ore if k == 1 else ore, glint=glint if k == 1 else None)
     return p.sprite()
 
 
@@ -1168,8 +1178,15 @@ def _trestle(
                 )
 
 
-def _flume(p: Painter, points: list[tuple[float, float, float]], timber: RGB, water: RGB) -> None:
-    """A boarded trough carried along the (u, v, z) `points`, full of running `water`."""
+def _flume(
+    p: Painter,
+    points: list[tuple[float, float, float]],
+    timber: RGB,
+    water: RGB,
+    fleck: RGB | None = None,
+) -> None:
+    """A boarded trough carried along the (u, v, z) `points`, full of running `water`, glinting
+    with flecks of `fleck` if given."""
     for a, b in itertools.pairwise(points):
         _face(
             p,
@@ -1205,15 +1222,23 @@ def _flume(p: Painter, points: list[tuple[float, float, float]], timber: RGB, wa
             0.1,
             shade(timber, 0.8),
         )
+        if fleck is not None:
+            for t in (0.15, 0.4, 0.62, 0.85):
+                x, y = _p(
+                    *(a[i] + (b[i] - a[i]) * t + (0, 0.1 * (t - 0.5), 0.78)[i] for i in range(3))
+                )
+                p.blob(x - 0.16 * METRE, y - 0.1 * METRE, x + 0.16 * METRE, y + 0.1 * METRE, fleck)
 
 
-def _stamps(p: Painter, top: Top, high: float, iron: RGB) -> None:
-    """The open lit side of a stamp mill's battery: a dark bay showing a row of iron stamps, each
-    a tall stem with a tappet on it and a shoe in the mortar box at its foot, lifted by cams on a
-    shaft running across them."""
+def _stamps(p: Painter, top: Top, high: float, iron: RGB, glow: RGB) -> None:
+    """The open lit side of a stamp mill's battery: a bay lit warm with `glow` from within,
+    showing a row of iron stamps, each a tall stem with a tappet on it and a shoe in the mortar
+    box at its foot, lifted by cams on a shaft running across them."""
     m = METRE
     left, front, _, _ = top
-    _patch(p, left, front, (0.1, 0.9), (0.8 * m, (high - 0.4) * m), (40, 34, 30))
+    _patch(p, left, front, (0.1, 0.9), (0.8 * m, (high - 0.4) * m), shade(glow, 0.42))
+    _patch(p, left, front, (0.12, 0.88), (2.6 * m, (high - 0.5) * m), shade(glow, 0.75))
+    _patch(p, left, front, (0.16, 0.84), (4.2 * m, (high - 2.0) * m), glow)
     _patch(p, left, front, (0.12, 0.88), ((high - 2.0) * m, (high - 0.6) * m), shade(iron, 0.7))
     _bar(
         p,
@@ -1243,24 +1268,261 @@ def _stamps(p: Painter, top: Top, high: float, iron: RGB) -> None:
     )
 
 
-def gold_mine() -> Sprite:
-    """A gold mine on a hillside: a timber headframe with one winding wheel on the crest beside
-    its hoist house, tubs of ore on a trestle down to a stamp mill stepping down the slope in
-    three boarded houses on timber cribbing, its battery open on its lit side to show a row of
-    stamps, a flume of water on trestles running along the hill to a wheel that drives them,
-    pale tailings spread in a fan below it, and an assay office with a false front and a gilt
-    sign at the foot of the hill."""
+# Each letter the signs spell, as strokes from (across, down) to (across, down), both 0 to 1.
+STROKES: dict[str, tuple[tuple[float, float, float, float], ...]] = {
+    "G": ((1, 0, 0, 0), (0, 0, 0, 1), (0, 1, 1, 1), (1, 1, 1, 0.5), (1, 0.5, 0.5, 0.5)),
+    "O": ((0, 0, 1, 0), (1, 0, 1, 1), (1, 1, 0, 1), (0, 1, 0, 0)),
+    "L": ((0, 0, 0, 1), (0, 1, 1, 1)),
+    "D": (
+        (0, 0, 0.6, 0),
+        (0.6, 0, 1, 0.3),
+        (1, 0.3, 1, 0.7),
+        (1, 0.7, 0.6, 1),
+        (0.6, 1, 0, 1),
+        (0, 1, 0, 0),
+    ),
+}
+
+
+def _letters(
+    p: Painter,
+    a: Point,
+    b: Point,
+    word: str,
+    span: tuple[float, float],
+    drop: tuple[float, float],
+    colour: RGB,
+) -> None:
+    """`word` in block capitals of `colour` on the wall under the edge from `a` to `b`, from
+    `span[0]` to `span[1]` along it and `drop[0]` to `drop[1]` down it."""
+    t0, t1 = span
+    d0, d1 = drop
+    pitch = (t1 - t0) / len(word)
+    for k, letter in enumerate(word):
+        left = t0 + k * pitch + pitch * 0.15
+        wide = pitch * 0.7
+        for x0, y0, x1, y1 in STROKES[letter]:
+            _bar(
+                p,
+                _on_wall(a, b, left + x0 * wide, d0 + y0 * (d1 - d0)),
+                _on_wall(a, b, left + x1 * wide, d0 + y1 * (d1 - d0)),
+                0.13 * METRE,
+                colour,
+            )
+
+
+def _nugget(p: Painter, x: float, y: float, size: float, gold: RGB) -> None:
+    """A gilt nugget `size` units across sitting on (x, y), lumpy, lit on the left and glinting."""
+    r = size / 2
+    for dx, dy, k, tone in (
+        (0.3, -0.35, 0.6, 0.72),
+        (-0.25, -0.4, 0.7, 0.9),
+        (0.05, -0.75, 0.55, 1.0),
+    ):
+        p.blob(
+            x + dx * r - k * r,
+            y + dy * r - k * r * 0.8,
+            x + dx * r + k * r,
+            y + dy * r + k * r * 0.8,
+            shade(gold, tone),
+        )
+    p.blob(x - 0.45 * r, y - 1.05 * r, x - 0.05 * r, y - 0.7 * r, shade(gold, 1.12))
+    _glint(p, x - 0.3 * r, y - 0.95 * r, 0.32 * r)
+
+
+def _guard(p: Painter, u: float, v: float) -> None:
+    """A guard 1.8 m tall standing at (u, v) in a dark coat and a hat, his rifle upright at his
+    side."""
     m = METRE
-    p = Painter(50, 58, (25, 38))
+    x, y = _p(u, v)
+    coat = (44, 52, 72)
+    _bar(p, (x - 0.12 * m, y), (x - 0.1 * m, y - 0.9 * m), 0.16 * m, (40, 38, 40))
+    _bar(p, (x + 0.12 * m, y), (x + 0.1 * m, y - 0.9 * m), 0.16 * m, (40, 38, 40))
+    p.blob(x - 0.28 * m, y - 1.6 * m, x + 0.28 * m, y - 0.75 * m, coat)
+    p.blob(x - 0.2 * m, y - 1.55 * m, x, y - 0.9 * m, shade(coat, 1.3))
+    p.blob(x - 0.13 * m, y - 1.9 * m, x + 0.13 * m, y - 1.6 * m, (222, 182, 150))
+    p.blob(x - 0.24 * m, y - 1.98 * m, x + 0.24 * m, y - 1.85 * m, (36, 34, 36))
+    p.blob(x - 0.13 * m, y - 2.12 * m, x + 0.13 * m, y - 1.9 * m, (36, 34, 36))
+    _bar(p, (x + 0.32 * m, y - 0.6 * m), (x + 0.27 * m, y - 2.3 * m), 0.07 * m, (70, 58, 46))
+
+
+def _sentry(p: Painter, u: float, v: float, roof: RGB) -> None:
+    """A boarded sentry box 1.4 m square at (u, v) under a gabled roof of `roof`, its guard
+    standing at its door."""
+    m = METRE
+    wall = (150, 126, 92)
+    box = _block(p, u, v, 1.4, 1.4, 2.5, wall, None)
+    left, front, _, _ = box
+    _boards(p, box, 2.5, wall, 0.45)
+    _patch(p, left, front, (0.25, 0.75), (0.5 * m, 2.5 * m), DOORWAY)
+    p.gable(box, 0.7 * m, roof, wall)
+    _guard(p, u + 0.4, v - 1.3)
+
+
+def _bullion_wagon(p: Painter, u: float, v: float, gold: RGB, glint: RGB) -> None:
+    """A stout four-wheeled wagon 4.4 m long along `u` at (u, v), its pole out to the front and its
+    low green sides bound in iron, heaped in a stepped pile of cast gold bars gleaming in the
+    sun."""
+    m = METRE
+    green, iron, spoke = (50, 74, 58), (58, 56, 56), (150, 112, 70)
+
+    def wheel(du: float, dv: float) -> None:
+        x, y = _p(u + du, v + dv, 0.7)
+        p.ellipse(x - 0.7 * m, y - 0.7 * m, x + 0.7 * m, y + 0.7 * m, iron)
+        p.ellipse(x - 0.55 * m, y - 0.55 * m, x + 0.55 * m, y + 0.55 * m, shade(spoke, 0.8))
+        for k in range(4):
+            t = k * math.pi / 4
+            _bar(
+                p,
+                (x - 0.52 * m * math.cos(t), y - 0.52 * m * math.sin(t)),
+                (x + 0.52 * m * math.cos(t), y + 0.52 * m * math.sin(t)),
+                0.09 * m,
+                spoke,
+            )
+        p.blob(x - 0.16 * m, y - 0.16 * m, x + 0.16 * m, y + 0.16 * m, iron)
+
+    for du in (-1.5, 1.5):
+        wheel(du, 1.2)
+    _block(p, u, v, 4.2, 1.6, 0.3, (70, 56, 44), None, 0.6)
+    _beam(p, (u + 2.1, v - 0.1, 0.8), (u + 4.2, v - 0.1, 0.4), 0.16, (110, 84, 58))
+    body = _block(p, u, v, 4.4, 2.3, 0.5, green, (40, 46, 40), 0.9)
+    left, front, right, _ = body
+    for a, b in ((left, front), (front, right)):
+        _bar(p, _on_wall(a, b, 0, 0.08 * m), _on_wall(a, b, 1, 0.08 * m), 0.08 * m, iron)
+        for t in (0.03, 0.5, 0.97):
+            _bar(p, _on_wall(a, b, t, 0), _on_wall(a, b, t, 0.5 * m), 0.1 * m, iron)
+    bar_top = (252, 220, 120)
+    for level, (along, across) in enumerate(((5, 4), (4, 3), (3, 2), (2, 1), (1, 1))):
+        z = 1.3 + level * 0.24
+        for j in reversed(range(across)):
+            dv = (j - (across - 1) / 2) * 0.48
+            for i in range(along):
+                du = (i - (along - 1) / 2) * 0.8
+                _block(p, u + du, v + dv, 0.76, 0.44, 0.24, shade(gold, 0.92), bar_top, z)
+    for du, dv, z in ((-0.8, -0.7, 1.7), (0.9, -0.3, 2.0), (0.0, 0.0, 2.6), (-1.6, 0.5, 1.6)):
+        x, y = _p(u + du, v + dv, z)
+        _glint(p, x, y, 0.5 * m, glint)
+    for du in (-1.5, 1.5):
+        wheel(du, -1.2)
+
+
+def _adit(p: Painter, u: float, v: float, rock: RGB, timber: RGB) -> None:
+    """A timbered adit mouth driven into a hillside along `v` at (u, v), opening to the lit side:
+    a dark way in 2.4 m wide and 3 m high under a heavy lintel on two posts, set in a headwall
+    of rough stone courses."""
+    m = METRE
+    high = 4.2
+    wall = _block(p, u, v + 0.6, 4.8, 1.2, high, rock, shade(rock, 1.08))
+    left, front, right, _ = wall
+    for drop in np.arange(0.8, high, 0.8):
+        _bar(
+            p,
+            _on_wall(left, front, 0, drop * m),
+            _on_wall(left, front, 1, drop * m),
+            0.06 * m,
+            shade(rock, 0.8),
+        )
+        _bar(
+            p,
+            _on_wall(front, right, 0, drop * m),
+            _on_wall(front, right, 1, drop * m),
+            0.06 * m,
+            shade(rock, 0.62),
+        )
+    _patch(p, left, front, (0.25, 0.75), (1.2 * m, high * m), (24, 20, 18))
+    _patch(p, left, front, (0.3, 0.7), (1.6 * m, high * m), (36, 30, 26))
+    for t in (0.25, 0.75):
+        _bar(
+            p,
+            _on_wall(left, front, t, 1.1 * m),
+            _on_wall(left, front, t, high * m),
+            0.38 * m,
+            timber,
+        )
+    _bar(
+        p,
+        _on_wall(left, front, 0.18, 1.1 * m),
+        _on_wall(left, front, 0.82, 1.1 * m),
+        0.5 * m,
+        shade(timber, 1.15),
+    )
+
+
+def _gallows(
+    p: Painter,
+    u: float,
+    v: float,
+    z: float,
+    high: float,
+    timber: RGB,
+    wheel: RGB,
+    ground: Callable[[float, float], float],
+) -> tuple[float, float, float]:
+    """A timber headframe over a shaft at (u, v) on ground `z` up: four posts braced in crosses
+    rising `high` metres to a cap sill carrying a winding wheel turning along `v`, propped by two
+    backstays leaning back along +v to the `ground`; returns where the rope leaves the wheel's
+    front."""
+    dark, lit = shade(timber, 0.72), shade(timber, 1.18)
+    girts = [z, z + high * 0.3, z + high * 0.58, z + high * 0.82, z + high]
+
+    def leg(su: float, sv: float, h: float) -> tuple[float, float, float]:
+        f = (h - z) / high
+        return u + su * (2.1 - 1.0 * f), v + sv * (1.9 - 0.8 * f), h
+
+    def face(a: tuple[float, float], b: tuple[float, float], colour: RGB) -> None:
+        for z0, z1 in itertools.pairwise(girts):
+            _beam(p, leg(*a, z0), leg(*b, z1), 0.2, colour)
+            _beam(p, leg(*b, z0), leg(*a, z1), 0.2, colour)
+            _beam(p, leg(*a, z1), leg(*b, z1), 0.3, colour)
+
+    top = z + high
+    for su in (-1, 1):
+        head = (u + su * 1.0, v + 1.0, top - 0.4)
+        foot = (u + su * 1.8, v + 7.5, ground(u + su * 1.8, v + 7.5))
+        _beam(p, foot, head, 0.5, dark)
+        mid = tuple((a + b) / 2 for a, b in zip(foot, head, strict=True))
+        _beam(p, mid, leg(su, 1, mid[2]), 0.22, dark)
+    face((-1, 1), (1, 1), dark)
+    face((-1, -1), (-1, 1), dark)
+    for su, sv in ((-1, 1), (1, 1)):
+        _beam(p, leg(su, sv, z), leg(su, sv, top), 0.5, dark)
+    _block(p, u, v, 2.8, 2.6, 0.6, timber, lit, top - 0.2)
+    hub = top + 2.6
+    for su in (-0.5, 0.5):
+        _beam(p, (u + su, v - 1.2, top + 0.4), (u + su, v, hub), 0.3, timber)
+        _beam(p, (u + su, v + 1.2, top + 0.4), (u + su, v, hub), 0.3, dark)
+    _sheave(p, u, v, hub, 2.4, wheel, 8, along_v=True)
+    face((1, -1), (1, 1), timber)
+    face((-1, -1), (1, -1), lit)
+    for su in (-1, 1):
+        _beam(p, leg(su, -1, z), leg(su, -1, top), 0.55, lit if su < 0 else timber)
+    _beam(p, leg(1, 1, z), leg(1, 1, top), 0.5, shade(timber, 0.85))
+    return u, v - 2.4, hub
+
+
+def gold_mine() -> Sprite:
+    """A gold mine on a hillside, gold wherever it can be: a tall timber headframe on the crest
+    with its winding wheel and backstays and a hoist house smoking behind it, a timbered adit in
+    the hill's face with tubs of white quartz glinting with gold coming out on rails, a stamp
+    mill stepping down the slope in three boarded houses under honey-gold shingles, its battery
+    open on its lit side and glowing warm round a row of stamps, a flume on trestles to the wheel
+    that drives them, a sluice below it and pale tailings, both glinting gold, and an assay
+    office with a gilt GOLD sign and a gilt nugget on its false front, a wagon heaped with gold
+    bars before it under guard and a sentry box."""
+    m = METRE
+    p = Painter(52, 62, (26, 42))
     timber, weathered = (150, 116, 80), (132, 120, 104)
-    shingle = (106, 92, 80)
-    rust = (150, 96, 64)
+    shingle = (214, 164, 58)
     tailings = (214, 204, 176)
     water = (104, 156, 196)
     grass, scrub = (112, 136, 70), (82, 106, 54)
+    rock = (150, 136, 116)
+    quartz = (222, 218, 206)
     gold = (236, 190, 64)
-    honey = (198, 158, 74)
+    honey = (232, 182, 58)
+    glint = (255, 226, 120)
     levels = ((-8.0, 4.0, 7.0, 8.0, 9.5), (-1.5, 4.0, 7.0, 8.0, 5.5), (5.0, 4.0, 7.0, 8.0, 1.6))
+    adit_u, adit_v = -7.5, -1.6
 
     def hill(u: float, v: float) -> float:
         across = max(0.0, 1 - ((v - 5) / 11) ** 2)
@@ -1270,6 +1532,8 @@ def gold_mine() -> Sprite:
         for lu, lv, length, depth, level in levels:
             if abs(u - lu) <= length / 2 + 0.3 and abs(v - lv) <= depth / 2 + 0.3:
                 return level
+        if abs(u - adit_u) <= 2.6 and v <= adit_v + 1.2:
+            return 0.0
         return hill(u, v)
 
     def paint(u: float, v: float, z: float, slope: float) -> RGB | None:
@@ -1279,68 +1543,53 @@ def gold_mine() -> Sprite:
             if abs(u - lu) <= length / 2 + 1 and abs(v - lv) <= depth / 2 + 1:
                 return shade(timber, 0.8) if slope > 1.0 else (150, 134, 104)
         grain = 1 + 0.025 * _speckle(u, v) + 0.04 * _swell(u, v, 3)
+        if abs(u - adit_u) <= 3.4 and v <= adit_v + 2 and slope > 0.9:
+            return shade(rock, grain)
         if _swell(u * 1.3, v * 1.1, 3) > 0.6 and z > 2:
             return shade(scrub, grain)
         return shade(grass, grain)
 
-    _yard(p, [(-4, 0, 16, 12), (12, 0, 9, 8), (6, -10, 8, 6)], (170, 150, 112), 0.85)
+    _yard(
+        p,
+        [(-4, 0, 16, 12), (12, 0, 9, 8), (8, -12, 9, 7), (adit_u, -6, 4, 6)],
+        (170, 150, 112),
+        0.85,
+    )
     _yard(p, [(12, 2, 7, 8), (17, 0, 5, 6), (10, -2, 5, 4)], tailings, 0.95)
-    for a, b in (((8.5, 5), (14, 6.5)), ((14, 6.5), (19, 3.5))):
+    for a, b in (((13, 4), (15, 6.5)), ((15, 6.5), (19, 3.5))):
         _beam(p, (*a, 0), (*b, 0), 0.5, shade(water, 1.1))
+        for t in (0.3, 0.7):
+            x, y = _p(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+            p.blob(x - 0.18 * m, y - 0.12 * m, x + 0.18 * m, y + 0.12 * m, glint)
     _land(p, (-27, 10, -8, 18), height, paint, 0.35)
-    for fu, fv in ((-19, 0), (-13, -5.5), (-21, 6), (-11, -4), (-18, 10.5)):
+    for fu, fv in ((-20, 1), (-21, 7), (-18, 11), (-15.5, -3.5)):
         _fir(p, fu, fv, hill(fu, fv) - 0.2, 6.5 + 1.5 * _speckle(fu, fv))
     _cone(p, 14, 1, 4.6, 2.6, tailings, shade(tailings, 0.9))
     _cone(p, 17, 4.5, 3.0, 1.7, shade(tailings, 0.96))
-    crest = hill(-13, 5)
-    hoist = _block(p, -15, -1, 6, 5, 3.6, weathered, None, hill(-15, -1) - 0.4)
+    for gu, gv, gz in ((13.2, 0.4, 1.4), (15.0, 2.0, 0.9), (12.4, -1.6, 0.3), (16.6, 3.8, 1.0)):
+        x, y = _p(gu, gv, gz)
+        _glint(p, x, y, 0.38 * m, glint)
+    shaft_u, shaft_v = -13.0, 5.0
+    crest = hill(shaft_u, shaft_v)
+    hoist_z = hill(-13, 14.5) - 0.4
+    hoist = _block(p, -13, 14.5, 6, 5, 3.6, weathered, None, hoist_z)
     _boards(p, hoist, 3.6, weathered)
-    p.gable(hoist, 1.8 * m, rust, weathered)
-    _roof_rows(p, hoist, 1.8 * m, rust, (0.5,))
-    head = (-13.0, 5.0, crest + 11)
-    for su, sv in ((-1.6, 2), (1.6, 2), (-1.6, -2), (1.6, -2)):
-        _beam(
-            p,
-            (head[0] + su * 1.4, head[1] + sv, crest),
-            (head[0] + su * 0.5, head[1] + sv * 0.5, head[2]),
-            0.4,
-            shade(timber, 0.9 if sv > 0 else 1.0),
-        )
-    for z in (crest + 3.5, crest + 7):
-        f = (z - crest) / 11
-        bu, bv = 1.6 * 1.4 * (1 - f) + 0.8 * f, 2 * (1 - f) + f
-        _beam(p, (head[0] - bu, head[1] - bv, z), (head[0] + bu, head[1] - bv, z), 0.25, timber)
-        _beam(
-            p,
-            (head[0] + bu, head[1] - bv, z),
-            (head[0] + bu, head[1] + bv, z),
-            0.25,
-            shade(timber, 0.8),
-        )
-    _beam(
-        p,
-        (head[0] - 2.2, head[1] - 2, crest),
-        (head[0] + 0.8, head[1] - 1, head[2] - 4),
-        0.18,
-        timber,
-    )
-    _beam(
-        p,
-        (head[0] - 9, head[1], crest - 3),
-        (head[0] - 0.6, head[1], head[2]),
-        0.5,
-        shade(timber, 0.85),
-    )
-    _sheave(p, head[0], head[1], head[2] + 1.6, 1.8, (90, 84, 78), spokes=6)
-    _beam(p, (head[0] - 1.8, head[1], head[2] + 1.6), (-15, -1, hill(-15, -1) + 3), 0.08, ROPE)
+    p.gable(hoist, 1.8 * m, shingle, weathered)
+    _roof_rows(p, hoist, 1.8 * m, shingle, (0.5,))
+    sx, sy = _p(-11.5, 15, hoist_z + 5)
+    _bar(p, (sx, sy + 1.2 * m), (sx, sy - 2.4 * m), 0.4 * m, (52, 50, 50))
+    _smoke(p, sx + 0.5, sy - 3.4 * m, (210, 210, 214), 2)
+    rope = _gallows(p, shaft_u, shaft_v, crest, 15, timber, (206, 160, 60), hill)
+    _beam(p, (rope[0], rope[1] + 4.8, rope[2]), (-13, 12, hoist_z + 3.2), 0.08, ROPE)
+    _beam(p, rope, (rope[0], rope[1], crest + 1), 0.08, ROPE)
     bin_top = levels[0][4]
-    run = [(head[0] + 1.5, head[1] - 1, crest + 3.5), (-8.0, 2.5, bin_top + 6.2)]
+    run = [(shaft_u + 2.2, shaft_v - 1.2, crest + 3.5), (-8.0, 2.5, bin_top + 6.2)]
     _trestle(p, run, hill, timber)
     _beam(p, (*run[0][:2], run[0][2]), (*run[1][:2], run[1][2]), 0.35, shade(timber, 0.9))
-    _tub(p, -10.5, 3.2, (128, 116, 100), z=bin_top + 5.5, glint=gold)
+    _tub(p, -10.2, 3.0, quartz, z=bin_top + 5.5, glint=gold)
     flume = [(-7.0, 13.5, hill(-7, 13.5) + 0.4), (2.6, 13.5, 9.6), (2.6, 9.0, 9.4)]
     _trestle(p, flume, hill, shade(timber, 0.85), 3.2)
-    _flume(p, flume, timber, water)
+    _flume(p, flume, timber, water, glint)
     upper = _block(p, -8, 4, 6.5, 7.5, 5.5, weathered, None, bin_top)
     _boards(p, upper, 5.5, weathered)
     p.gable(upper, 2.2 * m, shingle, weathered)
@@ -1349,7 +1598,7 @@ def gold_mine() -> Sprite:
     battery = _block(p, -1.5, 4, 6.5, 7.5, high, timber, None, battery_z)
     _, b_front, b_right, _ = battery
     _boards(p, battery, high, timber)
-    _stamps(p, battery, high, (84, 80, 78))
+    _stamps(p, battery, high, (84, 80, 78), (250, 196, 84))
     _framed(p, b_front, b_right, (0.3, 0.45), 2.0, 1.6, shade(timber, 1.25), shade(WINDOW, 0.8))
     _framed(p, b_front, b_right, (0.6, 0.75), 2.0, 1.6, shade(timber, 1.25), shade(WINDOW, 0.8))
     p.gable(battery, 2.6 * m, honey, timber)
@@ -1395,8 +1644,26 @@ def gold_mine() -> Sprite:
     for t in (0.2, 0.45, 0.7):
         _framed(p, l_left, l_front, (t - 0.06, t + 0.06), 1.2, 1.6, shade(weathered, 1.3))
     _patch(p, l_front, l_right, (0.3, 0.7), (1.4 * m, 4.4 * m), (52, 44, 40))
-    p.gable(lower, 2.0 * m, rust, weathered)
-    _roof_rows(p, lower, 2.0 * m, rust, (0.33, 0.66))
+    p.gable(lower, 2.0 * m, shingle, weathered)
+    _roof_rows(p, lower, 2.0 * m, shingle, (0.33, 0.66))
+    sluice = [(8.6, 3.2, 1.3), (13.0, 3.6, 0.35)]
+    for su, sz in ((9.6, 1.1), (11.6, 0.6)):
+        _beam(p, (su, 2.7, 0), (su, 2.7, sz), 0.16, shade(timber, 0.8))
+    _flume(p, sluice, timber, water, glint)
+    for t in (0.2, 0.4, 0.6, 0.8):
+        _beam(
+            p,
+            tuple(
+                a + (b - a) * t + (0, -0.45, 0.8)[i]
+                for i, (a, b) in enumerate(zip(*sluice, strict=True))
+            ),
+            tuple(
+                a + (b - a) * t + (0, 0.45, 0.8)[i]
+                for i, (a, b) in enumerate(zip(*sluice, strict=True))
+            ),
+            0.08,
+            shade(timber, 0.7),
+        )
     office_wall = (178, 150, 110)
     office = _block(p, 7, -10, 6, 5, 3.6, office_wall, None)
     _boards(p, office, 3.6, office_wall)
@@ -1405,18 +1672,11 @@ def gold_mine() -> Sprite:
     f_left, f_front, _, _ = face
     _boards(p, face, 5.6, office_wall)
     _patch(p, f_left, f_front, (0, 1), (0, 0.35 * m), shade(office_wall, 0.7))
-    _patch(p, f_left, f_front, (0.1, 0.9), (0.7 * m, 1.9 * m), (40, 62, 50))
-    _patch(p, f_left, f_front, (0.1, 0.9), (0.7 * m, 0.82 * m), gold)
-    _patch(p, f_left, f_front, (0.1, 0.9), (1.78 * m, 1.9 * m), gold)
-    for k in range(6):
-        t = 0.2 + k * 0.12
-        _bar(
-            p,
-            _on_wall(f_left, f_front, t, 1.05 * m),
-            _on_wall(f_left, f_front, t + 0.07, 1.05 * m),
-            0.32 * m,
-            gold,
-        )
+    _patch(p, f_left, f_front, (0.06, 0.94), (0.55 * m, 2.05 * m), gold)
+    _patch(p, f_left, f_front, (0.09, 0.91), (0.7 * m, 1.9 * m), (34, 56, 46))
+    _letters(p, f_left, f_front, "GOLD", (0.2, 0.8), (0.95 * m, 1.65 * m), gold)
+    nx, ny = _on_wall(f_left, f_front, 0.5, -0.1 * m)
+    _nugget(p, nx, ny, 1.3 * m, gold)
     _framed(p, f_left, f_front, (0.14, 0.34), 2.7, 1.8, (232, 222, 196))
     _patch(p, f_left, f_front, (0.5, 0.7), (2.5 * m, 5.6 * m), DOOR)
     _framed(p, f_left, f_front, (0.76, 0.92), 2.7, 1.8, (232, 222, 196))
@@ -1427,8 +1687,15 @@ def gold_mine() -> Sprite:
         0.3 * m,
         (232, 222, 196),
     )
+    _adit(p, adit_u, adit_v, rock, timber)
+    _rails(p, (adit_u, adit_v - 0.2), (adit_u, adit_v - 9), gauge=0.6, ballast=None)
+    for k, tv in enumerate((-3.6, -5.6, -7.6)):
+        _tub(p, adit_u, adit_v + tv, quartz, along_u=False, glint=gold if k != 1 else glint)
     _rails(p, (8.5, 0.2), (8.5, -6), gauge=0.6, ballast=None)
-    _tub(p, 8.5, -2.4, (128, 116, 100), along_u=False, glint=gold)
+    _tub(p, 8.5, -2.4, quartz, along_u=False, glint=gold)
+    _sentry(p, 2.5, -14.5, shingle)
+    _bullion_wagon(p, 9.5, -16.0, gold, glint)
+    _guard(p, 12.2, -18.0)
     return p.sprite()
 
 

@@ -6,25 +6,28 @@ cones lit at their mouths and gasworks of great gasholders in iron guide frames.
 import itertools
 import math
 
-from railroads.ui.pixel.art.commerce import _glass_rack
 from railroads.ui.pixel.art.crafts import MOLTEN
 from railroads.ui.pixel.art.industry import (
     GLASS_AMBER,
+    GLASS_AQUA,
+    GLASS_COBALT,
     GLASS_GREEN,
-    GLASS_SAND,
-    GLASS_SODA,
+    GLASS_SEA,
     SMOKE,
     SOIL,
     _bed,
     _crate,
     _door,
     _footing,
+    _glass_baskets,
+    _glass_carboys,
     _glass_cone,
     _glass_crates,
-    _glass_heap,
+    _glass_cullet,
     _glass_house,
     _glass_lehr,
     _glass_packing,
+    _glass_panes,
     _glass_yard,
     _on_roof,
     _ring,
@@ -448,18 +451,22 @@ BRIGHT: RGB = (255, 214, 120)
 
 def big_glassworks() -> Sprite:
     """A big glassworks round two English glass cones of brick, 26 and 22 m high, hooped with
-    iron and sooted at their smoking tops, their furnace mouths glowing in deep arches; a long
-    brick glasshouse joining them whose arched windows and ridge vent glow with the furnaces; a
-    long lehr shed with amber windows and flues; a brick warehouse; a boarded packing house; and
-    a yard of crates of bottles in green and amber glass, racks of window panes glinting aqua,
-    and heaps of sand and soda."""
+    iron and sooted at their smoking tops, their furnace mouths glowing with gathers of molten
+    glass drawn out on blowpipes; a long brick glasshouse joining them, its arched windows
+    glowing under a roof glazed in aqua with a glass lantern; a smaller glazed glasshouse
+    behind; a long lehr shed with amber windows and an aqua skylight; a packing house with a
+    show window of coloured glass; and a yard of big racks of window panes glinting aqua and sea
+    green, crates and baskets of bottles in green, amber and cobalt, carboys in wicker, and
+    heaps of coloured cullet."""
     m = METRE
     p = Painter(58, 56, (28, 40))
 
     def at(u: float, v: float) -> Point:
         return _iso(0, 0, (u - 22) * m, (v - 8) * m)
 
-    _glass_yard(p, [(at(18, 6), 16), (at(6, -2), 8), (at(34, 2), 10), (at(38, 12), 8)])
+    _glass_yard(
+        p, [(at(18, 6), 16), (at(6, -2), 8), (at(34, 2), 10), (at(38, 12), 8), (at(27, -5), 8)]
+    )
     for u, v, length, depth in ((22, 8, 16, 9), (40, 8, 14, 5), (37, 17, 10, 6), (40, -2, 8, 5)):
         _bed(p, _footing(*at(u, v), length * m, depth * m), margin=0.8)
     _glass_cone(p, *at(26, 18), 6.5 * m, 22 * m)
@@ -468,22 +475,28 @@ def big_glassworks() -> Sprite:
     _glass_house(p, *at(22, 8), (16 * m, 9 * m, 7 * m))
     _glass_lehr(p, *at(40, 8), 14 * m, 5 * m)
     _glass_packing(p, *at(40, -2), 8 * m, 5 * m)
-    _glass_heap(p, *at(-2, 2), 3.2 * m, 2.8 * m, GLASS_SAND)
-    _glass_heap(p, *at(0.5, -2), 2.2 * m, 1.9 * m, GLASS_SODA)
-    for u, v in ((11, -4), (15.5, -4.5), (20, -5)):
-        _glass_rack(p, *at(u, v))
-    _glass_crates(p, *at(26, -3), (GLASS_GREEN, GLASS_AMBER, GLASS_GREEN, GLASS_AMBER))
-    _glass_crates(p, *at(26.6, -4.6), (GLASS_AMBER, GLASS_GREEN, GLASS_AMBER))
+    _glass_cullet(p, *at(-2, 2), 3.2 * m, 2.6 * m, (GLASS_AQUA, GLASS_SEA, GLASS_GREEN))
+    _glass_cullet(p, *at(0.5, -2.5), 2.4 * m, 1.9 * m, (GLASS_COBALT, GLASS_AMBER, GLASS_AQUA))
+    for u, v in ((9.5, -3.6), (15, -4.4), (20.5, -5.2)):
+        _glass_panes(p, *at(u, v), 4.5, 2.8)
+    _glass_crates(p, *at(26, -2.8), (GLASS_GREEN, GLASS_AMBER, GLASS_COBALT, GLASS_GREEN))
+    _glass_crates(p, *at(26.6, -4.4), (GLASS_COBALT, GLASS_GREEN, GLASS_AMBER))
+    _glass_carboys(
+        p, *at(23.5, -6.2), (GLASS_GREEN, GLASS_AMBER, GLASS_GREEN, GLASS_COBALT, GLASS_AMBER)
+    )
+    _glass_baskets(p, *at(30, -6), (GLASS_AMBER, GLASS_GREEN, GLASS_COBALT))
     return p.sprite()
 
 
 def mega_glassworks() -> Sprite:
     """A great glassworks round three English glass cones of brick, the middle one 28 m high,
-    each hooped with iron, sooted at its smoking top and glowing at its furnace mouth; a long
-    brick glasshouse under a roof glazed in aqua panes joining them, its arched windows and
-    ridge vent glowing; two long lehr sheds with amber windows and flues; a boarded packing house
-    and a brick warehouse; and a yard of crates of bottles in green and amber glass, racks of
-    window panes glinting aqua, and heaps of sand and soda."""
+    each hooped with iron, sooted at its smoking top and glowing at its furnace mouth with gathers
+    of molten glass drawn out on blowpipes; a long brick glasshouse joining them under a roof
+    glazed in aqua with a glass lantern along its ridge, its arched windows glowing; a smaller
+    glazed glasshouse behind; two long lehr sheds with amber windows and aqua skylights; a
+    packing house with a show window of coloured glass and a blue glass globe lamp; and a yard
+    of big racks of window panes glinting aqua and sea green, crates and baskets of bottles in
+    green, amber and cobalt, rows of carboys in wicker, and heaps of coloured cullet."""
     m = METRE
     p = Painter(64, 62, (31, 45))
 
@@ -491,7 +504,15 @@ def mega_glassworks() -> Sprite:
         return _iso(0, 0, (u - 25) * m, (v - 9) * m)
 
     _glass_yard(
-        p, [(at(22, 7), 18), (at(6, -2), 9), (at(42, 3), 11), (at(44, 15), 9), (at(16, 21), 9)]
+        p,
+        [
+            (at(22, 7), 18),
+            (at(6, -2), 9),
+            (at(42, 3), 11),
+            (at(44, 15), 9),
+            (at(16, 21), 9),
+            (at(30, -5), 9),
+        ],
     )
     for u, v, length, depth in (
         (26, 8, 22, 9),
@@ -506,15 +527,23 @@ def mega_glassworks() -> Sprite:
     _glass_cone(p, *at(41, 23.5), 6.5 * m, 22 * m)
     _glass_lehr(p, *at(45, 13), 16 * m, 5 * m)
     _glass_cone(p, *at(7, 9), 7 * m, 24 * m)
-    _glass_house(p, *at(26, 8), (22 * m, 9 * m, 7.5 * m), glazed=True)
+    _glass_house(p, *at(26, 8), (22 * m, 9 * m, 7.5 * m))
     _glass_lehr(p, *at(45, 6), 16 * m, 5 * m)
     _glass_packing(p, *at(40, -3), 9 * m, 5 * m)
-    _glass_heap(p, *at(-3, 2), 3.4 * m, 3 * m, GLASS_SAND)
-    _glass_heap(p, *at(0, -2.5), 2.4 * m, 2 * m, GLASS_SODA)
-    for u, v in ((10, -4), (14.5, -4.5), (19, -5), (23.5, -5.5)):
-        _glass_rack(p, *at(u, v))
-    _glass_crates(p, *at(28, -3), (GLASS_GREEN, GLASS_AMBER, GLASS_GREEN, GLASS_AMBER, GLASS_GREEN))
-    _glass_crates(p, *at(28.6, -4.6), (GLASS_AMBER, GLASS_GREEN, GLASS_AMBER, GLASS_GREEN))
+    _glass_cullet(p, *at(-3, 2), 3.4 * m, 2.8 * m, (GLASS_AQUA, GLASS_SEA, GLASS_GREEN))
+    _glass_cullet(p, *at(0, -2.5), 2.6 * m, 2 * m, (GLASS_COBALT, GLASS_AMBER, GLASS_AQUA))
+    for u, v in ((9.5, -3.6), (15, -4.4), (20.5, -5.2), (26, -6)):
+        _glass_panes(p, *at(u, v), 4.5, 2.8)
+    _glass_crates(
+        p, *at(29, -2.6), (GLASS_GREEN, GLASS_AMBER, GLASS_COBALT, GLASS_GREEN, GLASS_AMBER)
+    )
+    _glass_crates(p, *at(29.6, -4.2), (GLASS_COBALT, GLASS_GREEN, GLASS_AMBER, GLASS_COBALT))
+    _glass_carboys(
+        p,
+        *at(29.5, -6.6),
+        (GLASS_GREEN, GLASS_AMBER, GLASS_GREEN, GLASS_COBALT, GLASS_AMBER, GLASS_GREEN),
+    )
+    _glass_baskets(p, *at(36.5, -6.6), (GLASS_AMBER, GLASS_GREEN, GLASS_COBALT))
     return p.sprite()
 
 
