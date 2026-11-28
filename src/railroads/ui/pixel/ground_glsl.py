@@ -1127,45 +1127,48 @@ vec4 grove_at(vec2 q, ivec2 texel, float lit) {
     return vec4(light_by, float(i + 1) + min(fade, 0.999));
 }
 
-const vec2 TOWN_AROUND[@AROUND_COUNT@] = vec2[@AROUND_COUNT@](@TOWN_AROUND@);
-
-// The colour of town ground at plane point `p`, pixel `pixel` (railroads.ui.pixel.ground
-// .town_ground).
-vec3 town_ground(vec2 p, ivec2 pixel) {
+// The colour of cobbles at pixel `pixel` (railroads.ui.pixel.ground.road_colour).
+vec3 road_colour(ivec2 pixel) {
     float u = (float(pixel.x) + 0.5) / float(k);
     float v = (float(pixel.y) + 0.5) / float(k);
-    float row = floor(v / @TOWN_HEIGHT@);
-    float along = u / @TOWN_WIDTH@ + 0.5 * mod(row, 2.0);
-    float stone = floor(along);
-    float tone = 0.88 + 0.16 * table_hash(int(stone), int(row), 91);
-    vec3 colour = @TOWN_SETTS@ * tone;
-    if ((along - stone) * @TOWN_WIDTH@ < @TOWN_JOINT@
-            || (v / @TOWN_HEIGHT@ - row) * @TOWN_HEIGHT@ < @TOWN_JOINT@) {
-        colour = @TOWN_JOINTS@;
-    }
-    float earth = clamp((@N_TOWN_EARTH@ - @TOWN_EARTH_FROM@) * 6.0, 0.0, 1.0);
-    colour = colour * (1.0 - earth) + @TOWN_EARTH_COLOUR@ * earth;
-    return colour * (0.94 + 0.1 * table_hash(pixel.x, pixel.y, 92));
+    float row = floor(v);
+    float along = u + 0.5 * mod(row, 2.0);
+    float cobble = floor(along);
+    vec3 colour = @ROAD_SETTS@ * (0.88 + 0.16 * table_hash(int(cobble), int(row), 93));
+    if (along - cobble < @ROAD_JOINT@ || v - row < @ROAD_JOINT@) colour *= 0.82;
+    return colour * (0.95 + 0.08 * table_hash(pixel.x, pixel.y, 94));
 }
 
-// Lays town ground at picture point `q` where the cells round it lay it (Ground._pave_town).
-void lay_town(vec2 q, ivec2 texel, inout vec4 layer) {
-    if (towns_near == 0) return;
+// Lays the cobbled roads near the chunk and the squares round lone buildings at picture point
+// `q`, off the minor rivers, on land (Ground._lay_roads, road_cover).
+void lay_roads(vec2 q, ivec2 texel, inout vec4 layer) {
+    if (road_count == 0 && square_count == 0) return;
     vec2 p = to_plane * (q + projection_origin);
-    ivec2 cell = clamp(cell_at(p), ivec2(0), cells_size - 1);
-    if (texelFetch(woods, cell, 0).g < 0.5) return;
-    float share = 0.0;
-    for (int i = 0; i < @AROUND_COUNT@; i++) {
-        ivec2 there = clamp(cell_at(p + TOWN_AROUND[i]), ivec2(0), cells_size - 1);
-        share += texelFetch(woods, there, 0).b;
+    float distance = 1e9;
+    for (int i = 0; i < road_count; i++) {
+        vec4 road = texelFetch(roads, ivec2(i, 0), 0);
+        vec2 a = road.xy, d = road.zw - road.xy;
+        float t = clamp(dot(p - a, d) / dot(d, d), 0.0, 1.0);
+        distance = min(distance, length(p - a - t * d));
     }
-    share /= @AROUND_FLOAT@;
-    if (share <= 0.0) return;
-    float edge = @N_TOWN_A@ * 0.55 + @N_TOWN_B@ * 0.3;
-    float cover = clamp((share + (edge - 0.42) * @TOWN_FRAY@ - @TOWN_FROM@) * @TOWN_SOFT@, 0.0, 1.0);
-    if (@N_TOWN_HOLES@ > @TOWN_HOLES_FROM@) cover = 0.0;
+    float waver = (@N_WAVER@ - 0.5) * @ROAD_WAVER@;
+    float cover = clamp((@ROAD_HALF@ + waver - distance) / @ROAD_SOFT@, 0.0, 1.0);
+    bool kerb = distance > @ROAD_HALF@ + waver - @ROAD_KERB@;
+    if (square_count > 0) {
+        float reach = 1e9;
+        for (int i = 0; i < square_count; i++) {
+            vec4 square = texelFetch(squares, ivec2(i, 0), 0);
+            reach = min(reach, length(p - square.xy) / square.z);
+        }
+        float fray = (@N_SQUARE_FRAY@ - 0.5) * @SQUARE_FRAY@;
+        float paved = clamp((1.0 - reach + fray) * @SQUARE_SOFT@, 0.0, 1.0);
+        kerb = kerb && paved < 0.5;
+        cover = max(cover, paved);
+    }
     if (cover <= 0.0 || on_stream(p)) return;
-    vec3 colour = town_ground(p, chunk_origin * k + texel);
+    ivec2 cell = clamp(cell_at(p), ivec2(0), cells_size - 1);
+    if (texelFetch(woodland, cell, 0).g < 0.5) return;
+    vec3 colour = kerb ? @ROAD_KERB_COLOUR@ : road_colour(chunk_origin * k + texel);
     lay(layer, colour / 255.0, cover);
 }
 
@@ -1236,8 +1239,11 @@ uniform highp sampler2D plots;
 uniform int plot_count;
 uniform highp sampler2D yards;
 uniform int yard_count;
-uniform highp sampler2D woods;
-uniform int towns_near;
+uniform highp sampler2D roads;
+uniform int road_count;
+uniform highp sampler2D squares;
+uniform int square_count;
+uniform highp sampler2D woodland;
 uniform ivec2 relief_origin;
 uniform vec4 slope;
 uniform float metres_per_unit;
@@ -1505,7 +1511,7 @@ void main() {
         return;
     }
     vec4 layer = vec4(0.0, 0.0, 0.0, here.g);
-    lay_town(q, texel, layer);
+    lay_roads(q, texel, layer);
     lay_fields(q, texel, lit, layer);
     lay_yards(texel, layer);
     bool painted = false;
@@ -1906,27 +1912,17 @@ def _fields_names() -> dict[str, str]:
             for side, edge in zip(("LEFT", "RIGHT", "TOP", "BOTTOM"), cpu.GARDEN, strict=True)
         },
         "GARDEN_ROWS": glsl_number(cpu.GARDEN_ROWS),
-        "AROUND_COUNT": str(len(cpu.AROUND)),
-        "TOWN_AROUND": ", ".join(
-            f"vec2({glsl_number(x * cpu.TOWN_BLEND)}, {glsl_number(y * cpu.TOWN_BLEND)})"
-            for x, y in cpu.AROUND
-        ),
-        "AROUND_FLOAT": glsl_number(len(cpu.AROUND)),
-        "N_TOWN_A": _noise(0.55, 63),
-        "N_TOWN_B": _noise(0.16, 64),
-        "N_TOWN_EARTH": _noise(cpu.TOWN_EARTH[0], 65),
-        "N_TOWN_HOLES": _noise(cpu.TOWN_HOLES[0], 66),
-        "TOWN_EARTH_FROM": glsl_number(cpu.TOWN_EARTH[1]),
-        "TOWN_HOLES_FROM": glsl_number(cpu.TOWN_HOLES[1]),
-        "TOWN_FROM": glsl_number(cpu.TOWN_FROM),
-        "TOWN_FRAY": glsl_number(cpu.TOWN_FRAY),
-        "TOWN_SOFT": glsl_number(cpu.TOWN_SOFT),
-        "TOWN_WIDTH": glsl_number(cpu.TOWN_STONE[0]),
-        "TOWN_HEIGHT": glsl_number(cpu.TOWN_STONE[1]),
-        "TOWN_JOINT": glsl_number(cpu.TOWN_JOINT),
-        "TOWN_SETTS": _vec3(cpu.TOWN_SETTS),
-        "TOWN_JOINTS": _vec3(cpu.TOWN_JOINTS),
-        "TOWN_EARTH_COLOUR": _vec3(cpu.TOWN_EARTH_COLOUR),
+        "ROAD_SETTS": _vec3(cpu.ROAD_SETTS),
+        "ROAD_KERB_COLOUR": _vec3(cpu.ROAD_KERB_COLOUR),
+        "ROAD_JOINT": glsl_number(cpu.ROAD_JOINT),
+        "ROAD_HALF": glsl_number(cpu.ROAD_HALF),
+        "ROAD_KERB": glsl_number(cpu.ROAD_KERB),
+        "ROAD_SOFT": glsl_number(cpu.ROAD_SOFT),
+        "ROAD_WAVER": glsl_number(cpu.ROAD_WAVER),
+        "N_WAVER": _noise(cpu.ROAD_WAVER_SIZE, 95),
+        "SQUARE_FRAY": glsl_number(cpu.SQUARE_FRAY),
+        "SQUARE_SOFT": glsl_number(cpu.SQUARE_SOFT),
+        "N_SQUARE_FRAY": _noise(cpu.SQUARE_FRAY_SIZE, 96),
     }
 
 

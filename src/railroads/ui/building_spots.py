@@ -1,7 +1,7 @@
 """Where buildings stand on a map.
 
-A cell's room is split into CELL_SPACE slots in a ring round its centre, and each building stands
-in the middle of the slots it takes, in the order it was built: six houses make a ring of roofs,
+A cell's room is split into CELL_SPACE slots in a ring round its centre, each facing one edge of
+the hex, and each building stands in the middle of the slots it takes, in the order it was built: six houses make a ring of roofs,
 a farm fills half the cell. Zoomed out, buildings show as coloured dots there
 (railroads.ui.buildings); close up they are sprites in the pixel art (see railroads.ui.pixel), which
 is also painted where imgui is not loaded, as in web workers, so nothing here needs it.
@@ -201,6 +201,13 @@ def _clear_of_track(
     return x, y
 
 
+def first_edge(row: int, col: int) -> int:
+    """The edge of a cell its first slot faces, which differs from cell to cell so towns do not
+    look ruled; slot i faces the edge after it (railroads.ui.pixel.town_roads)."""
+    return (row * 7 + col * 13) % CELL_SPACE
+
+
 def _cell_turn(row: int, col: int) -> float:
-    """A turn of up to one slot that differs from cell to cell, so towns do not look ruled."""
-    return (row * 0.618034 + col * 0.414214) % 1.0 * 2 * math.pi / CELL_SPACE
+    """How far the slots of a cell are turned, in whole slots, so each slot faces the middle of
+    one edge of its hex: the hex's corners lie half a slot either side of an edge's middle."""
+    return 2 * math.pi * (first_edge(row, col) - 0.5) / CELL_SPACE

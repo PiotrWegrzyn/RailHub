@@ -102,7 +102,6 @@ from railroads.ui.pixel.ground_palette import (
     MAX_SLOPE_SHADES,
     MEADOWS,
     OLD,
-    ON_THE_LAND,
     OPEN_WATER,
     ORE_ROCK,
     OVERHANG,
@@ -112,6 +111,15 @@ from railroads.ui.pixel.ground_palette import (
     REGION_SPAN,
     RELIEF_SMOOTHING_CELLS,
     RELIEF_STEPS_PER_CELL,
+    ROAD_HALF,
+    ROAD_JOINT,
+    ROAD_KERB,
+    ROAD_KERB_COLOUR,
+    ROAD_REACH,
+    ROAD_SETTS,
+    ROAD_SOFT,
+    ROAD_WAVER,
+    ROAD_WAVER_SIZE,
     ROLL_LEAST,
     ROLL_LIGHT,
     ROLL_MOST,
@@ -135,21 +143,12 @@ from railroads.ui.pixel.ground_palette import (
     SPARKLE_FACING,
     SPARKLE_MIX,
     SPARKLE_SHARE,
+    SQUARE_FRAY,
+    SQUARE_FRAY_SIZE,
+    SQUARE_SOFT,
     STAND_SPAN,
     THIN_SPAN,
     THINNED,
-    TOWN_BLEND,
-    TOWN_EARTH,
-    TOWN_EARTH_COLOUR,
-    TOWN_FRAY,
-    TOWN_FROM,
-    TOWN_HOLES,
-    TOWN_JOINT,
-    TOWN_JOINTS,
-    TOWN_REACH,
-    TOWN_SETTS,
-    TOWN_SOFT,
-    TOWN_STONE,
     TREE_SHADE,
     TRUNK_BARK,
     TRUNK_BELOW,
@@ -200,6 +199,7 @@ from railroads.ui.pixel.streams import (
     stream_distance,
     stream_links,
 )
+from railroads.ui.pixel.town_roads import Roads, town_roads
 
 
 class Ground:
@@ -274,14 +274,8 @@ class Ground:
         # 0 for open land, and CLEARING where anything else is built, so the woods give it room.
         woods = np.isin(self._biomes, WOODS) | woodland
         self._woods = np.where(built, CLEARING, woods).astype(np.float32)
-        town = np.zeros(self.tile_map.grid.shape, dtype=bool)
-        for construction in self.constructions:
-            if isinstance(construction, Building) and construction.kind not in ON_THE_LAND:
-                town[construction.cell] = True
-        self._town = (town & self._land).astype(np.float32)
-        rows, cols = np.nonzero(self._town)
-        px, py = self.projection.to_pixels(*self.tile_map.grid.center(rows, cols))
-        self._town_pixels = (np.atleast_1d(px), np.atleast_1d(py))
+        self.roads = town_roads(self.constructions)
+        self._road_boxes = _road_boxes(self.roads, self.projection)
         grid = self.tile_map.grid
         self._plots = plots_of(self.constructions, FIELD_KINDS)
         # Where each kind's fields sit in the picture, to find those near a block quickly.
@@ -510,14 +504,15 @@ class Ground:
 
     @property
     def woodland(self) -> FloatArray:
-        """Each cell's say in whether woods cover a point near it, 1 where it is land and 1 where
-        it lays town ground (ON_THE_LAND), as (rows, cols, 3) floats, for the graphics card."""
-        return np.stack([self._woods, self._land.astype(np.float32), self._town], axis=-1)
+        """Each cell's say in whether woods cover a point near it and 1 where it is land, as
+        (rows, cols, 2) floats, for the graphics card."""
+        return np.stack([self._woods, self._land.astype(np.float32)], axis=-1)
 
     @property
-    def town_pixels(self) -> tuple[FloatArray, FloatArray]:
-        """Where the middle of each cell laying town ground lies in the picture."""
-        return self._town_pixels
+    def road_boxes(self) -> tuple[FloatArray, FloatArray]:
+        """The box each road and each square of the town roads covers in the picture, as rows
+        of left, top, right and bottom in art pixels."""
+        return self._road_boxes
 
     @property
     def plot_table(self) -> FloatArray:
@@ -720,7 +715,7 @@ class Ground:
         """Paints the ground round buildings over a picture of the ground from (`left`, `top`),
         `k` pixels to an art pixel, RGB from 0 to 1 multiplied by its alpha (YARD_REACH), where
         the picture shows the map, as `fields` says."""
-        self._pave_town(canvas, left, top, k, shown)
+        self._lay_roads(canvas, left, top, k, shown)
         xs, ys, kinds, reaches = self.buildings
         rows, cols = canvas.shape[0] // k, canvas.shape[1] // k
         reach = float(reaches.max()) if reaches.size else 0.0
@@ -738,49 +733,26 @@ class Ground:
         ):
             self._yard(canvas, shown, (x0 - left) * k, (y0 - top) * k, kind, out, k)
 
-    def _pave_town(
+    def _lay_roads(
         self, canvas: FloatArray, left: int, top: int, k: int, shown: BoolArray | None
     ) -> None:
-        """Lays town ground over the cells that lay it (ON_THE_LAND) in a picture of the ground
-        from (`left`, `top`), `k` pixels to an art pixel, off the minor rivers, given out into
-        the grass at its frayed edge."""
-        if not self._town.any():
-            return
+        """Lays the cobbled roads of towns and the squares round lone buildings
+        (railroads.ui.pixel.town_roads) over a picture of the ground from (`left`, `top`), `k`
+        pixels to an art pixel, off the minor rivers, on land."""
         rows, cols = canvas.shape[0] // k, canvas.shape[1] // k
-        grid = self.tile_map.grid
-        px, py = self._town_pixels
-        reach = TOWN_REACH
-        near = (px > left - reach) & (px < left + cols + reach)
-        near &= (py > top - reach) & (py < top + rows + reach)
-        if not near.any():
+        segments, squares = near_roads(self.roads, self._road_boxes, (left, top), (cols, rows))
+        if not len(segments) and not len(squares):
             return
-        first_col = max(int((px[near].min() - reach - left) * k), 0)
-        last_col = min(int((px[near].max() + reach - left) * k) + 1, cols * k)
-        first_row = max(int((py[near].min() - reach - top) * k), 0)
-        last_row = min(int((py[near].max() + reach - top) * k) + 1, rows * k)
-        if first_col >= last_col or first_row >= last_row:
-            return
-        box = (first_row, last_row, first_col, last_col)
-        place = (slice(first_row, last_row), slice(first_col, last_col))
-        x, y, flat, ix, iy = self._patch_points(box, left, top, k, None)
-        x, y = x.astype(np.float32), y.astype(np.float32)
-        land = self._land.ravel()[flat]
-        share = np.zeros(x.shape, dtype=np.float32)
-        for dx, dy in AROUND:
-            sr, sc = grid.cell_on_map(x + dx * TOWN_BLEND, y + dy * TOWN_BLEND)
-            share += self._town[sr, sc]
-        share /= len(AROUND)
-        edge = noise(x, y, 0.55, 63) * 0.55 + noise(x, y, 0.16, 64) * 0.3
-        cover = np.clip((share + (edge - 0.42) * TOWN_FRAY - TOWN_FROM) * TOWN_SOFT, 0, 1)
-        cover *= land
-        holes_size, holes_from = TOWN_HOLES
-        cover[noise(x, y, holes_size, 66) > holes_from] = 0
+        x, y, flat, ix, iy = self._patch_points((0, rows * k, 0, cols * k), left, top, k, None)
+        cover, kerb = road_cover(x, y, segments, squares)
         if not (cover > 0).any():
             return
-        cover *= _on_map(canvas, shown)[place]
+        cover *= _on_map(canvas, shown)
         cover *= self._off_streams(x, y, flat)
-        colour = town_ground(x, y, ix, iy, k)
-        _over(canvas[place], colour / 255, cover)
+        cover *= self._land.ravel()[flat]
+        colour = road_colour(ix, iy, k)
+        colour[kerb] = ROAD_KERB_COLOUR
+        _over(canvas, colour / 255, cover)
 
     def _yard(
         self,
@@ -1391,23 +1363,88 @@ def _shrunk(inside: BoolArray) -> BoolArray:
     return both
 
 
-def town_ground(x: FloatArray, y: FloatArray, ix: IntArray, iy: IntArray, k: int) -> FloatArray:
-    """The colour of town ground at plane points `x`, `y`, pixels `ix`, `iy` of a picture `k`
-    to an art pixel (ON_THE_LAND), RGB from 0 to 255."""
+def _road_boxes(roads: Roads, projection: PixelProjection) -> tuple[FloatArray, FloatArray]:
+    """The box each road and square covers in the picture (Ground.road_boxes)."""
+    ax, ay = projection.to_pixels(roads.segments[:, 0], roads.segments[:, 1])
+    bx, by = projection.to_pixels(roads.segments[:, 2], roads.segments[:, 3])
+    reach = ROAD_REACH
+    lines = np.stack(
+        [
+            np.minimum(ax, bx) - reach,
+            np.minimum(ay, by) - reach,
+            np.maximum(ax, bx) + reach,
+            np.maximum(ay, by) + reach,
+        ],
+        axis=-1,
+    ).reshape(-1, 4)
+    x, y, radius = roads.squares[:, 0], roads.squares[:, 1], roads.squares[:, 2]
+    corners = [projection.to_pixels(x + dx * radius, y + dy * radius) for dx, dy in _SQUARE_RIM]
+    xs = np.stack([cx for cx, _ in corners])
+    ys = np.stack([cy for _, cy in corners])
+    squares = np.stack(
+        [xs.min(0) - reach, ys.min(0) - reach, xs.max(0) + reach, ys.max(0) + reach], axis=-1
+    ).reshape(-1, 4)
+    return lines, squares
+
+
+_SQUARE_RIM = ((-1, -1), (1, -1), (-1, 1), (1, 1))
+
+
+def near_roads(
+    roads: Roads,
+    boxes: tuple[FloatArray, FloatArray],
+    origin: tuple[int, int],
+    size: tuple[int, int],
+) -> tuple[FloatArray, FloatArray]:
+    """The roads and squares whose boxes (Ground.road_boxes) reach the art pixels `size` across
+    and down from `origin`."""
+    left, top = origin
+    right, bottom = left + size[0], top + size[1]
+
+    def overlapping(box: FloatArray) -> npt.NDArray[np.bool_]:
+        return (box[:, 0] < right) & (box[:, 2] > left) & (box[:, 1] < bottom) & (box[:, 3] > top)
+
+    lines, squares = boxes
+    return roads.segments[overlapping(lines)], roads.squares[overlapping(squares)]
+
+
+def road_cover(
+    x: FloatArray, y: FloatArray, segments: FloatArray, squares: FloatArray
+) -> tuple[FloatArray, npt.NDArray[np.bool_]]:
+    """How fully the roads and squares cover each plane point, and where their kerb lies."""
+    distance = np.full(x.shape, np.inf)
+    for x0, y0, x1, y1 in segments.tolist():
+        dx, dy = x1 - x0, y1 - y0
+        t = np.clip(((x - x0) * dx + (y - y0) * dy) / (dx * dx + dy * dy), 0, 1)
+        np.minimum(distance, np.hypot(x - x0 - t * dx, y - y0 - t * dy), out=distance)
+    fx, fy = x.astype(np.float32), y.astype(np.float32)
+    waver = (noise(fx, fy, ROAD_WAVER_SIZE, 95) - 0.5) * ROAD_WAVER
+    cover = np.clip((ROAD_HALF + waver - distance) / ROAD_SOFT, 0, 1)
+    kerb = distance > ROAD_HALF + waver - ROAD_KERB
+    if len(squares):
+        reach = np.full(x.shape, np.inf)
+        for sx, sy, radius in squares.tolist():
+            np.minimum(reach, np.hypot(x - sx, y - sy) / radius, out=reach)
+        fray = (noise(fx, fy, SQUARE_FRAY_SIZE, 96) - 0.5) * SQUARE_FRAY
+        square = np.clip((1 - reach + fray) * SQUARE_SOFT, 0, 1)
+        kerb &= square < 0.5
+        cover = np.maximum(cover, square)
+    return cover.astype(np.float32), kerb
+
+
+def road_colour(ix: IntArray, iy: IntArray, k: int) -> FloatArray:
+    """The colour of cobbles at pixels `ix`, `iy` of a picture `k` to an art pixel, RGB from 0
+    to 255."""
     u = (ix + 0.5) / k
     v = (iy + 0.5) / k
-    width, height = TOWN_STONE
-    row = np.floor(v / height)
-    along = u / width + 0.5 * (row % 2)
-    stone = np.floor(along)
-    tone = 0.88 + 0.16 * table_hash(stone.astype(np.int64), row.astype(np.int64), 91)
-    colour = TOWN_SETTS * tone[..., None]
-    joint = ((along - stone) * width < TOWN_JOINT) | ((v / height - row) * height < TOWN_JOINT)
-    colour[joint] = TOWN_JOINTS
-    size, earth_from = TOWN_EARTH
-    earth = np.clip((noise(x, y, size, 65) - earth_from) * 6, 0, 1)[..., None]
-    colour = colour * (1 - earth) + TOWN_EARTH_COLOUR * earth
-    return colour * (0.94 + 0.1 * table_hash(ix, iy, 92))[..., None]
+    row = np.floor(v)
+    along = u + 0.5 * (row % 2)
+    cobble = np.floor(along)
+    tone = 0.88 + 0.16 * table_hash(cobble.astype(np.int64), row.astype(np.int64), 93)
+    colour = ROAD_SETTS * tone[..., None]
+    joint = (along - cobble < ROAD_JOINT) | (v - row < ROAD_JOINT)
+    colour[joint] *= 0.82
+    return colour * (0.95 + 0.08 * table_hash(ix, iy, 94))[..., None]
 
 
 def _on_map(canvas: FloatArray, shown: BoolArray | None) -> BoolArray:

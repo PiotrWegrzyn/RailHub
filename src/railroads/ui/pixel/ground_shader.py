@@ -229,7 +229,8 @@ class GroundShader:
         self._woodland = new_texture()
         self._trees = np.zeros((0, 2), dtype=np.float32)
         self._clearings = np.zeros((0, 4), dtype=np.float32)
-        self._town_pixels: tuple[FloatArray, FloatArray] = (np.zeros(0), np.zeros(0))
+        self._roads = cpu.Roads.none()
+        self._road_boxes = (np.zeros((0, 4)), np.zeros((0, 4)))
         self._plots = np.zeros((0, 10), dtype=np.float32)
         self._yards = np.zeros((0, 4), dtype=np.float32)
         self.surfaces_version: object = None
@@ -434,10 +435,11 @@ class GroundShader:
         """Takes what is drawn over the ground from `ground`: each cell's say in the woods and
         whether it is land, where trees stand, whose shade lies on the grass round them, where
         logging camps clear the woods round them, the fields and groves, the buildings' yards and
-        where cells lay town ground."""
+        the roads of towns."""
         GL.glDeleteTextures(1, [self._woodland])
-        self._woodland = _floats(np.pad(ground.woodland, ((0, 0), (0, 0), (0, 1))))
-        self._town_pixels = ground.town_pixels
+        self._woodland = _floats(np.pad(ground.woodland, ((0, 0), (0, 0), (0, 2))))
+        self._roads = ground.roads
+        self._road_boxes = ground.road_boxes
         self._trees = np.stack(ground.trees, axis=-1).astype(np.float32).reshape(-1, 2)
         xs, feet, reaches = (np.asarray(values, dtype=np.float64) for values in ground.clearings)
         ys = feet + cpu.CLEARING_DROP
@@ -499,6 +501,7 @@ class GroundShader:
         plots = _near(self._plots, (left, top), chunk_size, PLOT_REACH)[:, 2:]
         yards = self._yards
         yards = _near(yards, (left, top), chunk_size, float(yards[:, 2].max(initial=0.0)) + 1)
+        roads, squares = cpu.near_roads(self._roads, self._road_boxes, (left, top), chunk_size)
         uniforms = self._ground_uniforms(View(left, top, CHUNK, rows)) | {
             "chunk_origin": ("2i", (left, top)),
             "k": ("1i", (drawn,)),
@@ -510,33 +513,31 @@ class GroundShader:
             "edges": ("1i", (5,)),
             "plots": ("1i", (6,)),
             "yards": ("1i", (7,)),
-            "woods": ("1i", (8,)),
-            "towns_near": ("1i", (int(self._towns_near(left, top, rows)),)),
+            "road_count": ("1i", (len(roads),)),
+            "square_count": ("1i", (len(squares),)),
+            "roads": ("1i", (8,)),
+            "squares": ("1i", (9,)),
+            "woodland": ("1i", (10,)),
         }
         if self._chunk_plots:
             GL.glDeleteTextures(1, [self._chunk_plots])
         self._chunk_plots = _floats(_columns(plots))
         listed = _floats(_row(yards))
+        lines = _floats(_row(roads.astype(np.float32)))
+        rims = _floats(_row(np.pad(squares, ((0, 0), (0, 1))).astype(np.float32)))
         textures = (
             self._wooded.texture,
             self._edges.texture,
             self._chunk_plots,
             listed,
+            lines,
+            rims,
             self._woodland,
         )
         inputs = (self._cells, self._light, self._table, self._chunk_relief.texture, *textures)
         self._run(self._canopy, self._programs.canopy, uniforms | {"mode": ("1i", (0,))}, inputs)
         self._run(self._groves, self._programs.canopy, uniforms | {"mode": ("1i", (1,))}, inputs)
-        GL.glDeleteTextures(1, [listed])
-
-    def _towns_near(self, left: int, top: int, rows: int) -> bool:
-        """Whether town ground may reach into the art pixels CHUNK across and `rows` down from
-        (`left`, `top`)."""
-        px, py = self._town_pixels
-        reach = cpu.TOWN_REACH
-        near = (px > left - reach) & (px < left + CHUNK + reach)
-        near &= (py > top - reach) & (py < top + rows + reach)
-        return bool(near.any())
+        GL.glDeleteTextures(3, [listed, lines, rims])
 
     def dress_onto(self, target: RenderTarget, chunk: tuple[int, int], k: int, times: int) -> None:
         """Draws what `lay_surfaces` worked out for a chunk into `target`, premultiplied by its
