@@ -5092,107 +5092,735 @@ def sake_brewery() -> Sprite:
     return p.sprite()
 
 
-def tannery() -> Sprite:
-    """Low tanning sheds with doors, windows, slatted drying lofts and dark plinths, hides
-    stretched to dry on wooden frames over drip-stained ground, a pit of tan liquor sunk in a
-    sodden patch, a heap of oak bark spreading over the ground and a track worn out of the near
-    shed's door."""
-    p = Painter(34, 30, (17, 18))
-    near = _footing(-7, -2, 10, 5)
-    _bed(p, _footing(-2, -6, 10, 5))
-    _bed(p, near)
-    p.blob(-8, 3, 2, 8, (92, 84, 56))
-    _spill(p, -12, 7, 3, (140, 92, 58))
-    p.shadow(12, 3.5)
-    _track(p, near[0], near[1], (0.3, 0.7), 2.5)
-    wall, roof = (184, 160, 124), (96, 82, 74)
-    for x, y in ((-2, -6), (-7, -2)):
-        top = p.hall(x, y, 10, 5, 4, wall, None)
-        _plinth(p, top, 4, wall, 0.7)
-        _stains(p, top[1], top[2], 4, (0.2, 0.8), shade(wall, 0.52), 1)
-        for t in (0.1, 0.18):
-            p.line(
-                [_on_wall(top[0], top[1], t, 0.5), _on_wall(top[0], top[1], t, 2.6)], (110, 92, 70)
+TAN_OCHRE: RGB = (206, 162, 98)
+TAN_OAK: RGB = (94, 68, 48)
+TAN_SLAT: RGB = (140, 106, 74)
+TAN_ROOF: RGB = (124, 70, 50)
+TAN_MUD: RGB = (104, 86, 62)
+TAN_LIME: RGB = (234, 234, 224)
+TAN_BARK: RGB = (132, 76, 46)
+TAN_HIDES: tuple[RGB, ...] = ((232, 204, 160), (204, 152, 96), (162, 100, 60))
+TAN_LIQUORS: tuple[RGB, ...] = ((82, 52, 32), (112, 72, 42), (146, 100, 58))
+
+
+def _tan_louvres(
+    p: Painter,
+    a: Point,
+    b: Point,
+    bays: int,
+    span: tuple[float, float],
+    tone: float,
+) -> None:
+    """A storey of drying loft on the wall under the edge from `a` to `b`, from `span[0]` to `span[1]` down it: oak posts dividing it into `bays`, and between them
+    slatted louvres with dark gaps, pale hides hung to dry showing through them."""
+    m = METRE
+    head, foot = span
+    _patch(p, a, b, (0, 1), span, shade((50, 38, 30), tone))
+    for k in range(bays):
+        t0, t1 = k / bays, (k + 1) / bays
+        for j in range(3):
+            s0 = t0 + (t1 - t0) * (0.12 + 0.28 * j)
+            s1 = s0 + (t1 - t0) * 0.22
+            hide = TAN_HIDES[(k + j) % len(TAN_HIDES)]
+            _patch(
+                p,
+                a,
+                b,
+                (s0, s1),
+                (head + 0.3 * m, foot - 0.4 * m - 0.3 * m * ((k + j) % 2)),
+                shade(hide, tone * 0.8),
             )
-        _patch(p, top[0], top[1], (0.3, 0.7), (1, 4), (70, 56, 44))
-        p.line([_on_wall(top[0], top[1], 0.5, 1), _on_wall(top[0], top[1], 0.5, 4)], (54, 42, 34))
-        _window(p, top[0], top[1], (0.78, 0.92), 1.2)
-        _window(p, top[1], top[2], (0.35, 0.65), 1.2, shade(WINDOW, 0.8))
-        p.gable(top, 3, roof, wall)
-        _roof_rows(p, top, 3, roof, (0.5,))
-        ridge_back, ridge_front = _ridge(top, 3)
-        p.line(
-            [
-                _on_wall(ridge_back, ridge_front, 0.3, -0.6),
-                _on_wall(ridge_back, ridge_front, 0.7, -0.6),
-            ],
-            shade(roof, 0.7),
+    rows = max(2, round((foot - head) / (0.42 * m)))
+    for r in range(rows):
+        d0 = head + (foot - head) * r / rows
+        d1 = d0 + (foot - head) / rows * 0.58
+        _patch(p, a, b, (0, 1), (d0, d1), shade(TAN_SLAT, tone))
+        _bar(
+            p,
+            _on_wall(a, b, 0, d0 + 0.03 * m),
+            _on_wall(a, b, 1, d0 + 0.03 * m),
+            0.05 * m,
+            shade(TAN_SLAT, tone * 1.25),
         )
-    p.ellipse(-6, 4, 0, 7, (138, 116, 86))
-    p.blob(-5, 4.5, -1, 6.5, (96, 66, 40))
-    p.point(-4, 5, (140, 100, 62))
-    _heap(p, -12, 7, 3, 2.5, (140, 92, 58))
-    for k, hide in enumerate(((198, 150, 100), (162, 108, 68), (214, 180, 130))):
-        _hide_frame(p, 2 + 4 * k, 6 - 2 * k, hide)
+    for k in range(bays + 1):
+        t = k / bays
+        _bar(p, _on_wall(a, b, t, head), _on_wall(a, b, t, foot), 0.3 * m, shade(TAN_OAK, tone))
+    for d in (head, foot):
+        _bar(p, _on_wall(a, b, 0, d), _on_wall(a, b, 1, d), 0.3 * m, shade(TAN_OAK, tone))
+
+
+def _tan_pit(
+    p: Painter,
+    at: Callable[[float, float], Point],
+    u: tuple[float, float],
+    v: tuple[float, float],
+    liquor: RGB,
+) -> None:
+    """A tanning pit sunk in the ground from `u[0]` to `u[1]` along and `v[0]` to `v[1]` across,
+    where `at` places a spot on the ground: a kerb of oak planks round it and the dark liquor
+    of bark, or the milky lime, standing a little below the kerb."""
+    m = METRE
+    (u0, u1), (v0, v1) = u, v
+    kerb = 0.28
+    p.polygon(
+        [
+            at(u0 - kerb, v0 - kerb),
+            at(u1 + kerb, v0 - kerb),
+            at(u1 + kerb, v1 + kerb),
+            at(u0 - kerb, v1 + kerb),
+        ],
+        (150, 118, 84),
+    )
+    p.polygon([at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)], (46, 36, 30))
+    drop = 0.35 * m
+    near_l, near_r, far_r, far_l = at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)
+    p.polygon(
+        [
+            near_l,
+            near_r,
+            (far_r[0], far_r[1] + drop),
+            (far_l[0], far_l[1] + drop),
+        ],
+        liquor,
+    )
+    sheen = shade(liquor, 1.3 if liquor != TAN_LIME else 0.94)
+    sx, sy = at(u0 + (u1 - u0) * 0.3, v0 + (v1 - v0) * 0.55)
+    p.blob(
+        sx - 0.5 * m, sy - 0.08 * m + drop * 0.5, sx + 0.3 * m, sy + 0.12 * m + drop * 0.5, sheen
+    )
+    _bar(p, near_l, near_r, 0.12 * m, (176, 142, 102))
+
+
+def _tan_hide(
+    p: Painter,
+    at: Callable[[float, float], Point],
+    cs: float,
+    cd: float,
+    hs: float,
+    hd: float,
+    hide: RGB,
+) -> list[Point]:
+    """The outline of a hide spread flat, its middle at (`cs`, `cd`) on a face where `at(s, d)`
+    gives the point `s` across and `d` down it, `hs` and `hd` its half width and height: a
+    broad back, four legs reaching to the corners, the neck at its top and the tail at its foot,
+    lit pale along its spine. Returns the tips of its legs."""
+    half = [
+        (0.0, -1.0),
+        (0.2, -0.94),
+        (0.36, -0.72),
+        (0.78, -0.98),
+        (0.92, -0.82),
+        (0.62, -0.5),
+        (0.66, -0.05),
+        (0.62, 0.34),
+        (0.86, 0.62),
+        (0.96, 0.86),
+        (0.7, 0.86),
+        (0.4, 0.74),
+        (0.16, 0.92),
+        (0.06, 1.0),
+    ]
+    outline = half + [(-x, y) for x, y in reversed(half)]
+    p.polygon([at(cs + x * hs, cd + y * hd) for x, y in outline], hide, shade(hide, 0.62))
+    p.polygon(
+        [
+            at(cs + x * hs * 0.35, cd + y * hd * 0.8)
+            for x, y in ((0, -1), (1, -0.6), (1, 0.7), (0, 1), (-1, 0.7), (-1, -0.6))
+        ],
+        shade(hide, 1.1),
+    )
+    return [
+        at(cs + x * hs, cd + y * hd)
+        for x, y in ((0.85, -0.92), (-0.85, -0.92), (0.92, 0.86), (-0.92, 0.86))
+    ]
+
+
+def _tan_frame(
+    p: Painter, x: float, y: float, wide: float, tall: float, hide: RGB, slope: float = 0.5
+) -> None:
+    """A hide laced with cords into an upright oak frame `wide` across and `tall` high standing
+    on (x, y), its left foot, along a face running `slope` down for every unit across, to dry
+    and stretch, dripping onto the ground."""
+    m = METRE
+    tone = 1.0 if slope > 0 else 0.8
+
+    def at(s: float, d: float) -> Point:
+        return x + s, y + s * slope - tall + d
+
+    p.blob(
+        x + wide * 0.15,
+        y + wide * slope * 0.5 - 0.3 * m,
+        x + wide * 0.85,
+        y + wide * slope * 0.5 + 0.4 * m,
+        (84, 74, 52),
+        150,
+    )
+    rail = 0.18 * m
+    for s in (0, wide):
+        _bar(p, at(s, -0.25 * m), at(s, tall), rail, shade(TAN_OAK, tone * 1.1))
+    for d in (0.1 * m, tall - 0.45 * m):
+        _bar(p, at(-0.15 * m, d), at(wide + 0.15 * m, d), rail, shade(TAN_OAK, tone * 1.2))
+    tips = _tan_hide(p, at, wide / 2, tall * 0.48, wide * 0.4, tall * 0.36, shade(hide, tone))
+    cord = (60, 48, 40)
+    corners = [at(wide, 0.1 * m), at(0, 0.1 * m), at(wide, tall - 0.45 * m), at(0, tall - 0.45 * m)]
+    for tip, corner in zip(tips, corners, strict=True):
+        _bar(p, tip, corner, 0.05 * m, cord)
+    for s in (0.25, 0.5, 0.75):
+        _bar(p, at(wide * s, tall * 0.48 - tall * 0.34), at(wide * s, 0.1 * m), 0.04 * m, cord)
+        _bar(
+            p,
+            at(wide * s, tall * 0.48 + tall * 0.33),
+            at(wide * s, tall - 0.45 * m),
+            0.04 * m,
+            cord,
+        )
+
+
+def _tan_bark(p: Painter, x: float, y: float, half: float, tall: float) -> None:
+    """A heap of oak bark for the tan liquor, `half` across either way and `tall` high on
+    (x, y): a rounded mound of rusty brown lit on its left, rough curls of bark lying over it
+    and slipped round its foot."""
+    m = METRE
+    p.blob(
+        x - half * 1.2, y - half * 0.35, x + half * 1.25, y + half * 0.5, shade(TAN_BARK, 0.62), 170
+    )
+    profile = [
+        (0.0, half),
+        (tall * 0.35, half * 0.82),
+        (tall * 0.7, half * 0.52),
+        (tall * 0.92, half * 0.22),
+        (tall, 0.0),
+    ]
+    split = math.acos(1 / 3)
+    lit_arc = [
+        (x + half * math.cos(a), y + half / 2 * math.sin(a)) for a in np.linspace(split, math.pi, 6)
+    ]
+    dark_arc = [
+        (x + half * math.cos(a), y + half / 2 * math.sin(a)) for a in np.linspace(0, split, 4)
+    ]
+    left = [(x - w, y - h) for h, w in profile]
+    middle = [(x + w / 3, y - h) for h, w in profile]
+    right = [(x + w, y - h) for h, w in profile]
+    p.polygon(lit_arc + left + middle[::-1], TAN_BARK)
+    p.polygon(dark_arc + middle + right[::-1], shade(TAN_BARK, 0.74))
+    for k in range(16):
+        h = tall * (0.06 + 0.8 * ((k * 5) % 16) / 16)
+        w = half * (1 - h / tall) ** 0.8
+        across = ((k * 7) % 11) / 10 * 2 - 1
+        px, py = x + w * across * 0.85, y - h + w * 0.25 * (1 - across * across)
+        tone = 1.25 if across < 0.2 else 0.95
+        _bar(
+            p,
+            (px - 0.28 * m, py + 0.08 * m),
+            (px + 0.28 * m, py - 0.06 * m),
+            0.13 * m,
+            shade(TAN_BARK, tone),
+        )
+    for dx in (-1.1, 0.9, 1.2):
+        px, py = x + dx * half, y + 0.25 * half
+        _bar(p, (px - 0.3 * m, py), (px + 0.3 * m, py - 0.1 * m), 0.13 * m, shade(TAN_BARK, 0.9))
+
+
+def _tan_cart(p: Painter, x: float, y: float) -> None:
+    """A two-wheeled cart 3.2 m long at (x, y) along the lit walls, piled with raw hides still in
+    their hair, red-brown, black and white, one hanging over its side, its shafts down on the
+    ground ahead of it."""
+    m = METRE
+    p.blob(x - 2.4 * m, y - 0.9 * m, x + 2.6 * m, y + 1.2 * m, (60, 56, 52), 100)
+    for v in (-0.45, 0.45):
+        sx, sy = _iso(x, y, 1.6 * m, v * m)
+        _bar(p, (sx, sy - 0.9 * m), _iso(sx, sy, 2.4 * m, 0), 0.14 * m, shade(TAN_OAK, 1.2))
+    body = p.hall(x, y - 0.9 * m, 3.2 * m, 1.7 * m, 0.6 * m, (128, 92, 60), (96, 70, 48))
+    left, front, _, _ = body
+    for t in (0.33, 0.66):
+        _bar(p, _on_wall(left, front, t, 0), _on_wall(left, front, t, 0.6 * m), 0.08 * m, TAN_OAK)
+    pile = ((150, 86, 56), (62, 50, 44), (196, 130, 82), (226, 214, 196), (122, 66, 44))
+    for k, colour in enumerate(pile):
+        along, across = 0.5 + 0.95 * (k % 3), 0.5 + 0.7 * (k // 3)
+        cx, cy = _iso(*left, along * m, across * m)
+        lift = (0.15 + 0.3 * (k // 3)) * m
+        p.blob(cx - 1.1 * m, cy - lift - 0.55 * m, cx + 1.1 * m, cy - lift + 0.45 * m, colour)
+        p.blob(
+            cx - 0.7 * m,
+            cy - lift - 0.5 * m,
+            cx + 0.3 * m,
+            cy - lift - 0.1 * m,
+            shade(colour, 1.15),
+        )
+    drape = (172, 104, 64)
+    a, b = _on_wall(left, front, 0.4, 0), _on_wall(left, front, 0.78, 0)
+    p.polygon(
+        [
+            a,
+            b,
+            (b[0], b[1] + 0.8 * m),
+            (b[0] - 0.4 * m, b[1] + 1.0 * m),
+            (a[0] + 0.3 * m, a[1] + 0.9 * m),
+        ],
+        drape,
+        shade(drape, 0.6),
+    )
+    wx, wy = _on_wall(left, front, 0.5, 0.7 * m)
+    p.ellipse(wx - 0.75 * m, wy - 0.75 * m, wx + 0.75 * m, wy + 0.75 * m, (60, 48, 40))
+    p.ellipse(wx - 0.55 * m, wy - 0.55 * m, wx + 0.55 * m, wy + 0.55 * m, (128, 92, 60))
+    for k in range(3):
+        turn = k * math.pi / 3
+        dx, dy = 0.5 * m * math.cos(turn), 0.5 * m * math.sin(turn)
+        _bar(p, (wx - dx, wy - dy), (wx + dx, wy + dy), 0.09 * m, (70, 52, 38))
+    p.blob(wx - 0.14 * m, wy - 0.14 * m, wx + 0.14 * m, wy + 0.14 * m, (44, 38, 34))
+
+
+def tannery() -> Sprite:
+    """A tanyard. The tannery, 20 by 10 m, has a beamhouse of ochre-washed walls with arched
+    doors and barred windows, and jettied over it a tall timber storey of louvred drying lofts,
+    two floors of slatted oak with pale hides glimpsed hanging through them, under a steep
+    chestnut-tiled roof with two louvred vents on its ridge. Before it twelve tanning pits
+    are sunk in the trodden mud in two rows, kerbed in oak planks and brimming with bark liquor
+    from pale to near black, the two by the door milky white with lime. Hides stretched to dry
+    in upright oak frames stand in a row beside it, a cart piled with raw hides waits at the
+    door, and heaps of oak bark for the liquor rise behind."""
+    m = METRE
+    p = Painter(46, 36, (23, 23))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 11.5) * m, (v - 1.5) * m)
+
+    def up(u: float, v: float, z: float) -> Point:
+        x, y = at(u, v)
+        return x, y - z * m
+
+    length, depth = 20 * m, 10 * m
+    low, high, rise = 4.2 * m, 9.6 * m, 4.2 * m
+    p.polygon(
+        [at(-1, -7.4), at(25, -7.4), at(25, 0.6), at(21, 0.6), at(21, -0.6), at(-1, -0.6)], TAN_MUD
+    )
+    p.soft([(*at(-1.5, -5), *at(4, -1.5))], TAN_LIME, 0.35, 0.6)
+    p.shadow(15, 5, 3)
+    _tan_bark(p, *at(23.5, 11.5), 3.0 * m, 3.0 * m)
+    _tan_bark(p, *at(26.5, 9), 2.2 * m, 2.0 * m)
+    foot = _footing(*at(10, 5), length, depth)
+    _bed(p, foot)
+    beam = p.hall(*at(10, 5), length, depth, low, TAN_OCHRE, None)
+    left, front, right, _ = beam
+    _plinth(p, beam, low, TAN_OCHRE, 0.6 * m)
+    _stains(p, left, front, low, (0.04, 0.16, 0.5, 0.62, 0.95), shade(TAN_OCHRE, 0.72), 1.4 * m)
+    for t in (0.14, 0.62):
+        p.polygon(_round_head(left, front, length, t, 3 * m, 0.7 * m, low), shade(TAN_OCHRE, 0.78))
+        p.polygon(_round_head(left, front, length, t, 2.6 * m, 0.9 * m, low), (52, 40, 34))
+        _patch(p, left, front, (t - 0.06, t - 0.002), (1.9 * m, low), (110, 74, 48))
+    for t in (0.3, 0.42, 0.78, 0.9):
+        _patch(p, left, front, (t - 0.03, t + 0.03), (1.0 * m, 2.6 * m), (52, 44, 40))
+        for s in (t - 0.012, t + 0.012):
+            _bar(
+                p,
+                _on_wall(left, front, s, 1.0 * m),
+                _on_wall(left, front, s, 2.6 * m),
+                0.07 * m,
+                (40, 34, 32),
+            )
+    _patch(p, front, right, (0.35, 0.65), (1.0 * m, low), (52, 40, 34))
+    loft = p.hall(*up(10, 5, 4.2), length + 0.8 * m, depth + 0.8 * m, high - low, TAN_OAK, None)
+    l_left, l_front, l_right, _ = loft
+    mid = (high - low) / 2
+    for a, b, bays, tone in ((l_left, l_front, 8, 1.0), (l_front, l_right, 4, 0.78)):
+        _tan_louvres(p, a, b, bays, (0.2 * m, mid), tone)
+        _tan_louvres(p, a, b, bays, (mid, high - low - 0.1 * m), tone)
+    p.gable(loft, rise, TAN_ROOF, TAN_OAK)
+    _roof_rows(p, loft, rise, TAN_ROOF, (0.2, 0.4, 0.6, 0.8))
+    back, front_ridge = _ridge(loft, rise)
+    for along in (0.3, 0.7):
+        vx, vy = _on_wall(back, front_ridge, along, 0)
+        vent = p.hall(vx, vy + 0.5 * m, 4.5 * m, 2 * m, 1.9 * m, (40, 32, 28), None)
+        v_left, v_front, v_right, _ = vent
+        for a, b, tone in ((v_left, v_front, 1.0), (v_front, v_right, 0.78)):
+            for r in range(4):
+                d = (0.25 + 0.3 * r) * m
+                _patch(p, a, b, (0, 1), (d, d + 0.17 * m), shade(TAN_SLAT, tone * 1.1))
+        p.gable(vent, 1.0 * m, shade(TAN_ROOF, 0.9), (40, 32, 28))
+    _tan_cart(p, *at(5.3, -1.5))
+    for k in range(2):
+        for j in range(6):
+            u0 = 2.0 + 3.1 * j
+            liquor = TAN_LIME if j == 0 else TAN_LIQUORS[(j + k) % 3]
+            v0 = -4.4 - 2.7 * k
+            _tan_pit(p, at, (u0, u0 + 2.3), (v0, v0 + 1.7), liquor)
+    for k, (u, v) in enumerate(((20.2, -6.8), (21.4, -3.3), (22.6, 0.2), (23.8, 3.7))):
+        _tan_frame(p, *at(u, v), 3.6 * m, 3.7 * m, TAN_HIDES[k % 3])
     return p.sprite()
 
 
-def shoe_factory() -> Sprite:
-    """A narrow workshop of two storeys in leather brown with a cornice between its floors, windows with sills, a
-    shop window and door on the ground floor, a chimney, a pavement of flags along its front with
-    a worn path to the door, boxes of shoes at its foot and a big boot hung out from its wall as
-    a sign."""
-    p = Painter(24, 38, (12, 29))
-    foot = _footing(1, 0, 6, 6)
-    paving = (176, 170, 158)
-    _bed(p, foot, paving, 2.2)
-    _bed(p, foot, SOIL, 0.8)
-    for t in (0.3, 0.6):
-        p.line(
-            [_on_wall(foot[0], foot[1], t, 0.8), _on_wall(foot[0], foot[1], t, 2)],
-            shade(paving, 0.8),
+SHOE_BRICK: RGB = (180, 100, 66)
+SHOE_TRIM: RGB = (238, 222, 186)
+SHOE_SLATE: RGB = (78, 74, 84)
+SHOE_LEATHER: RGB = (150, 96, 58)
+SHOE_CARTON: RGB = (206, 176, 128)
+SHOE_LAMPLIT: RGB = (226, 196, 134)
+
+
+def _shoe_window(
+    p: Painter,
+    a: Point,
+    b: Point,
+    length: float,
+    t: float,
+    wide: float,
+    span: tuple[float, float],
+    tone: float = 1.0,
+) -> None:
+    """A tall factory window `wide` across about `t` along the wall under the edge from `a` to
+    `b`, which is `length` units long, from `span[0]` down the wall to `span[1]`: a cream lintel
+    with a keystone and a cream sill, small panes in an iron frame, and through the lower ones a
+    lamplit room with a bench of stitching machines along it."""
+    m = METRE
+    head, foot = span
+    half = wide / 2 / length
+    trim, glass = shade(SHOE_TRIM, tone), shade((58, 66, 82), tone)
+    _patch(p, a, b, (t - half, t + half), span, glass)
+    room = head + (foot - head) * 0.38
+    _patch(p, a, b, (t - half, t + half), (room, foot), shade(SHOE_LAMPLIT, tone))
+    bench = head + (foot - head) * 0.8
+    _patch(p, a, b, (t - half, t + half), (bench, foot), shade((92, 60, 42), tone))
+    for k in range(2):
+        s = t - half + 2 * half * (0.28 + 0.44 * k)
+        x, y = _on_wall(a, b, s, bench)
+        p.polygon(
+            [
+                (x - 0.22 * m, y),
+                (x - 0.22 * m, y - 0.3 * m),
+                (x + 0.22 * m, y - 0.38 * m),
+                (x + 0.22 * m, y),
+            ],
+            shade((46, 42, 44), tone),
         )
-    p.shadow(8, 2.5)
-    _track(p, foot[0], foot[1], (0.55, 0.8), 2.4, shade(paving, 0.9), ruts=False)
-    wall, roof = (170, 112, 70), (92, 52, 40)
-    s, floors = 6, 2
-    top = p.box(1, 0, s, 4 * floors, wall, None)
-    left, front, right, _ = top
-    _plinth(p, top, 4 * floors, wall)
-    _stains(p, front, right, 4 * floors, (0.15, 0.5, 0.85), shade(wall, 0.58), 1.5)
-    for f in range(1, floors):
-        _bands(p, left, front, right, 4 * f - 0.5, shade(wall, 1.15), shade(wall, 0.85))
-    for f in range(floors - 1):
-        for t in (0.3, 0.7):
-            _window(p, left, front, (t - 0.07, t + 0.07), 1.2 + 4 * f, tall=1.6)
-    for f in range(floors):
-        for t in (0.3, 0.7):
-            _window(p, front, right, (t - 0.07, t + 0.07), 1.2 + 4 * f, shade(WINDOW, 0.75), 1.6)
-    ground = 4 * (floors - 1)
-    _patch(p, left, front, (0.1, 0.42), (ground + 0.8, ground + 2.8), GLASS)
-    p.line(
-        [_on_wall(left, front, 0.15, ground + 1.4), _on_wall(left, front, 0.2, ground + 1.2)],
-        (220, 236, 244),
+    bar = shade((40, 40, 46), tone)
+    _bar(p, _on_wall(a, b, t, head), _on_wall(a, b, t, foot), 0.08 * m, bar)
+    for k in (1, 2):
+        d = head + (foot - head) * k / 3
+        _bar(p, _on_wall(a, b, t - half, d), _on_wall(a, b, t + half, d), 0.07 * m, bar)
+    lip = 0.25 * m / length
+    _patch(p, a, b, (t - half - lip, t + half + lip), (head - 0.45 * m, head), trim)
+    _patch(
+        p,
+        a,
+        b,
+        (t - 0.12 * m / length, t + 0.12 * m / length),
+        (head - 0.55 * m, head + 0.1 * m),
+        shade(trim, 1.04),
     )
-    _patch(p, left, front, (0.08, 0.44), (ground + 0.2, ground + 0.8), (210, 186, 140))
-    _door(p, left, front, (0.55, 0.8), ground + 0.5, ground + 4, (60, 40, 30))
-    p.point(*_on_wall(left, front, 0.75, ground + 2.2), (226, 196, 120))
-    p.gable(top, 4, roof, wall)
-    _roof_rows(p, top, 4, roof)
-    x, y = _on_roof(top, 4, 0.7, 0.9)
-    p.rect(x - 1, y - 2.5, x, y, BRICK)
-    p.line([(x - 1.5, y - 3), (x + 0.5, y - 3)], shade(BRICK, 0.55))
-    p.line([(-5, -8.5), (-7.5, -8.5)], (60, 56, 54))
-    boot = (140, 54, 40)
+    _patch(p, a, b, (t - half - lip * 0.6, t + half + lip * 0.6), (foot, foot + 0.22 * m), trim)
+
+
+def _shoe_boot(p: Painter, x: float, y: float, tall: float) -> None:
+    """A gilt boot `tall` high standing on (x, y), turned side on to the viewer with its toe to
+    the right: a laced shaft, a dark sole and a heel, lit along its back and shaft."""
+    w = tall
+    outline = (
+        (0.04, 0.0),
+        (0.46, 0.0),
+        (0.46, 0.5),
+        (0.62, 0.58),
+        (0.84, 0.66),
+        (0.97, 0.75),
+        (1.0, 0.84),
+        (0.97, 0.9),
+        (0.4, 0.9),
+        (0.32, 0.86),
+        (0.25, 0.9),
+        (0.25, 1.0),
+        (0.0, 1.0),
+        (0.0, 0.82),
+        (0.05, 0.58),
+        (0.0, 0.32),
+    )
+    left = x - w * 0.5
+
+    def pt(s: float, d: float) -> Point:
+        return left + s * w, y - tall + d * tall
+
+    p.polygon([pt(s, d) for s, d in outline], GILT, shade(GILT, 0.55))
+    p.polygon([pt(0.4, 0.9), pt(0.97, 0.9), pt(0.99, 0.84), pt(1.0, 0.95), pt(0.4, 0.96)], OXBLOOD)
+    p.polygon([pt(0.0, 0.9), pt(0.25, 0.9), pt(0.25, 1.0), pt(0.0, 1.0)], OXBLOOD)
+    p.polygon([pt(0.04, 0.0), pt(0.46, 0.0), pt(0.46, 0.08), pt(0.03, 0.08)], shade(GILT, 0.78))
+    p.polygon([pt(0.07, 0.12), pt(0.16, 0.12), pt(0.14, 0.8), pt(0.07, 0.8)], shade(GILT, 1.25))
+    for k in range(4):
+        d = 0.18 + 0.1 * k
+        _bar(p, pt(0.36, d), pt(0.46, d + 0.04), tall * 0.025, OXBLOOD)
+
+
+def _shoe_cartons(p: Painter, x: float, y: float, along: int, across: int, layers: int) -> None:
+    """Cartons of shoes, each 0.6 by 0.4 m and 0.3 m high, stacked `layers` deep on (x, y) in a
+    block `along` of them by `across`, a label on each end."""
+    m = METRE
+    long, wide, high = 0.6 * m, 0.4 * m, 0.3 * m
+    left, front, right, _ = p.hall(
+        x, y, along * long, across * wide, layers * high, SHOE_CARTON, shade(SHOE_CARTON, 1.12)
+    )
+    edge = shade(SHOE_CARTON, 0.7)
+    for k in range(1, layers):
+        _bar(
+            p,
+            _on_wall(left, front, 0, k * high),
+            _on_wall(left, front, 1, k * high),
+            0.04 * m,
+            edge,
+        )
+        _bar(
+            p,
+            _on_wall(front, right, 0, k * high),
+            _on_wall(front, right, 1, k * high),
+            0.04 * m,
+            shade(edge, 0.8),
+        )
+    for k in range(1, along):
+        _bar(
+            p,
+            _on_wall(left, front, k / along, 0),
+            _on_wall(left, front, k / along, layers * high),
+            0.04 * m,
+            edge,
+        )
+    for k in range(layers):
+        for j in range(along):
+            t = (j + 0.5) / along
+            _patch(
+                p,
+                left,
+                front,
+                (t - 0.2 / along, t + 0.2 / along),
+                (k * high + 0.1 * m, k * high + 0.2 * m),
+                (244, 240, 228),
+            )
+
+
+def _shoe_stack(p: Painter, x: float, y: float, tall: float) -> None:
+    """A square brick boiler stack drawn for `tall` units and lowered (CHIMNEY_SHARE): a plinth
+    with a cream band, a shaft tapering from 2 m square to 1.4 m with cream bands, a corbelled
+    black cap, smoking."""
+    m = METRE
+    tall *= CHIMNEY_SHARE
+    base = 2.6 * m
+    plinth = p.hall(x, y, 2.6 * m, 2.6 * m, base, SHOE_BRICK, None)
+    _bands(p, plinth[0], plinth[1], plinth[2], 0.3 * m, SHOE_TRIM, shade(SHOE_TRIM, 0.78))
+    foot, head = y - base, y - tall
+    r0, r1 = 1.0 * m, 0.7 * m
+    lit = [(x - 2 * r0, foot), (x, foot + r0), (x, head + r1), (x - 2 * r1, head)]
+    dark = [(x, foot + r0), (x + 2 * r0, foot), (x + 2 * r1, head), (x, head + r1)]
+    p.polygon(lit, SHOE_BRICK, shade(SHOE_BRICK, 0.6))
+    p.polygon(dark, shade(SHOE_BRICK, 0.76), shade(SHOE_BRICK, 0.5))
+    for up_ in (0.35, 0.7, 0.93):
+        h = (foot - head) * up_
+        r = r0 + (r1 - r0) * up_
+        yy = foot - h
+        _bar(p, (x - 2 * r, yy), (x, yy + r), 0.3 * m, SHOE_TRIM)
+        _bar(p, (x, yy + r), (x + 2 * r, yy), 0.3 * m, shade(SHOE_TRIM, 0.78))
+    p.hall(
+        x,
+        head + r1 * 0.5 + 0.2 * m,
+        2 * r1 * 1.25,
+        2 * r1 * 1.25,
+        0.7 * m,
+        (60, 52, 50),
+        (30, 28, 30),
+    )
+    _smoke(p, x + 1, head - 4, (210, 208, 212), 2)
+
+
+def shoe_factory() -> Sprite:
+    """A boot and shoe factory of warm brick, 26 by 11 m and three storeys high: even rows of
+    tall windows of small panes under cream lintels between pilasters, lamplit rooms of
+    stitching benches glimpsed through them, cream bands at every floor and a slate roof lit by
+    a strip of glazing, its middle bays rising in a cream-trimmed gable that carries a gilt boot
+    on its top. Beside it stands a two-storey leather store with stacked loading doors, a hoist
+    and a cart of hides from the tannery under it, a boiler house behind with a tall square
+    stack smoking, and along the front a loading dock stacked with crates and cartons of
+    shoes."""
+    m = METRE
+    p = Painter(52, 34, (26, 22))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 15.9) * m, (v - 7.1) * m)
+
+    def up(u: float, v: float, z: float) -> Point:
+        x, y = at(u, v)
+        return x, y - z * m
+
+    length, depth, high, rise = 26 * m, 11 * m, 12.6 * m, 3 * m
+    wall = SHOE_BRICK
     p.polygon(
-        [(-8.5, -8), (-6, -8), (-6, -3.5), (-9.5, -3.5), (-9.5, -4.6), (-9, -5.2), (-8.5, -5.2)],
-        boot,
-        shade(boot, 0.5),
+        [at(14.5, -4.5), at(36, -4.5), at(36, 8), at(26, 8), at(26, 0), at(14.5, 0)],
+        (150, 140, 124),
     )
-    p.line([(-7.6, -7.4), (-7.6, -5.4)], shade(boot, 1.4))
-    p.line([(-9.5, -3.5), (-6, -3.5)], (40, 32, 30))
-    for x, y in ((6, 5), (8.5, 4)):
-        _crate(p, x, y, (196, 160, 112))
+    p.shadow(17.5, 5.5, 2.5)
+    boiler = p.hall(*at(30, 11), 6 * m, 5 * m, 5 * m, wall, None)
+    _plinth(p, boiler, 5 * m, wall, 0.5 * m)
+    _patch(p, boiler[1], boiler[2], (0.3, 0.7), (1.5 * m, 5 * m), (50, 40, 38))
+    p.gable(boiler, 1.8 * m, SHOE_SLATE, wall)
+    _shoe_stack(p, *at(33.4, 10.6), 34 * m)
+    foot = _footing(*at(13, 5.5), length, depth)
+    _bed(p, foot)
+    top = p.hall(*at(13, 5.5), length, depth, high, wall, None)
+    left, front, right, _ = top
+    _plinth(p, top, high, wall, 0.6 * m)
+    _stains(p, left, front, high, (0.03, 0.3, 0.97), shade(wall, 0.68), 1.4 * m)
+    bays = 9
+    for k in range(bays + 1):
+        t = k / bays
+        _bar(
+            p,
+            _on_wall(left, front, t, 0.6 * m),
+            _on_wall(left, front, t, high),
+            0.55 * m,
+            shade(wall, 0.88),
+        )
+    for k in range(5):
+        t = k / 4
+        _bar(
+            p,
+            _on_wall(front, right, t, 0.6 * m),
+            _on_wall(front, right, t, high),
+            0.55 * m,
+            shade(wall, 0.7),
+        )
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
+        for d, w in ((0, 0.6), (4.35, 0.25), (8.55, 0.25)):
+            _patch(p, a, b, (0, 1), (d * m, (d + w) * m), shade(SHOE_TRIM, tone))
+    floors = ((1.2, 3.75), (5.4, 7.95), (9.6, 12.0))
+    for k in range(bays):
+        t = (k + 0.5) / bays
+        for j, (h0, f0) in enumerate(floors):
+            if j == 2 and k in (1, 6, 7):
+                continue
+            if j == 2 and k == 3:
+                continue
+            _shoe_window(p, left, front, length, t, 1.7 * m, (h0 * m, f0 * m))
+    for k in range(4):
+        t = (k + 0.5) / 4
+        for h0, f0 in floors:
+            _shoe_window(p, front, right, depth, t, 1.5 * m, (h0 * m, f0 * m), 0.78)
+    t = 1.5 / bays
+    p.polygon(_round_head(left, front, length, t, 2.4 * m, high - 3.9 * m, high), SHOE_TRIM)
+    p.polygon(_round_head(left, front, length, t, 1.9 * m, high - 3.6 * m, high), OXBLOOD)
+    _patch(
+        p,
+        left,
+        front,
+        (t - 0.0365, t + 0.0365),
+        (high - 3.6 * m, high - 2.9 * m),
+        shade(WINDOW, 1.1),
+    )
+    _bar(
+        p,
+        _on_wall(left, front, t, high - 2.6 * m),
+        _on_wall(left, front, t, high),
+        0.08 * m,
+        shade(OXBLOOD, 0.6),
+    )
+    for k in (6, 7):
+        t = (k + 0.5) / bays
+        _patch(p, left, front, (t - 0.042, t + 0.042), (high - 3.9 * m, high - 1.2 * m), SHOE_TRIM)
+        _patch(p, left, front, (t - 0.036, t + 0.036), (high - 3.7 * m, high - 1.2 * m), OXBLOOD)
+        _bar(
+            p,
+            _on_wall(left, front, t, high - 3.7 * m),
+            _on_wall(left, front, t, high - 1.2 * m),
+            0.08 * m,
+            shade(OXBLOOD, 0.6),
+        )
+    p.gable(top, rise, SHOE_SLATE, wall)
+    _roof_rows(p, top, rise, SHOE_SLATE, (0.3, 0.6))
+    glazing = [
+        _on_roof(top, rise, 0.05, 0.62),
+        _on_roof(top, rise, 0.95, 0.62),
+        _on_roof(top, rise, 0.95, 0.88),
+        _on_roof(top, rise, 0.05, 0.88),
+    ]
+    p.polygon(glazing, (150, 186, 206), (90, 110, 126))
+    for k in range(1, 18):
+        _bar(
+            p,
+            _on_roof(top, rise, 0.05 + 0.9 * k / 18, 0.62),
+            _on_roof(top, rise, 0.05 + 0.9 * k / 18, 0.88),
+            0.07 * m,
+            (96, 116, 132),
+        )
+    _bar(p, left, front, 0.3 * m, shade(SHOE_TRIM, 0.9))
+    g0, g1 = 3.5 / bays, 5.5 / bays
+    gable = [
+        _on_wall(left, front, g0, 0),
+        _on_wall(left, front, g0, -1.2 * m),
+        _on_wall(left, front, g0 + 0.02, -1.2 * m),
+        _on_wall(left, front, (g0 + g1) / 2, -3.6 * m),
+        _on_wall(left, front, g1 - 0.02, -1.2 * m),
+        _on_wall(left, front, g1, -1.2 * m),
+        _on_wall(left, front, g1, 0),
+    ]
+    p.polygon(gable, wall, shade(wall, 0.6))
+    p.polygon(
+        [
+            gable[2],
+            gable[3],
+            gable[4],
+            _on_wall(left, front, g1 - 0.02, -0.9 * m),
+            _on_wall(left, front, (g0 + g1) / 2, -3.2 * m),
+            _on_wall(left, front, g0 + 0.02, -0.9 * m),
+        ],
+        SHOE_TRIM,
+    )
+    _patch(p, left, front, (g0 + 0.02, g1 - 0.02), (-0.6 * m, 0.9 * m), SHOE_TRIM)
+    _patch(p, left, front, (g0 + 0.03, g1 - 0.03), (-0.45 * m, 0.75 * m), OXBLOOD)
+    for k in range(6):
+        s0 = g0 + 0.035 + (g1 - g0 - 0.07) * k / 6
+        _patch(p, left, front, (s0 + 0.004, s0 + 0.016), (-0.2 * m, 0.5 * m), GILT)
+    bx, by = _on_wall(left, front, (g0 + g1) / 2, -3.6 * m)
+    _shoe_boot(p, bx, by + 0.2 * m, 2.5 * m)
+    store = p.hall(*at(31, 4), 7 * m, 7 * m, 8 * m, shade(wall, 0.94), None)
+    s_left, s_front, s_right, _ = store
+    _plinth(p, store, 8 * m, wall, 0.5 * m)
+    for a, b, tone in ((s_left, s_front, 0.94), (s_front, s_right, 0.74)):
+        _patch(p, a, b, (0, 1), (3.9 * m, 4.15 * m), shade(SHOE_TRIM, tone))
+    for d0, d1 in ((1.2 * m, 3.6 * m), (8 * m - 3.2 * m, 8 * m)):
+        _patch(p, s_left, s_front, (0.36, 0.64), (d0 - 0.2 * m, d1), SHOE_TRIM)
+        _patch(p, s_left, s_front, (0.38, 0.62), (d0, d1), shade(SHOE_LEATHER, 0.8))
+        _bar(
+            p,
+            _on_wall(s_left, s_front, 0.5, d0),
+            _on_wall(s_left, s_front, 0.5, d1),
+            0.08 * m,
+            shade(SHOE_LEATHER, 0.5),
+        )
+    for t in (0.14, 0.86):
+        _shoe_window(p, s_left, s_front, 7 * m, t, 1.0 * m, (1.4 * m, 3.4 * m), 0.94)
+    for t in (0.3, 0.7):
+        _shoe_window(p, s_front, s_right, 7 * m, t, 1.2 * m, (1.4 * m, 3.4 * m), 0.74)
+        _shoe_window(p, s_front, s_right, 7 * m, t, 1.2 * m, (5.0 * m, 7.0 * m), 0.74)
+    _gable_across(p, store, 3 * m, SHOE_SLATE, shade(wall, 0.94))
+    hx, hy = _on_wall(s_left, s_front, 0.5, -2.4 * m)
+    _patch(p, s_left, s_front, (0.42, 0.58), (-1.9 * m, 0), shade(SHOE_LEATHER, 0.7))
+    beam_end = _iso(hx, hy, 0, -1.6 * m)
+    _bar(p, (hx, hy), beam_end, 0.3 * m, (62, 52, 48))
+    _bar(p, beam_end, (beam_end[0], beam_end[1] + 3.6 * m), 0.05 * m, (40, 36, 34))
+    p.blob(
+        beam_end[0] - 0.6 * m,
+        beam_end[1] + 3.5 * m,
+        beam_end[0] + 0.6 * m,
+        beam_end[1] + 4.6 * m,
+        (156, 96, 60),
+    )
+    dock_wall = shade(wall, 0.9)
+    deck = p.hall(*at(20.4, -1.3), 10.4 * m, 2.6 * m, 1.2 * m, dock_wall, (150, 120, 88))
+    for k in range(1, 8):
+        _bar(
+            p,
+            _on_wall(deck[0], deck[1], k / 8, 0),
+            _on_wall(deck[3], deck[2], k / 8, 0),
+            0.04 * m,
+            (120, 94, 68),
+        )
+    _crates(p, *up(17.4, -1.2, 1.2), (2, 1))
+    _shoe_cartons(p, *up(21.2, -1.4, 1.2), 3, 3, 4)
+    _shoe_cartons(p, *up(23.6, -1.0, 1.2), 2, 3, 3)
+    _crates(p, *at(26.6, -3), (1,))
+    _tan_cart(p, *at(31, -2))
     return p.sprite()
 
 

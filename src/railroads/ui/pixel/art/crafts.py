@@ -2,6 +2,7 @@
 sausage makers, the makers of luxury goods, manors, theatres and hospitals."""
 
 import math
+from collections.abc import Callable
 
 import numpy as np
 
@@ -10,9 +11,11 @@ from railroads.ui.pixel.art.commerce import PAVING, _lamp_post
 from railroads.ui.pixel.art.homes import _chimney_on, _foot, _outward
 from railroads.ui.pixel.art.industry import (
     DRESSING,
+    _bed,
     _footing,
     _mill_window,
     _round_head,
+    _stains,
     _tall_chimney,
 )
 from railroads.ui.pixel.art.painter import (
@@ -1321,21 +1324,445 @@ def _luxury_shop(sign: RGB, goods: RGB) -> Painter:
     return p
 
 
-def carpet_weaver() -> Sprite:
-    """A townhouse workshop with a red sign and carpets in reds and blues hung in its window, and
-    two patterned rugs hung over a line beside it."""
-    p = _luxury_shop((150, 40, 40), (60, 90, 170))
-    pole = (110, 84, 60)
-    rugs = (((-10, -0.5), (176, 40, 44), (232, 190, 80)), ((-6, 1.5), (50, 80, 160), (220, 70, 60)))
-    for x, y in ((-12.5, -1.5), (-3.5, 3)):
-        p.line([(x, y), (x, y - 8)], pole)
-    p.line([(-12.5, -9.5), (-3.5, -5)], shade(pole, 1.2))
-    for (x, y), field, border in rugs:
-        p.polygon([(x - 2, y - 8), (x + 2, y - 6), (x + 2, y), (x - 2, y - 2)], border)
+WEAVE_PLASTER: RGB = (236, 218, 182)
+WEAVE_ROOF: RGB = (150, 54, 46)
+WEAVE_MADDER: RGB = (164, 36, 44)
+WEAVE_INDIGO: RGB = (44, 56, 124)
+WEAVE_SAFFRON: RGB = (236, 174, 50)
+WEAVE_CREAM: RGB = (244, 232, 206)
+WEAVE_TIMBER: RGB = (112, 78, 52)
+WEAVE_YARD: RGB = (170, 150, 116)
+WEAVE_RUGS: tuple[tuple[RGB, RGB, RGB], ...] = (
+    (WEAVE_MADDER, WEAVE_INDIGO, WEAVE_SAFFRON),
+    (WEAVE_INDIGO, WEAVE_MADDER, WEAVE_CREAM),
+    (WEAVE_CREAM, WEAVE_MADDER, WEAVE_INDIGO),
+    (WEAVE_MADDER, WEAVE_SAFFRON, WEAVE_INDIGO),
+)
+
+
+def _weave_rug(
+    p: Painter,
+    at: Callable[[float, float], Point],
+    wide: float,
+    long: float,
+    colours: tuple[RGB, RGB, RGB],
+    tone: float = 1.0,
+) -> None:
+    """A knotted carpet `wide` across and `long` down hanging flat, where `at(s, d)` is the point
+    `s` units across and `d` down its face from its top left corner: a broad border with a guard
+    stripe inside it, a field with a corner piece in each corner, a medallion at its middle with
+    a heart in the border's colour, and a cream fringe at its foot, in `colours` of its field,
+    border and pattern, dimmed by `tone` on a shaded face."""
+    m = METRE
+    field, border, motif = (shade(c, tone) for c in colours)
+
+    def quad(s0: float, s1: float, d0: float, d1: float, colour: RGB) -> None:
+        p.polygon([at(s0, d0), at(s1, d0), at(s1, d1), at(s0, d1)], colour)
+
+    rim, guard = 0.3 * m, 0.07 * m
+    quad(0, wide, 0, long, border)
+    quad(rim - guard, wide - rim + guard, rim - guard, long - rim + guard, motif)
+    quad(rim, wide - rim, rim, long - rim, field)
+    corner = min(wide, long) * 0.2
+    for s0, d0, ds, dd in (
+        (rim, rim, 1, 1),
+        (wide - rim, rim, -1, 1),
+        (rim, long - rim, 1, -1),
+        (wide - rim, long - rim, -1, -1),
+    ):
+        p.polygon([at(s0, d0), at(s0 + ds * corner, d0), at(s0, d0 + dd * corner)], border)
+    cs, cd = wide / 2, long / 2
+    hs, hd = (wide - 2 * rim) * 0.34, (long - 2 * rim) * 0.36
+
+    def medallion(hs: float, hd: float, colour: RGB) -> None:
+        points = []
+        for k in range(8):
+            turn = math.pi * k / 4
+            reach = 1.0 if k % 2 == 0 else 0.6
+            points.append(at(cs + hs * reach * math.cos(turn), cd + hd * reach * math.sin(turn)))
+        p.polygon(points, colour)
+
+    medallion(hs, hd, motif)
+    medallion(hs * 0.45, hd * 0.45, border)
+    strands = max(3, round(wide / (0.22 * m)))
+    for k in range(strands + 1):
+        s = wide * (k / strands)
+        _bar(p, at(s, long - 0.05 * m), at(s, long + 0.22 * m), 0.07 * m, shade(WEAVE_CREAM, tone))
+
+
+def _weave_hanging(
+    p: Painter,
+    x: float,
+    y: float,
+    wide: float,
+    long: float,
+    colours: tuple[RGB, RGB, RGB],
+    slope: float = 0.5,
+) -> None:
+    """A carpet thrown over a rail or a line to air, its top folded over at (x, y), the left end
+    of the rail where it lies, and hanging `long` down from it on the face running `slope` down
+    for every unit across."""
+    m = METRE
+    tone = 1.0 if slope > 0 else 0.8
+
+    def at(s: float, d: float) -> Point:
+        return x + s, y + s * slope + d
+
+    _weave_rug(p, at, wide, long, colours, tone)
+    fold = shade(colours[1], tone * 0.8)
+    p.polygon([at(0, -0.12 * m), at(wide, -0.12 * m), at(wide, 0.14 * m), at(0, 0.14 * m)], fold)
+
+
+def _weave_loom(
+    p: Painter,
+    a: Point,
+    b: Point,
+    length: float,
+    t: float,
+    wide: float,
+    span: tuple[float, float],
+    colours: tuple[RGB, RGB, RGB],
+) -> None:
+    """A big workshop window in an indigo frame `wide` across about `t` along the wall under the
+    edge from `a` to `b`, which is `length` units long, from `span[0]` down the wall to
+    `span[1]`, and through it in the lamplight an upright loom: timber posts and beams, cream warp
+    threads strung down it and a carpet in `colours` half woven at its foot, the lower half of
+    its medallion done."""
+    m = METRE
+    head, foot = span
+    half = wide / 2 / length
+
+    def at(s: float, d: float) -> Point:
+        return _on_wall(a, b, t - half + s / length, head + d)
+
+    tall = foot - head
+    _patch(
+        p,
+        a,
+        b,
+        (t - half - 0.18 * m / length, t + half + 0.18 * m / length),
+        (head - 0.18 * m, foot),
+        WEAVE_INDIGO,
+    )
+    p.polygon([at(0, 0), at(wide, 0), at(wide, tall), at(0, tall)], (84, 64, 52))
+    p.polygon([at(0, 0), at(wide, 0), at(wide, 0.4 * tall), at(0, 0.25 * tall)], (112, 88, 66))
+    inner = 0.16 * wide
+    weave = 0.52 * tall
+    low = tall - 0.3 * m
+    for k in range(9):
+        s = inner + (wide - 2 * inner) * k / 8
+        _bar(p, at(s, 0.3 * m), at(s, weave), 0.05 * m, shade(WEAVE_CREAM, 0.92))
+    field, border, motif = colours
+    p.polygon(
+        [at(inner, weave), at(wide - inner, weave), at(wide - inner, low), at(inner, low)], border
+    )
+    rim = 0.16 * wide
+    p.polygon(
+        [
+            at(inner + rim, weave),
+            at(wide - inner - rim, weave),
+            at(wide - inner - rim, low - rim * 0.7),
+            at(inner + rim, low - rim * 0.7),
+        ],
+        field,
+    )
+    cs = wide / 2
+    hs = (wide - 2 * inner - 2 * rim) * 0.36
+    p.polygon([at(cs - hs, weave), at(cs + hs, weave), at(cs, weave + (low - weave) * 0.6)], motif)
+    p.polygon(
+        [at(cs - hs * 0.5, weave), at(cs + hs * 0.5, weave), at(cs, weave + (low - weave) * 0.3)],
+        border,
+    )
+    _bar(
+        p,
+        at(inner * 0.4, weave - 0.04 * m),
+        at(wide - inner * 0.4, weave - 0.04 * m),
+        0.12 * m,
+        shade(WEAVE_TIMBER, 1.2),
+    )
+    for s in (inner * 0.55, wide - inner * 0.55):
+        _bar(p, at(s, 0.15 * m), at(s, tall), 0.16 * m, WEAVE_TIMBER)
+    for d in (0.3 * m, low + 0.1 * m):
+        _bar(p, at(inner * 0.3, d), at(wide - inner * 0.3, d), 0.18 * m, WEAVE_TIMBER)
+    _bar(p, at(0, 0.55 * m), at(wide, 0.55 * m), 0.08 * m, shade(WEAVE_INDIGO, 1.3))
+    p.polygon(
+        [
+            at(-0.25 * m, tall),
+            at(wide + 0.25 * m, tall),
+            at(wide + 0.25 * m, tall + 0.2 * m),
+            at(-0.25 * m, tall + 0.2 * m),
+        ],
+        WEAVE_CREAM,
+    )
+
+
+def _weave_skeins(
+    p: Painter, a: Point, b: Point, count: int, long: float, colours: tuple[RGB, ...]
+) -> None:
+    """Skeins of dyed wool hung to dry along a pole from `a` to `b`, `count` of them, each a
+    twisted hank `long` down, in turn of `colours`."""
+    m = METRE
+    for k in range(count):
+        x, y = _on_wall(a, b, (k + 0.5) / count, 0)
+        colour = colours[k % len(colours)]
+        w = 0.13 * m
         p.polygon(
-            [(x - 1.2, y - 6.8), (x + 1.2, y - 5.6), (x + 1.2, y - 1), (x - 1.2, y - 2.2)], field
+            [(x - w, y), (x + w, y), (x + w * 0.7, y + long), (x - w * 0.7, y + long)],
+            colour,
+            shade(colour, 0.7),
         )
-        p.point(x, y - 4, border)
+        _bar(
+            p,
+            (x - w * 0.3, y + 0.1 * m),
+            (x - w * 0.2, y + long - 0.1 * m),
+            0.06 * m,
+            shade(colour, 1.25),
+        )
+
+
+def _weave_vat(p: Painter, x: float, y: float, liquor: RGB) -> None:
+    """A round wooden dye vat 1.8 m across and a metre high standing on (x, y), its staves bound
+    with two iron hoops and full to near its rim with dye of colour `liquor`."""
+    m = METRE
+    r, tall = 0.9 * m, 1.0 * m
+    oak = (126, 90, 58)
+    p.blob(x - 1.2 * r, y - 0.3 * r, x + 1.3 * r, y + 0.7 * r, shade(liquor, 0.7), 110)
+    _turned(p, x, y, [(0, r * 0.94), (tall, r)], oak, shade(oak, 1.1))
+    for k in range(1, 6):
+        a = math.pi * k / 6
+        _bar(
+            p,
+            (x - r * math.cos(a), y + r / 2 * math.sin(a) - 0.05 * m),
+            (x - r * math.cos(a), y - tall + r / 2 * math.sin(a)),
+            0.04 * m,
+            shade(oak, 0.75),
+        )
+    for h in (0.22 * m, 0.75 * m):
+        arc = [
+            (x + r * math.cos(a), y - h + r / 2 * math.sin(a)) for a in np.linspace(0, math.pi, 9)
+        ]
+        p.polygon(arc + [(px, py + 0.1 * m) for px, py in arc[::-1]], (58, 56, 58))
+    p.blob(
+        x - 0.84 * r,
+        y - tall - 0.42 * r + 0.08 * m,
+        x + 0.84 * r,
+        y - tall + 0.42 * r + 0.08 * m,
+        liquor,
+    )
+    p.blob(x - 0.5 * r, y - tall - 0.2 * r, x - 0.05 * r, y - tall, shade(liquor, 1.35))
+
+
+def _weave_chimney(p: Painter, top: Top, rise: float, along: float, tall: float) -> None:
+    """A brick chimney 0.9 m square standing `tall` units over the ridge `along` its length."""
+    m = METRE
+    back, front = _ridge(top, rise)
+    x, y = _on_wall(back, front, along, 0)
+    p.hall(x, y + 0.6 * m, 0.9 * m, 0.9 * m, tall + 0.6 * m, BRICK, None)
+    p.hall(x, y - tall, 1.2 * m, 1.2 * m, 0.25 * m, shade(BRICK, 0.7), (52, 46, 46))
+
+
+def _weave_belfry(p: Painter, x: float, y: float, wall: RGB, cap: RGB) -> None:
+    """A little open bell turret astride a ridge at (x, y), the manufactory's bell that calls the
+    weavers to work: a plastered base, four posts round a bronze bell, a pyramid cap and a gilt
+    ball on its top."""
+    m = METRE
+    p.hall(x, y + 0.9 * m, 1.6 * m, 1.6 * m, 1.6 * m, wall, shade(wall, 1.05))
+    floor = y - 0.7 * m
+    left, front, right, back = _footing(x, floor, 1.6 * m, 1.6 * m)
+    p.polygon(
+        [
+            (left[0], left[1] - 1.4 * m),
+            (front[0], front[1] - 1.4 * m),
+            (right[0], right[1] - 1.4 * m),
+            right,
+            front,
+            left,
+        ],
+        (46, 40, 40),
+    )
+    p.blob(x - 0.45 * m, floor - 1.2 * m, x + 0.45 * m, floor - 0.3 * m, (176, 128, 60))
+    p.blob(x - 0.3 * m, floor - 1.1 * m, x - 0.05 * m, floor - 0.6 * m, (220, 176, 96))
+    for corner, tone in ((left, 1.0), (front, 0.9), (right, 0.75)):
+        _bar(p, corner, (corner[0], corner[1] - 1.4 * m), 0.18 * m, shade(wall, tone))
+    eave = [(cx, cy - 1.4 * m) for cx, cy in (left, front, right, back)]
+    e_left, e_front, e_right, _ = eave
+    apex = (x, floor - 3.2 * m)
+    p.polygon([e_left, e_front, apex], cap, shade(cap, 0.6))
+    p.polygon([e_front, e_right, apex], shade(cap, 0.72), shade(cap, 0.5))
+    _bar(p, apex, (apex[0], apex[1] - 0.5 * m), 0.08 * m, (60, 56, 54))
+    p.blob(x - 0.2 * m, apex[1] - 0.75 * m, x + 0.2 * m, apex[1] - 0.35 * m, (232, 186, 70))
+
+
+def carpet_weaver() -> Sprite:
+    """A carpet manufactory, a weaving house 16.5 by 8.5 m and two storeys high of warm cream
+    plaster under a madder-red tiled roof with a little bell turret on its ridge: big
+    indigo-framed windows show upright looms with carpets half woven on them, and over the rail
+    of a timber gallery along its upper floor hang three rich carpets to air, bordered and
+    medallioned in madder, indigo, saffron and cream. Beside it a dye yard: a brick dye house
+    steaming from its chimney and glowing at its door, skeins of red, indigo and saffron wool
+    hung on a pole to dry, three wooden vats of dye spilling over the ground and two more
+    carpets over a line."""
+    m = METRE
+    p = Painter(36, 31, (18, 21))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 12.85) * m, (v - 4.65) * m)
+
+    def up(u: float, v: float, z: float) -> Point:
+        x, y = at(u, v)
+        return x, y - z * m
+
+    long = 16.5
+    length, depth, high, rise = long * m, 8.5 * m, 8.2 * m, 3.6 * m
+    wall, roof, pole = WEAVE_PLASTER, WEAVE_ROOF, (108, 80, 54)
+    p.polygon([at(16.8, -3.2), at(25.6, -3.2), at(25.6, 9.8), at(16.8, 9.8)], WEAVE_YARD)
+    for (u, v, r), colour in zip(
+        ((18.8, 2.3, 1.3), (21.3, 2.5, 1.5), (23.6, 2.1, 1.1), (20.6, 0.1, 0.9)),
+        (WEAVE_MADDER, WEAVE_INDIGO, WEAVE_SAFFRON, WEAVE_INDIGO),
+        strict=True,
+    ):
+        x, y = at(u, v)
+        p.blob(x - r * m, y - r * m / 2, x + r * m, y + r * m / 2, shade(colour, 0.8), 90)
+    p.shadow(12.5, 4.5, 2)
+    foot = _footing(*at(8.25, 4.25), length, depth)
+    _bed(p, foot)
+    top = p.hall(*at(8.25, 4.25), length, depth, high, wall, None)
+    left, front, right, _ = top
+    _plinth(p, top, high, wall, 0.6 * m)
+    _stains(p, front, right, high, (0.1, 0.9), shade(wall, 0.62), 1.2 * m)
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
+        _patch(
+            p, a, b, (0, 1), (high - 4.45 * m, high - 4.2 * m), shade(WEAVE_SAFFRON, 0.92 * tone)
+        )
+        _patch(p, a, b, (0, 1), (0, 0.3 * m), shade(wall, 0.82 * tone))
+    for k, u in enumerate((2.1, 6.2, 10.3, 14.4)):
+        _weave_loom(
+            p,
+            left,
+            front,
+            length,
+            u / long,
+            2.8 * m,
+            (high - 3.3 * m, high - 0.7 * m),
+            WEAVE_RUGS[(k + 1) % 4],
+        )
+    for u in (1.8, 5.1, 8.25, 11.4, 14.7):
+        t, half = u / long, 0.7 * m / length
+        _patch(
+            p,
+            left,
+            front,
+            (t - half - 0.01, t + half + 0.01),
+            (0.75 * m, high - 4.75 * m),
+            WEAVE_INDIGO,
+        )
+        _patch(
+            p, left, front, (t - half, t + half), (0.9 * m, high - 4.75 * m), shade(WINDOW, 1.05)
+        )
+        _bar(
+            p,
+            _on_wall(left, front, t, 0.9 * m),
+            _on_wall(left, front, t, high - 4.75 * m),
+            0.08 * m,
+            WEAVE_CREAM,
+        )
+        _bar(
+            p,
+            _on_wall(left, front, t - half, 1.6 * m),
+            _on_wall(left, front, t + half, 1.6 * m),
+            0.08 * m,
+            WEAVE_CREAM,
+        )
+    for t in (0.28, 0.72):
+        _patch(p, front, right, (t - 0.075, t + 0.075), (1.0 * m, 3.1 * m), WEAVE_INDIGO)
+        _patch(p, front, right, (t - 0.058, t + 0.058), (1.15 * m, 3.0 * m), shade(WINDOW, 0.8))
+    _patch(p, front, right, (0.385, 0.615), (high - 3.1 * m, high), WEAVE_INDIGO)
+    _patch(p, front, right, (0.405, 0.595), (high - 2.9 * m, high), shade(WEAVE_INDIGO, 0.72))
+    _patch(p, front, right, (0.405, 0.595), (high - 2.9 * m, high - 2.4 * m), shade(WINDOW, 0.9))
+    _bar(
+        p,
+        _on_wall(front, right, 0.5, high - 2.4 * m),
+        _on_wall(front, right, 0.5, high),
+        0.06 * m,
+        shade(WEAVE_INDIGO, 0.5),
+    )
+    p.gable(top, rise, roof, wall)
+    _tiles(p, top, rise, roof, (0.2, 0.4, 0.6, 0.8))
+    _, ridge_front = _ridge(top, rise)
+    ox, oy = ridge_front[0] - 0.3 * m, ridge_front[1] + rise * 0.55
+    p.ellipse(ox - 0.6 * m, oy - 0.6 * m, ox + 0.6 * m, oy + 0.6 * m, WEAVE_INDIGO)
+    p.ellipse(ox - 0.42 * m, oy - 0.42 * m, ox + 0.42 * m, oy + 0.42 * m, shade(WINDOW, 0.8))
+    _weave_chimney(p, top, rise, 0.22, 1.6 * m)
+    back, front_ridge = _ridge(top, rise)
+    _weave_belfry(p, *_on_wall(back, front_ridge, 0.6, 0), wall, roof)
+    floor, rail = 4.6, 5.6
+    p.hall(
+        *up(8.25, -0.65, floor - 0.25),
+        15.1 * m,
+        1.3 * m,
+        0.25 * m,
+        WEAVE_TIMBER,
+        shade(WEAVE_TIMBER, 1.25),
+    )
+    for u in (1.1, 4.5, 8.25, 12.0, 15.4):
+        _bar(
+            p,
+            up(u, -0.05, floor - 1.0),
+            up(u, -1.2, floor - 0.2),
+            0.14 * m,
+            shade(WEAVE_TIMBER, 0.8),
+        )
+    for k in range(31):
+        u = 0.8 + 14.9 * k / 30
+        _bar(p, up(u, -1.25, floor), up(u, -1.25, rail), 0.07 * m, shade(WEAVE_TIMBER, 0.9))
+    for u in (0.7, 15.8):
+        _bar(p, up(u, -1.25, floor - 0.25), up(u, -1.25, rail + 0.1), 0.2 * m, WEAVE_TIMBER)
+    _bar(p, up(0.6, -1.25, rail), up(15.9, -1.25, rail), 0.16 * m, shade(WEAVE_TIMBER, 1.2))
+    for k, (u0, u1) in enumerate(((1.2, 3.8), (6.6, 9.8), (12.4, 15.2))):
+        _weave_hanging(p, *up(u0, -1.3, rail), (u1 - u0) * m, 2.0 * m, WEAVE_RUGS[k])
+    dye_wall = (176, 96, 70)
+    dye = p.hall(*at(22, 7.75), 5 * m, 3.5 * m, 3.2 * m, dye_wall, None)
+    d_left, d_front, _, _ = dye
+    _plinth(p, dye, 3.2 * m, dye_wall, 0.4 * m)
+    _patch(p, d_left, d_front, (0.28, 0.72), (0.8 * m, 3.2 * m), (50, 40, 38))
+    _patch(p, d_left, d_front, (0.34, 0.66), (2.4 * m, 3.2 * m), (230, 130, 50))
+    _patch(p, d_left, d_front, (0.38, 0.62), (1.7 * m, 2.5 * m), (196, 120, 70))
+    p.gable(dye, 1.6 * m, (110, 104, 108), dye_wall)
+    _tiles(p, dye, 1.6 * m, (110, 104, 108))
+    sx, sy = up(23.8, 8.8, 3.2)
+    p.hall(sx, sy, 0.9 * m, 0.9 * m, 3.8 * m, shade(dye_wall, 0.92), (50, 44, 44))
+    p.soft(
+        [
+            (sx - 1.0 * m, sy - 6.8 * m, sx + 1.2 * m, sy - 4.9 * m),
+            (sx - 0.4 * m, sy - 8.6 * m, sx + 1.8 * m, sy - 6.6 * m),
+        ],
+        (246, 244, 240),
+        0.85,
+        0.4,
+    )
+    for u in (17.4, 24.8):
+        _bar(p, at(u, 4.8), up(u, 4.8, 2.5), 0.14 * m, pole)
+    _bar(p, up(17.2, 4.8, 2.45), up(25.0, 4.8, 2.45), 0.1 * m, shade(pole, 1.2))
+    _weave_skeins(
+        p,
+        up(17.6, 4.8, 2.45),
+        up(24.6, 4.8, 2.45),
+        14,
+        1.1 * m,
+        (WEAVE_MADDER, WEAVE_SAFFRON, WEAVE_INDIGO, (196, 70, 52)),
+    )
+    for (u, v), liquor in zip(
+        ((18.6, 3.0), (21.0, 3.3), (23.4, 2.9)),
+        ((150, 30, 40), (36, 44, 104), (226, 160, 40)),
+        strict=True,
+    ):
+        _weave_vat(p, *at(u, v), liquor)
+    line = 2.7
+    for u in (17.2, 25.6):
+        _bar(p, at(u, -1.8), up(u, -1.8, line + 0.2), 0.14 * m, pole)
+    _bar(p, up(17.1, -1.8, line), up(25.7, -1.8, line), 0.06 * m, (90, 86, 80))
+    _weave_hanging(p, *up(17.6, -1.8, line), 3.3 * m, 2.2 * m, WEAVE_RUGS[3])
+    _weave_hanging(p, *up(21.5, -1.8, line), 3.6 * m, 2.2 * m, WEAVE_RUGS[1])
     return p.sprite()
 
 
