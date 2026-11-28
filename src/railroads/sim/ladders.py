@@ -158,6 +158,7 @@ _POINTS: dict[BuildingKind, tuple[Points, int]] = {
     BuildingKind.CARPET_WEAVER: (Points.CORPORATE, 2),
     BuildingKind.CLOCK_MAKER: (Points.CORPORATE, 2),
     BuildingKind.MIRROR_MAKER: (Points.CORPORATE, 2),
+    BuildingKind.SADDLER: (Points.CORPORATE, 2),
     BuildingKind.MANOR: (Points.CORPORATE, 8),
     BuildingKind.THEATRE: (Points.CORPORATE, 5),
     BuildingKind.HOSPITAL: (Points.CORPORATE, 5),
@@ -664,6 +665,7 @@ TOWN_CRAFTS = (
     _town_craft(BuildingKind.CARPET_WEAVER, 2, 1700, LUXURY_TOWN, 250),
     _town_craft(BuildingKind.CLOCK_MAKER, 10, 1880, LUXURY_TOWN, 50),
     _town_craft(BuildingKind.MIRROR_MAKER, 10, 1700, LUXURY_TOWN, 50),
+    _town_craft(BuildingKind.SADDLER, 2, 0, LUXURY_TOWN, 250),
 )
 
 # Buildings that only buy: manors in towns of MANOR_TOWN people, theatres in towns of

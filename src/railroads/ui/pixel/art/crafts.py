@@ -2244,3 +2244,72 @@ def fish_dryer() -> Sprite:
             fx, fy = x0 + 0.8 + 1.2 * k, y0 - 5.4 + 0.6 * k
             p.line([(fx, fy), (fx, fy + 2.4)], fish if k % 2 else shade(fish, 0.8))
     return p.sprite()
+
+
+ROOF: RGB = (150, 70, 52)
+
+
+SADDLE: RGB = (150, 86, 44)
+
+
+SADDLE_TAN: RGB = (196, 142, 88)
+
+
+HARNESS: RGB = (58, 40, 30)
+
+
+BUCKLE: RGB = (214, 176, 80)
+
+
+TRESTLE: RGB = (104, 76, 50)
+
+
+SADDLER_SIGN: RGB = (104, 58, 34)
+
+
+def _saddle(p: Painter, x: float, y: float, leather: RGB = SADDLE) -> None:
+    """A saddle on a wooden trestle standing on (x, y), seen side on: the trestle's splayed legs
+    and rail, the saddle's seat dipping between a raised pommel and cantle, its skirt hanging
+    down over the rail and a stirrup on its leather."""
+    for dx in (-1.8, 1.8):
+        p.line([(x + dx * 0.8, y - 2.4), (x + dx, y)], TRESTLE)
+        p.line([(x + dx * 0.8, y - 2.4), (x + dx * 0.6, y + 0.4)], shade(TRESTLE, 0.8))
+    p.line([(x - 2.2, y - 2.5), (x + 2.2, y - 2.5)], shade(TRESTLE, 1.2))
+    p.polygon(
+        [
+            (x - 2.4, y - 4.9),
+            (x - 1.6, y - 4.4),
+            (x, y - 3.8),
+            (x + 1.6, y - 4.3),
+            (x + 2.3, y - 5.1),
+            (x + 2.5, y - 4.1),
+            (x + 1.6, y - 1.6),
+            (x - 1.4, y - 1.6),
+            (x - 2.6, y - 3.9),
+        ],
+        leather,
+        shade(leather, 0.55),
+    )
+    p.line([(x - 1.6, y - 4.2), (x, y - 3.6), (x + 1.6, y - 4.1)], shade(leather, 1.35))
+    p.line([(x - 1, y - 3.2), (x + 1, y - 3.2)], shade(leather, 0.75))
+    p.line([(x + 0.4, y - 2), (x + 0.4, y - 0.8)], HARNESS)
+    p.line([(x - 0.1, y - 0.6), (x + 0.9, y - 0.6)], BUCKLE)
+
+
+def _collar(p: Painter, x: float, y: float) -> None:
+    """A horse collar hung on a peg at (x, y): a dark padded ring with brass hames."""
+    p.ellipse(x - 1.4, y, x + 1.4, y + 3.4, HARNESS)
+    p.ellipse(x - 0.7, y + 0.8, x + 0.7, y + 2.8, shade(SADDLE_TAN, 0.8))
+    p.point(x - 1.2, y + 0.6, BUCKLE)
+    p.point(x + 1.2, y + 0.6, BUCKLE)
+
+
+def saddler() -> Sprite:
+    """A cream townhouse workshop under a saddle-brown sign, bridles and belts showing in its
+    window, a horse collar hung by its door with brass hames, and a saddle set out on a wooden
+    trestle before it."""
+    p = _luxury_shop(SADDLER_SIGN, SADDLE_TAN)
+    _collar(p, -2.6, -5.4)
+    _saddle(p, -9, 2.5)
+    _saddle(p, -4.5, 5, SADDLE_TAN)
+    return p.sprite()

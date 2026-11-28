@@ -567,14 +567,14 @@ window (H) lists the same.
 | Mega factory (1780) | 170 goods | 56.67 steel (from era 2), 28.33 copper (from era 4), 28.33 machinery (from era 3) | 17 paper (from mail and press demand 10), 8 bricks, 8 cement (from era 3) |
 | Cannery (1810) | 200 cans | 60 fruit, 20 steel (from era 2) |  |
 | Textile mill (1780) | 25 clothes | 62.5 fibre |  |
-| Furniture maker | 12 furniture | 48 planks | 6 wax |
+| Furniture maker | 12 furniture | 48 planks | 6 wax, 6 leather (from textiles and household demand 9) |
 | Tool works (era 3) | 50 tools | 50 steel (from era 2) |  |
 | Winery | 12 wine | 48 grapes | 24 barrels |
 | Barrel maker | 25 barrels | 12.5 planks |  |
 | Refinery (era 2) | 600 fuel | 600 oil (from era 2) |  |
 | Chemical works (era 3) | 60 chemicals, 30 fertiliser | 30 salt, 30 boiler fuel | 15 limestone |
 | Electronics plant (era 6) | 30 electronics | 30 copper (from era 4), 30 chemicals (from era 3) |  |
-| Car factory (era 4) | 12 cars | 60 steel (from era 2), 24 fuel (from era 2) |  |
+| Car factory (era 4) | 12 cars | 60 steel (from era 2), 24 fuel (from era 2) | 12 leather (from vehicles demand 12) |
 | Gun factory (era 3) | 60 guns | 30 steel (from era 2), 15 planks |  |
 | Tank factory (era 5) | 12 tanks | 72 steel (from era 2), 24 fuel (from era 2) |  |
 | Aircraft factory (era 5) | 12 planes | 36 steel (from era 2), 12 copper (from era 4), 12 fuel (from era 2), 12 electronics (from era 6) |  |
@@ -632,8 +632,8 @@ window (H) lists the same.
 | Mega cannery (1810) | 2,812 cans | 843.8 fruit, 281.2 steel (from era 2) |  |
 | Big textile mill (1780) | 62.5 clothes | 156.2 fibre |  |
 | Mega textile mill (1780) | 156.2 clothes | 390.6 fibre |  |
-| Big furniture maker | 30 furniture | 120 planks | 15 wax |
-| Mega furniture maker | 75 furniture | 300 planks | 37.5 wax |
+| Big furniture maker | 30 furniture | 120 planks | 15 wax, 15 leather (from textiles and household demand 9) |
+| Mega furniture maker | 75 furniture | 300 planks | 37.5 wax, 37.5 leather (from textiles and household demand 9) |
 | Big tool works (era 3) | 125 tools | 125 steel (from era 2) |  |
 | Mega tool works (era 3) | 312.5 tools | 312.5 steel (from era 2) |  |
 | Big barrel maker | 62.5 barrels | 31.25 planks |  |
@@ -646,8 +646,8 @@ window (H) lists the same.
 | Mega chemical works (era 3) | 375 chemicals, 187.5 fertiliser | 187.5 salt, 187.5 boiler fuel | 93.75 limestone |
 | Big electronics plant (era 6) | 75 electronics | 75 copper (from era 4), 75 chemicals (from era 3) |  |
 | Mega electronics plant (era 6) | 187.5 electronics | 187.5 copper (from era 4), 187.5 chemicals (from era 3) |  |
-| Big car factory (era 4) | 30 cars | 150 steel (from era 2), 60 fuel (from era 2) |  |
-| Mega car factory (era 4) | 75 cars | 375 steel (from era 2), 150 fuel (from era 2) |  |
+| Big car factory (era 4) | 30 cars | 150 steel (from era 2), 60 fuel (from era 2) | 30 leather (from vehicles demand 12) |
+| Mega car factory (era 4) | 75 cars | 375 steel (from era 2), 150 fuel (from era 2) | 75 leather (from vehicles demand 12) |
 | Big machine works (era 3) | 62.5 machinery | 62.5 steel (from era 2), 31.25 copper (from era 4) |  |
 | Mega machine works (era 3) | 156.2 machinery | 156.2 steel (from era 2), 78.12 copper (from era 4) |  |
 | Big brickworks | 32.5 bricks | 227.5 clay | 32.5 coal (from 1700) |
@@ -690,6 +690,7 @@ window (H) lists the same.
 | Carpet weaver (1700) | 3 luxury goods | 12 fibre |  |
 | Clock maker (1880) | 3 luxury goods | 6 copper (from era 4), 3 glass |  |
 | Mirror maker (1700) | 3 luxury goods | 6 glass, 0.3 gold |  |
+| Saddler | 3 luxury goods | 12 leather |  |
 | Manor |  | 60 food, 6 heating, 6 wine, 2 luxury goods (from 1700) | 3 furniture, 3 cola (from food and drink demand 13) |
 | Theatre |  | 6 clothes (from 1780), 3 glass, 3 paper (from 1150) | 3 wax, 1 luxury goods (from 1700) |
 | Hospital (1850) |  | 30 food, 3 heating, 6 chemicals (from era 3), 3 glass | 6 wax |
@@ -714,9 +715,11 @@ window (H) lists the same.
 | Mega clock maker (1880) | 18.75 luxury goods | 37.5 copper (from era 4), 18.75 glass |  |
 | Big mirror maker (1700) | 7.5 luxury goods | 15 glass, 0.75 gold |  |
 | Mega mirror maker (1700) | 18.75 luxury goods | 37.5 glass, 1.875 gold |  |
-| Military outpost (1800) |  | 35 guns (from era 3), 20 cars (from era 4) |  |
-| Military base (1800) |  | 110 guns (from era 3), 60 cars (from era 4), 20 planes (from era 5) |  |
-| Headquarters (1800) |  | 300 guns (from era 3), 110 cars (from era 4), 60 planes (from era 5), 60 tanks (from era 5) |  |
+| Big saddler | 7.5 luxury goods | 30 leather |  |
+| Mega saddler | 18.75 luxury goods | 75 leather |  |
+| Military outpost (1800) |  | 35 guns (from era 3), 20 cars (from era 4), 12 clothes (from 1780), 12 shoes (from 1850) |  |
+| Military base (1800) |  | 110 guns (from era 3), 60 cars (from era 4), 20 planes (from era 5), 36 clothes (from 1780), 36 shoes (from 1850) |  |
+| Headquarters (1800) |  | 300 guns (from era 3), 110 cars (from era 4), 60 planes (from era 5), 60 tanks (from era 5), 100 clothes (from 1780), 100 shoes (from 1850) |  |
 | Airport (1920) |  | 25 fuel (from era 2) |  |
 | Church |  | 6 wax | 6 incense |
 | Basilica |  | 20 wax | 12 incense |
@@ -761,7 +764,7 @@ Steel mills, canneries, factories, shipyards and every works are processors: eac
 months of every input it uses at most for every building, takes in what reaches it even while it
 waits for another input, and works from it. A processor dies out only once nothing has reached it
 for thirty years (brickworks, breweries, distilleries, potters, glassworks, textile mills,
-coopers, gasworks, tile works and carpet weavers 250, the other rare crafts 50) and its stockpile is empty, so a steel mill with
+coopers, gasworks, tile works, carpet weavers and saddlers 250, the other rare crafts 50) and its stockpile is empty, so a steel mill with
 coal but no iron stands on. Nothing is made that has nowhere to go: a building makes only what a
 buyer takes, and a processor uses up only the inputs for what it made, so a steel mill with no
 one to take its steel keeps its iron ore and coal waiting. Needs are handed out in the order of
@@ -896,7 +899,8 @@ more outposts come slowly in play, a little faster the more military points are 
 a neighbourhood become a base and three bases a headquarters. They are
 judged on what they get like any other building, so a garrison that is kept supplied grows far
 faster than one left alone, though one left without supplies never dies out. Each military point sends and wants 12 passengers and 6 pieces of mail
-(outpost 3, base 9, headquarters 27), as much as a small town. Cars are wanted from 1930, planes from 1935 by bases and
+(outpost 3, base 9, headquarters 27), as much as a small town. Soldiers wear clothes from the start and shoes
+from 1850, outposts 12 of each a month, bases 36 and headquarters 100. Cars are wanted from 1930, planes from 1935 by bases and
 headquarters, tanks from 1940 by headquarters.
 
 Gun factories open from 1800 where there is industry, one per 26,000 land cells. Aircraft factories open from 1935 and tank factories from 1940,

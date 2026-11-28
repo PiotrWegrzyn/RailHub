@@ -713,3 +713,21 @@ def test_of_two_trains_turning_opposite_ways_at_a_double_junction_only_the_one_c
 
     assert turns
     assert any(kept_apart) and not all(kept_apart)
+
+
+@pytest.mark.parametrize("branch", [NORTH, SOUTH])
+def test_a_train_runs_on_behind_one_turning_off_at_a_junction_without_stopping_at_its_signal(
+    branch: tuple[int, int],
+) -> None:
+    game = game_with((WEST, EAST, TrackWidth.DOUBLE), (branch, WEST, TrackWidth.DOUBLE))
+    shuttle(game, WEST, branch)
+    for _ in range(40):
+        game.railway.run(STEP)
+    following = shuttle(game, WEST, EAST)
+    waited = 0
+
+    while following.arrivals == 0:
+        game.railway.run(STEP)
+        waited += following.status.startswith("Waiting at a signal")
+
+    assert waited == 0

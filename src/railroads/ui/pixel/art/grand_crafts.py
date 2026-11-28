@@ -6,6 +6,15 @@ works and great engine halls of machine works under gantry cranes."""
 
 import math
 
+from railroads.ui.pixel.art.crafts import (
+    BUCKLE,
+    HARNESS,
+    SADDLE,
+    SADDLE_TAN,
+    SADDLER_SIGN,
+    _collar,
+    _saddle,
+)
 from railroads.ui.pixel.art.industry import (
     BUNDLE,
     FRAME,
@@ -1444,3 +1453,133 @@ def mega_machine_works() -> Sprite:
     p.line([(17.2, -11.5), (17.2, -7)], (70, 64, 58))
     _wheel(p, 17.2, -4.1, 2.4, 3, shade(CASTING, 0.9))
     return p.sprite()
+
+
+SADDLER_WALL: RGB = (222, 206, 178)
+SADDLER_ROOF: RGB = (92, 60, 48)
+CARRIAGE: RGB = (34, 32, 36)
+HORSE: RGB = (112, 72, 44)
+
+
+def _leather_house(
+    p: Painter, x: float, y: float, length: float, depth: float, height: float
+) -> Top:
+    """A cream saddlery with a saddle-brown sign studded with brass along under its eaves."""
+    top = p.hall(x, y, length, depth, height, SADDLER_WALL, None)
+    left, front, right, _ = top
+    _patch(p, left, front, (0, 1), (0.4, 1.8), SADDLER_SIGN)
+    _patch(p, front, right, (0, 1), (0.4, 1.8), shade(SADDLER_SIGN, 0.78))
+    for t in (0.2, 0.4, 0.6, 0.8):
+        p.point(*_on_wall(left, front, t, 1.1), BUCKLE)
+    return top
+
+
+def big_saddler() -> Sprite:
+    """A long two-storey saddlery of cream walls under a brown roof and a saddle-brown sign with
+    brass studs, a shop window of saddles and bags, collars hung by its doors, a workshop shed
+    behind, saddles on trestles out in the yard and rolled hides by the door."""
+    p = Painter(50, 44, (24, 32))
+    foot = _footing(4, -1, 18, 8)
+    _bed(p, foot, SOIL, 1)
+    p.shadow(14, 4)
+    shed = p.hall(12, -8, 10, 6, 5, shade(SADDLER_WALL, 0.9), None)
+    _sawtooth(p, shed, 3, 3, SADDLER_ROOF, GLAZING, shade(SADDLER_WALL, 0.9))
+    _track(p, foot[0], foot[1], (0.8, 0.94), 3, (190, 172, 136), ruts=False)
+    top = _leather_house(p, 4, -1, 18, 8, 11)
+    left, front, right, _ = top
+    for t in (0.12, 0.32, 0.52):
+        _window(p, left, front, (t - 0.06, t + 0.06), 3, shade(WINDOW, 0.95), 2.4)
+    _patch(p, left, front, (0.05, 0.7), (7.4, 9.6), shade(WINDOW, 0.9))
+    for k, t in enumerate((0.15, 0.3, 0.45, 0.6)):
+        p.point(*_on_wall(left, front, t, 8.6), (SADDLE, SADDLE_TAN)[k % 2])
+    _door(p, left, front, (0.8, 0.94), 6.5, 11, SADDLER_SIGN)
+    _window(p, front, right, (0.3, 0.7), 3, shade(WINDOW, 0.8))
+    _window(p, front, right, (0.3, 0.7), 7, shade(WINDOW, 0.8))
+    p.gable(top, 5, SADDLER_ROOF, SADDLER_WALL)
+    _roof_rows(p, top, 5, SADDLER_ROOF)
+    x, y = _on_roof(top, 5, 0.3, 0.9)
+    p.rect(x - 1, y - 3, x, y, BRICK)
+    cx, cy = _on_wall(left, front, 0.74, 7)
+    _collar(p, cx, cy)
+    for k, (x, y) in enumerate(((-19, 1), (-14.5, 3.5), (-10, 6), (-15, 7.5))):
+        _saddle(p, x, y, (SADDLE, SADDLE_TAN)[k % 2])
+    for k, (x, y) in enumerate(((10, 9), (12, 8), (11, 6.8))):
+        _rolled(p, x, y, (SADDLE, SADDLE_TAN, shade(SADDLE, 0.8))[k])
+    return p.sprite()
+
+
+def mega_saddler() -> Sprite:
+    """A great leather goods house of three storeys under a brown roof, a saddle-brown and gilt
+    sign along its eaves and a gilt horse's head on its roof, shop windows of saddles and bags
+    along its whole front, a long workshop shed behind, rows of saddles on trestles in the yard,
+    rolled hides piled by the door and a black carriage with a horse in polished harness waiting
+    at the kerb."""
+    p = Painter(64, 58, (32, 40))
+    foot = _footing(4, -3, 26, 10)
+    _bed(p, foot, SOIL, 1)
+    p.shadow(20, 5)
+    shed = p.hall(16, -12, 14, 8, 6, shade(SADDLER_WALL, 0.9), None)
+    _sawtooth(p, shed, 4, 3, SADDLER_ROOF, GLAZING, shade(SADDLER_WALL, 0.9))
+    _track(p, foot[0], foot[1], (0.86, 0.96), 4, (190, 172, 136), ruts=False)
+    top = _leather_house(p, 4, -3, 26, 10, 16)
+    left, front, right, _ = top
+    for row in (3, 7.5):
+        for k in range(6):
+            t = 0.08 + k * 0.13
+            _window(p, left, front, (t - 0.04, t + 0.04), row, shade(WINDOW, 0.95), 2.2)
+    _patch(p, left, front, (0.04, 0.84), (12.4, 15), shade(WINDOW, 0.9))
+    for k in range(9):
+        p.point(*_on_wall(left, front, 0.08 + k * 0.09, 13.8), (SADDLE, SADDLE_TAN, BUCKLE)[k % 3])
+    _door(p, left, front, (0.88, 0.97), 10.5, 16, SADDLER_SIGN, BUCKLE)
+    for row in (3, 7.5, 12):
+        _window(p, front, right, (0.2, 0.4), row, shade(WINDOW, 0.8))
+        _window(p, front, right, (0.6, 0.8), row, shade(WINDOW, 0.8))
+    p.gable(top, 6, SADDLER_ROOF, SADDLER_WALL)
+    _roof_rows(p, top, 6, SADDLER_ROOF, (0.25, 0.5, 0.75))
+    for along in (0.25, 0.7):
+        x, y = _on_roof(top, 6, along, 0.9)
+        p.rect(x - 1, y - 3, x, y, BRICK)
+    rx, ry = _on_roof(top, 6, 0.5, 1)
+    p.polygon(
+        [
+            (rx - 1.5, ry - 1),
+            (rx - 1, ry - 5),
+            (rx + 1, ry - 7),
+            (rx + 2.6, ry - 6),
+            (rx + 1.2, ry - 4.6),
+            (rx + 1, ry - 1),
+        ],
+        BUCKLE,
+        shade(BUCKLE, 0.6),
+    )
+    p.point(rx + 1.2, ry - 6, shade(BUCKLE, 0.5))
+    for k, (x, y) in enumerate(((-27, -2), (-23, 0), (-19, 2), (-24, 5), (-20, 7), (-16, 9))):
+        _saddle(p, x, y, (SADDLE, SADDLE_TAN)[k % 2])
+    for k, (x, y) in enumerate(((13, 11), (15, 10), (14, 8.8), (16.5, 8.5))):
+        _rolled(p, x, y, (SADDLE, SADDLE_TAN, shade(SADDLE, 0.8), SADDLE_TAN)[k])
+    _carriage(p, -4, 14)
+    return p.sprite()
+
+
+def _carriage(p: Painter, x: float, y: float) -> None:
+    """A black carriage with yellow wheels and a brown horse in harness before it, seen side on,
+    standing on (x, y)."""
+    body = CARRIAGE
+    p.blob(x - 4, y - 5, x + 2, y - 1.6, body)
+    p.rect(x - 3.6, y - 7, x + 1, y - 5, shade(body, 1.3))
+    p.rect(x - 3, y - 6.6, x - 1, y - 5.2, (150, 180, 200))
+    for wx, r in ((x - 3, 1.5), (x + 1.4, 1.1)):
+        p.ellipse(wx - r, y - 2 * r, wx + r, y, (200, 160, 60))
+        p.ellipse(wx - r + 0.5, y - 2 * r + 0.5, wx + r - 0.5, y - 0.5, body)
+    p.line([(x + 2, y - 2.6), (x + 6, y - 3)], HARNESS)
+    hx = x + 7
+    horse = HORSE
+    p.blob(hx - 2, y - 4.6, hx + 2, y - 2.4, horse)
+    for dx in (-1.6, -0.9, 1.0, 1.7):
+        p.line([(hx + dx, y - 2.6), (hx + dx, y)], shade(horse, 0.6))
+    p.polygon(
+        [(hx + 1.4, y - 4.2), (hx + 2.4, y - 6.6), (hx + 3.6, y - 6), (hx + 2.6, y - 3.8)], horse
+    )
+    p.line([(hx - 1.5, y - 4.4), (hx + 1.6, y - 4.4)], HARNESS)
+    p.point(hx, y - 4.4, BUCKLE)
+    p.line([(hx - 2, y - 4.2), (hx - 2.6, y - 2.2)], shade(horse, 0.5))

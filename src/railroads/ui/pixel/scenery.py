@@ -160,6 +160,7 @@ BUILDING_SPRITES = {
     BuildingKind.CARPET_WEAVER: "carpet_weaver",
     BuildingKind.CLOCK_MAKER: "clock_maker",
     BuildingKind.MIRROR_MAKER: "mirror_maker",
+    BuildingKind.SADDLER: "saddler",
     BuildingKind.MANOR: "manor",
     BuildingKind.THEATRE: "theatre",
     BuildingKind.HOSPITAL: "hospital",

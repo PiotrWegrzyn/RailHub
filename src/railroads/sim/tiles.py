@@ -309,12 +309,20 @@ UNLOCKS: Mapping[tuple[BuildingKind, Need], tuple[Tile, int]] = MappingProxyType
         (K.HOUSE, Need.CARS): (T.VEHICLES, 14),
         (K.TENEMENT, Need.APPLIANCES): (T.MODERN, 14),
         (K.HOUSE, Need.APPLIANCES): (T.MODERN, 15),
+        **{
+            (kind, Need.LEATHER): (T.HOUSEHOLD, 9)
+            for kind in (K.FURNITURE_MAKER, K.BIG_FURNITURE_MAKER, K.MEGA_FURNITURE_MAKER)
+        },
+        **{
+            (kind, Need.LEATHER): (T.VEHICLES, 12)
+            for kind in (K.CAR_FACTORY, K.BIG_CAR_FACTORY, K.MEGA_CAR_FACTORY)
+        },
     }
 )
 # The demand level of a tile from which a kind of works comes up: cola bottling plants once homes
-# start to want cola.
+# start to want cola, saddlers once homes want more of what is made of textiles and leather.
 KIND_OPENED_BY: Mapping[BuildingKind, tuple[Tile, int]] = MappingProxyType(
-    {K.COLA_BOTTLER: UNLOCKS[(K.HOUSE, Need.COLA)]}
+    {K.COLA_BOTTLER: UNLOCKS[(K.HOUSE, Need.COLA)], K.SADDLER: (T.HOUSEHOLD, 7)}
 )
 
 

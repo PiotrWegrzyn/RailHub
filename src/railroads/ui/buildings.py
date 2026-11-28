@@ -39,6 +39,7 @@ DOTS: dict[BuildingKind, tuple[RGB, float]] = {
     BuildingKind.CARPET_WEAVER: ((150, 40, 40), 0.1),
     BuildingKind.CLOCK_MAKER: ((40, 90, 60), 0.1),
     BuildingKind.MIRROR_MAKER: ((200, 160, 60), 0.1),
+    BuildingKind.SADDLER: ((150, 86, 44), 0.1),
     BuildingKind.MANOR: ((240, 236, 226), 0.16),
     BuildingKind.THEATRE: ((226, 214, 188), 0.16),
     BuildingKind.HOSPITAL: ((240, 240, 236), 0.16),

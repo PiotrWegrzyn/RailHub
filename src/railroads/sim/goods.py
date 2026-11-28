@@ -555,8 +555,10 @@ BOOST_MOST = 1.0
 PACKAGING: Mapping[Need, float] = MappingProxyType({Need.PAPER: 0.1})
 PACKAGING_MOST = 0.5
 # Furniture makers polish and shoe works blacken with wax, which makes them make up to this
-# much more.
+# much more; furniture makers share it with the leather they upholster with.
 WAX_BOOST = 0.25
+# Car works upholster their seats with leather, which makes them make up to this much more.
+SEATS_BOOST = 0.25
 
 
 @dataclass(frozen=True, slots=True)
@@ -674,6 +676,7 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.CARPET_WEAVER: Recipe(Good.LUXURIES, 3, {Need.FIBRE: 4.0}),
             BuildingKind.CLOCK_MAKER: Recipe(Good.LUXURIES, 3, {Need.COPPER: 2.0, Need.GLASS: 1.0}),
             BuildingKind.MIRROR_MAKER: Recipe(Good.LUXURIES, 3, {Need.GLASS: 2.0, Need.GOLD: 0.1}),
+            BuildingKind.SADDLER: Recipe(Good.LUXURIES, 3, {Need.LEATHER: 4.0}),
             BuildingKind.GUN_FACTORY: Recipe(Good.GUNS, 60, {Need.STEEL: 0.5, Need.PLANKS: 0.25}),
             BuildingKind.TANK_FACTORY: Recipe(Good.TANKS, 12, {Need.STEEL: 6, Need.FUEL: 2}),
             BuildingKind.PLANE_FACTORY: Recipe(
@@ -722,7 +725,11 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.SHIPYARD: Recipe(Good.GOODS, 20, {Need.STEEL: 2 / 3, Need.PLANKS: 1 / 3}),
             BuildingKind.TEXTILE_MILL: Recipe(Good.CLOTHES, 25, {Need.FIBRE: 2.5}),
             BuildingKind.FURNITURE_MAKER: Recipe(
-                Good.FURNITURE, 12, {Need.PLANKS: 4.0}, {Need.WAX: 0.5}, boost_most=WAX_BOOST
+                Good.FURNITURE,
+                12,
+                {Need.PLANKS: 4.0},
+                {Need.WAX: 0.5, Need.LEATHER: 0.5},
+                boost_most=WAX_BOOST,
             ),
             BuildingKind.TOOL_WORKS: Recipe(Good.TOOLS, 50, {Need.STEEL: 1.0}),
             BuildingKind.BARREL_MAKER: Recipe(Good.BARRELS, 25, {Need.PLANKS: 0.5}),
@@ -739,7 +746,13 @@ RECIPES: Mapping[BuildingKind, Recipe] = MappingProxyType(
             BuildingKind.ELECTRONICS_PLANT: Recipe(
                 Good.ELECTRONICS, 30, {Need.COPPER: 1.0, Need.CHEMICALS: 1.0}
             ),
-            BuildingKind.CAR_FACTORY: Recipe(Good.CARS, 12, {Need.STEEL: 5.0, Need.FUEL: 2.0}),
+            BuildingKind.CAR_FACTORY: Recipe(
+                Good.CARS,
+                12,
+                {Need.STEEL: 5.0, Need.FUEL: 2.0},
+                {Need.LEATHER: 1.0},
+                boost_most=SEATS_BOOST,
+            ),
             BuildingKind.MACHINE_WORKS: Recipe(
                 Good.MACHINERY, 25, {Need.STEEL: 1.0, Need.COPPER: 0.5}
             ),
@@ -1034,13 +1047,21 @@ _NEEDS: Mapping[BuildingKind, Mapping[Need, float]] = MappingProxyType(
         },
         BuildingKind.JEWELLER: {Need.GOLD: 12, Need.DIAMONDS: 6},
         BuildingKind.CAR_DEALER: {Need.CARS: 12, Need.RUBBER: 6},
-        BuildingKind.OUTPOST: {Need.GUNS: 35, Need.CARS: 20},
-        BuildingKind.BASE: {Need.GUNS: 110, Need.CARS: 60, Need.PLANES: 20},
+        BuildingKind.OUTPOST: {Need.GUNS: 35, Need.CARS: 20, Need.CLOTHES: 12, Need.SHOES: 12},
+        BuildingKind.BASE: {
+            Need.GUNS: 110,
+            Need.CARS: 60,
+            Need.PLANES: 20,
+            Need.CLOTHES: 36,
+            Need.SHOES: 36,
+        },
         BuildingKind.HEADQUARTERS: {
             Need.GUNS: 300,
             Need.CARS: 110,
             Need.PLANES: 60,
             Need.TANKS: 60,
+            Need.CLOTHES: 100,
+            Need.SHOES: 100,
         },
         BuildingKind.AIRPORT: {Need.FUEL: 25},
         BuildingKind.FILLING_STATION: {Need.FUEL: 25},
@@ -1119,9 +1140,12 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.CEMENT,
     BuildingKind.GLASSWORKS,
     Need.GLASS,
+    BuildingKind.TANNERY,
+    Need.LEATHER,
     BuildingKind.CARPET_WEAVER,
     BuildingKind.CLOCK_MAKER,
     BuildingKind.MIRROR_MAKER,
+    BuildingKind.SADDLER,
     Need.LUXURIES,
     BuildingKind.PORCELAIN_WORKS,
     Need.PORCELAIN,
@@ -1129,8 +1153,6 @@ _PIPELINE: tuple[Need | BuildingKind, ...] = (
     Need.PAPER,
     BuildingKind.PRINTING_WORKS,
     Need.NEWSPAPERS,
-    BuildingKind.TANNERY,
-    Need.LEATHER,
     BuildingKind.SHOE_FACTORY,
     Need.SHOES,
     BuildingKind.FURNITURE_MAKER,

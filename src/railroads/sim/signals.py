@@ -27,7 +27,9 @@ the way through it is set, and one beside it can pass; into a station they run o
 two trains each way come in or leave at once.
 A train may follow another going its way onto track that one holds, FOLLOW_GAP behind it, as long
 as wherever all the trains ahead stopped it would stand clear too, and never past where theirs is
-set unless it runs beside it on quadruple track; anywhere else two trains never hold track in the same cell at once. Stations are no blocks:
+set unless it runs beside it on quadruple track; it may follow one turning off its way at a junction, or one
+that came onto it there, FOLLOW_GAP behind it on the track they share, as long as the way set for
+that one lets its tail clear that track (`_behind_on`); one that turned off before is no longer ahead of it. Anywhere else two trains never hold track in the same cell at once. Stations are no blocks:
 any number of trains may be in one, passing each other, but never a train they follow. Of two
 trains level on one way, the one whose way is set further, else the one bought first, is ahead.
 A train standing where it could not have been
@@ -36,6 +38,7 @@ already on it, so nothing is left stuck.
 """
 
 import itertools
+import math
 import weakref
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
@@ -606,8 +609,56 @@ class Signals:
             same = way == (entry, exit_) and crossing.lane == lane
             if follow and same and self._ahead(train, crossing, other, start):
                 continue
+            if follow and self._behind_on(train, crossing, other, entry, exit_, start) is not None:
+                continue
             return other
         return None
+
+    def _behind_on(
+        self, train: Train, crossing: Pass, other: Train, entry: Point, exit_: Point, start: float
+    ) -> float | None:
+        """How far along its path a train may run behind another ahead of it that shares only
+        one end of its way across this cell going the same way: one parting from its way there,
+        on the track from the cell's edge to its middle, or one joining it, on the track from the
+        middle on. It stays FOLLOW_GAP short of the other's tail on that track until the tail
+        has left it. None for any other train, and for one whose way is not set far enough for
+        its tail to leave that track, as it might stand there in the way."""
+        parting = entry == crossing.entry and exit_ != crossing.exit
+        joining = exit_ == crossing.exit and entry != crossing.entry
+        if not (parting or joining) or crossing.touch:
+            return None
+        end = next(
+            (
+                claim[4]
+                for claim in other.claims
+                if claim[0] == crossing.cell and (claim[1], claim[2]) == (entry, exit_)
+            ),
+            None,
+        )
+        if end is None:
+            return None
+        middle = self.blocks.middles[crossing.cell]
+        mine = crossing.start + self._to_middle(crossing.entry, crossing.exit, middle) * (
+            crossing.end - crossing.start
+        )
+        theirs = start + self._to_middle(entry, exit_, middle) * (end - start)
+        shared = (start, crossing.start) if parting else (theirs, mine)
+        offset = shared[1] - shared[0]
+        if not self._leads(other, train, offset + other.along - train.along, offset):
+            return None
+        if other.cleared - SIGNAL_GAP - other.length < theirs - SAME:
+            return None
+        tail = other.along - other.length
+        if tail >= theirs - SAME if parting else tail >= end - SAME:
+            return float("inf")
+        return shared[1] + max(0.0, tail - shared[0]) - FOLLOW_GAP
+
+    @staticmethod
+    def _to_middle(entry: Point, exit_: Point, middle: Point) -> float:
+        """The share of a way across a cell that lies before its middle."""
+        into = math.dist(entry, middle)
+        out = math.dist(middle, exit_)
+        return into / (into + out) if into + out > SAME else 0.5
 
     def _going_my_way(self, train: Train, crossing: Pass) -> dict[int, tuple[Train, float]]:
         """The other trains ahead of this one holding the cell on the same way and track across
@@ -777,7 +828,7 @@ class Signals:
                     holder = self._holder(train, crossing, follow=True)
             return None
         for crossing in wanted:
-            leaders = self._still_ahead(leaders, crossing)
+            leaders = self._still_coming(self._still_ahead(leaders, crossing), crossing)
             holder = self._holder(train, crossing, follow=True)
             alongside = self._going_my_way(train, crossing)
             if holder is None and not leaders.keys() <= alongside.keys():
@@ -824,6 +875,24 @@ class Signals:
             and other.along - other.length >= start - SAME
         }
         return {key: pair for key, pair in leaders.items() if key not in beside}
+
+    def _still_coming(
+        self, leaders: dict[int, tuple[Train, float]], crossing: Pass
+    ) -> dict[int, tuple[Train, float]]:
+        """The trains a train follows but those whose way left its own before this crossing, as
+        where they turned off at a junction before it: those are no longer ahead of it there."""
+        if not leaders:
+            return leaders
+        way = (crossing.cell, crossing.entry)
+        return {
+            key: (other, offset)
+            for key, (other, offset) in leaders.items()
+            if any(
+                (later.cell, later.entry) == way
+                for later in passes(self.network, other)
+                if later.end > other.along - other.length + SAME
+            )
+        }
 
     def _ends_with(self, train: Train, way: list[Pass]) -> bool:
         """Whether a train's path ends where this way on of it does: a train coming to the end
@@ -1036,9 +1105,19 @@ class Signals:
         length = self.network.length(train)
         limit = length if train.cleared >= length - SAME else train.cleared - SIGNAL_GAP
         ahead = None
-        for cell, entry, exit_, start, _, _, lane in train.claims:
+        for claim in train.claims:
+            cell, entry, exit_, start, _, _, lane = claim
             for other, other_entry, other_exit, other_start, other_lane in self._held.get(cell, ()):
-                if other is train or (other_entry, other_exit, other_lane) != (entry, exit_, lane):
+                if other is train:
+                    continue
+                if (other_entry, other_exit) != (entry, exit_):
+                    stand = self._behind_on(
+                        train, _crossing(claim), other, other_entry, other_exit, other_start
+                    )
+                    if stand is not None and stand < limit:
+                        limit, ahead = stand, other
+                    continue
+                if other_lane != lane:
                     continue
                 offset = start - other_start
                 front = offset + other.along
