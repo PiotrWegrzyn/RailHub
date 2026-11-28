@@ -380,8 +380,10 @@ IRON_MINES = Ladder(
 
 # Logging camps stand in forests with at least four forest cells around them and flat open land
 # beside them, the likelier the more of the neighbourhood is forest, best by a river to float the
-# logs and near towns to buy them. They clear the forest around them (railroads.sim.forests) and
-# close once it is gone, another coming up in the nearest cell that suits one.
+# logs and near towns to buy them. They clear the forest around them (railroads.sim.forests) as
+# fast as they sell, and close once it is gone, another coming up in the nearest cell that suits
+# one. A camp that sells nothing clears nothing, so few come up on their own; the ones that sell
+# breed beside them, as fast as satisfied homes do.
 LOGGING_CAMPS = Ladder(
     kinds=(BuildingKind.LOGGING_CAMP,),
     land=Land(
@@ -393,7 +395,8 @@ LOGGING_CAMPS = Ladder(
         least_forest_nearby=4,
         forest_share=True,
     ),
-    base=468,
+    base=24,
+    per_doubling=840,
     most_per_cell=1,
     most_nearby=3,
 )

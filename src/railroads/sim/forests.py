@@ -2,8 +2,9 @@
 
 Each month a forest cell may be cleared, by chance: CLEARING_PER_POINT for every population or
 industry point in its neighbourhood (the cell and the cells next to it), and CLEARING_PER_MILL,
-110 times as much, for every logging camp there, so a camp among four to seven forest cells clears
-one every five to ten years. Open grassland may turn to forest, by SPREAD_PER_FOREST for every
+fifty times as much, for every logging camp there times how satisfied it is: nothing for a camp
+that sold none of its logs, twice it for one at 200%. So a fully satisfied camp among five to
+seven forest cells clears one every twelve to seventeen years. Open grassland may turn to forest, by SPREAD_PER_FOREST for every
 forest cell next to it, where nothing is built. A logging camp with fewer than MILLS_CLOSE_BELOW
 forest cells in its neighbourhood closes, and another comes up in the nearest cell one could go
 up in (Growth.fits), picked at random among those as near. POPULATION_PER_CLEARING_POINT
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
     from railroads.sim.growth import Growth
 
 CLEARING_PER_POINT = 0.00002
-CLEARING_PER_MILL = 110 * CLEARING_PER_POINT
+CLEARING_PER_MILL = 50 * CLEARING_PER_POINT
 SPREAD_PER_FOREST = 0.00004
 MILLS_CLOSE_BELOW = 3
 # How far from a closed logging camp the next one is looked for, in cells.
@@ -61,13 +62,14 @@ def forest_turn(
     tile_map: TileMap,
     near: FlatIndices,
     people: npt.NDArray[np.float64] | npt.NDArray[np.int64],
-    mills: npt.NDArray[np.int64],
+    mills: npt.NDArray[np.float64] | npt.NDArray[np.int64],
     rule: ForestRule,
     months: int,
     rng: np.random.Generator,
 ) -> tuple[FlatIndices, FlatIndices]:
     """Which forest cells are cleared and which grassland cells turn to forest over `months`,
-    from the population and industry points and the logging camps in each neighbourhood. Says
+    from the population and industry points and the logging camps in each neighbourhood, each
+    camp counted by how satisfied it is. Says
     nothing of what stands in the cells; the vegetation is left as it is."""
     land = tile_map.terrain.ravel() == Terrain.LAND
     vegetation = tile_map.vegetation.ravel()
@@ -102,7 +104,8 @@ def change_forests(
         growth.nearby(Points.POPULATION) / POPULATION_PER_CLEARING_POINT
         + growth.nearby(Points.INDUSTRY)
     ).ravel()
-    mills = growth.nearby(Points.TIMBER).ravel()
+    served = np.append(growth.served(Points.TIMBER), 0.0)
+    mills = served[:-1] + served[near].sum(axis=0)
     cleared, grown = forest_turn(tile_map, near, people, mills, rule, months, rng)
     cols = grid.cols
     grown = np.array(
