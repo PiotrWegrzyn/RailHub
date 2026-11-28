@@ -253,22 +253,29 @@ The ideas every change to the game should follow.
 - A building stands on the land it works with: a logging camp among trees.
 - Homes and what takes raw goods from the land keep their cell's own ground; every other building
   turns its whole cell into town ground, with a little grass at its edge.
-- Every kind of building is recognisable at a glance and never looks like a house or like another
-  kind.
-- Big and mega works have their own look, the same trade grown grander; a mega one is spectacular.
+- Every kind of building is recognisable at a glance from a middle zoom and never looks like a
+  house or like another kind: it shows what it is by its shape and by one subtle sign, such as a
+  gilt diamond on a jeweller's roof, never by a cottage with a sign on it.
+- Every level of a building looks different, not only bigger: big and mega works have their own
+  look, the same trade grown grander, and a mega one is spectacular.
 - The game looks like a moving model railway, not pixel art; every new piece of art serves that
   look.
 - One model at every zoom: it is drawn once at its largest and shrunk, never drawn again for each
   zoom, so the style never drifts.
 - At every zoom above 3 the ground looks the same.
 - One scale for every building, measured by houses: a barn a touch bigger than a house, a works
-  bigger than a tenement, a station fitting the buildings around it.
-- A works' colours match what it makes.
+  bigger than a tenement, a station fitting the buildings around it. Only what could not be read
+  at its true size is drawn bigger: farm animals are twice their size.
+- A building's colours follow what it makes: amber and copper for beer, white and blue for milk,
+  glowing metal and steel grey for steel.
 - Every building stands on the ground and inside its cell: nothing floats or sticks out of its hex.
 - Fields and farms blend into the colour of the land under them.
-- Trains, trees and buildings are realistic and detailed, like models on a layout, never toys.
+- Trains, trees and buildings are realistic, like 3D models on a layout, never toys, with as much
+  detail as can be drawn.
 - A station looks its level and matches the other buildings.
 - Rarity has the same colours everywhere: green common, blue rare, purple epic, gold legendary.
+- Art is judged by eye first: a change to the art alone is shown in the game and the tests run
+  only once its look is approved.
 
 ## Windows
 
