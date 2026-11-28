@@ -252,9 +252,12 @@ The ideas every change to the game should follow.
 - The perspective is consistent, as in Railroad Tycoon 2: track lies under the trees and stations
   stand turned along their track. The art is our own.
 - A building stands on the land it works with: a logging camp among trees.
-- Homes and what takes raw goods straight from the land (fields, farms, mines, quarries, logging
-  camps) keep their cell's own ground; every other building (works, shops, churches, ports) paves
-  its whole cell as town ground, with a little grass at its edge. Track and stations never do.
+- Buildings fill a cell's six sixths in a ring, each sixth facing one edge of the hex.
+- Everything that does not grow from the land (homes, works, shops, churches, ports) gets a cobbled
+  road along the edges of the sixths it stands on; such cells side by side share a road along
+  their common edge, and a loose piece of road joins the rest by the shortest way round the cells.
+  Fields, farms, mines, quarries and logging camps keep their own ground and no road. Track and
+  stations never lay a road.
 - Every kind of building is recognisable at a glance from a middle zoom and never looks like a
   house or like another kind: it shows what it is by its shape and by one subtle sign, such as a
   gilt diamond on a jeweller's roof, never by a cottage with a sign on it.
