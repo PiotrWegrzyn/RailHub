@@ -2,6 +2,7 @@
 
 import itertools
 import math
+from collections.abc import Callable
 
 import numpy as np
 
@@ -1369,40 +1370,516 @@ def barrel_maker() -> Sprite:
     return p.sprite()
 
 
+FOOD_RENDER: RGB = (238, 226, 198)
+FOOD_BRICK: RGB = (178, 82, 56)
+FOOD_IRON: RGB = (172, 178, 188)
+FOOD_GREEN: RGB = (34, 86, 62)
+FOOD_CREAM: RGB = (242, 232, 204)
+FOOD_TIN: RGB = (214, 218, 226)
+FOOD_LABELS: tuple[RGB, ...] = ((214, 44, 38), (244, 198, 40), (62, 152, 60))
+FOOD_CABBAGE: RGB = (110, 160, 72)
+FOOD_CARROT: RGB = (238, 122, 30)
+FOOD_TOMATO: RGB = (220, 40, 32)
+FOOD_WICKER: RGB = (180, 138, 82)
+FOOD_CASE: RGB = (208, 174, 124)
+FOOD_SETTS: RGB = (150, 140, 124)
+FOOD_BAY: RGB = (130, 78, 44)
+FOOD_MANE: RGB = (46, 36, 30)
+FOOD_FEATHER: RGB = (236, 228, 210)
+FOOD_GILT: RGB = (220, 176, 72)
+FOOD_WAGON: RGB = (138, 104, 72)
+FOOD_WHEEL: RGB = (176, 66, 44)
+
+
+def _food_horse(p: Painter, x: float, y: float, facing: int = 1, coat: RGB = FOOD_BAY) -> None:
+    """A heavy draught horse in harness standing on (x, y) along the lit walls, its head the way
+    they run down to the front if `facing` is 1 and up to the back if -1: 2.6 m from nose to tail
+    and 1.65 m to the withers, a bay with a dark mane and tail, a white blaze, white feathered
+    feet, and a black collar with brass hames."""
+    m = METRE
+
+    def at(s: float, z: float, w: float = 0) -> Point:
+        px, py = _iso(x, y, facing * s * m, w * m)
+        return px, py - z * m
+
+    def oval(s: float, z: float, ls: float, lz: float, w: float) -> list[Point]:
+        turns = np.linspace(0, 2 * math.pi, 20, endpoint=False)
+        return [at(s + ls * math.cos(a), z + lz * math.sin(a), w) for a in turns]
+
+    dark, hoof = shade(coat, 0.62), (52, 46, 42)
+    for s, w in ((0.42, 0.22), (-0.5, 0.22)):
+        _bar(p, at(s, 1.05, w), at(s + 0.04, 0.12, w), 0.24 * m, dark)
+        _bar(p, at(s + 0.04, 0.24, w), at(s + 0.04, 0, w), 0.24 * m, shade(FOOD_FEATHER, 0.8))
+    p.polygon(
+        [at(-0.82, 1.5), at(-1.02, 1.1), at(-1.06, 0.62), at(-0.94, 0.66), at(-0.78, 1.18)],
+        FOOD_MANE,
+    )
+    p.polygon(oval(0, 1.22, 0.86, 0.4, 0.2), shade(coat, 0.7))
+    p.polygon(oval(-0.56, 1.3, 0.38, 0.38, -0.12), coat)
+    p.polygon(oval(0.5, 1.24, 0.4, 0.4, -0.12), coat)
+    p.polygon(oval(0, 1.2, 0.8, 0.38, -0.14), coat)
+    p.polygon(oval(0, 1.0, 0.66, 0.14, -0.16), shade(coat, 0.84))
+    p.polygon(oval(-0.2, 1.5, 0.62, 0.08, -0.16), shade(coat, 1.18))
+    head = [
+        (0.32, 1.6),
+        (0.66, 1.94),
+        (0.96, 2.18),
+        (1.1, 2.2),
+        (1.46, 1.72),
+        (1.6, 1.52),
+        (1.56, 1.36),
+        (1.34, 1.36),
+        (1.1, 1.5),
+        (0.98, 1.3),
+        (0.88, 0.98),
+        (0.42, 0.98),
+    ]
+    p.polygon([at(s, z, -0.1) for s, z in head], coat)
+    p.polygon([at(s, z, -0.1) for s, z in ((0.98, 2.14), (1.0, 2.4), (1.14, 2.16))], dark)
+    _bar(p, at(0.3, 1.7, -0.1), at(1.02, 2.24, -0.1), 0.18 * m, FOOD_MANE)
+    _bar(p, at(1.24, 2.02, -0.11), at(1.54, 1.52, -0.11), 0.09 * m, FOOD_FEATHER)
+    p.polygon(oval(1.54, 1.42, 0.08, 0.08, -0.11), shade(coat, 0.55))
+    p.polygon(oval(1.14, 1.92, 0.06, 0.06, -0.11), (24, 20, 20))
+    _bar(p, at(0.6, 1.98, -0.12), at(0.9, 1.02, -0.12), 0.26 * m, (36, 32, 32))
+    _bar(p, at(0.64, 2.1, -0.13), at(0.84, 1.36, -0.13), 0.07 * m, FOOD_GILT)
+    p.polygon(oval(0.05, 1.56, 0.2, 0.09, -0.15), (40, 34, 32))
+    _bar(p, at(0.78, 1.32, -0.15), at(-0.85, 1.22, -0.15), 0.07 * m, (40, 34, 32))
+    for s, knee in ((0.56, 0.0), (-0.6, -0.12)):
+        hock = (s + knee, 0.56)
+        _bar(p, at(s, 1.1, -0.2), at(*hock, -0.2), 0.27 * m, coat)
+        _bar(p, at(*hock, -0.2), at(s, 0.12, -0.2), 0.22 * m, coat)
+        p.polygon(oval(s, 0.16, 0.15, 0.16, -0.2), FOOD_FEATHER)
+        _bar(p, at(s - 0.1, 0.03, -0.2), at(s + 0.12, 0.03, -0.2), 0.08 * m, hoof)
+
+
+def _food_wheel(p: Painter, x: float, y: float, r: float, paint: RGB) -> None:
+    """A cart wheel `r` units across its middle at (x, y), turning along the lit walls: an iron
+    tyre on a felloe in `paint`, six spokes and a hub."""
+
+    def rim(k: float) -> list[Point]:
+        turns = np.linspace(0, 2 * math.pi, 20, endpoint=False)
+        return [(x + k * math.cos(a), y + k * math.cos(a) / 2 - k * math.sin(a)) for a in turns]
+
+    p.polygon(rim(r), (50, 44, 40))
+    p.polygon(rim(0.84 * r), paint)
+    p.polygon(rim(0.66 * r), shade(paint, 0.45))
+    for k in range(3):
+        a = k * math.pi / 3
+        dx, dy = 0.7 * r * math.cos(a), 0.7 * r * (math.cos(a) / 2 - math.sin(a))
+        _bar(p, (x - dx, y - dy), (x + dx, y + dy), 0.14 * r, paint)
+    p.polygon(rim(0.2 * r), shade(paint, 0.6))
+
+
+def _food_cart(
+    p: Painter,
+    x: float,
+    y: float,
+    length: float,
+    side: float,
+    ground: RGB,
+    cargo: Callable[[Callable[[float, float], Point]], None],
+) -> None:
+    """A four-wheeled farm cart `length` m long and 1.7 m wide standing on (x, y) along the lit
+    walls, its bed a metre up with plank sides `side` m high, red wheels, and a horse in its
+    shafts ahead of it down towards the front; `cargo` draws its load, given where on the bed's
+    floor a point `s` m along it from its middle and `w` m across it lies."""
+    m = METRE
+    half = length / 2
+
+    def at(s: float, z: float, w: float = 0) -> Point:
+        px, py = _iso(x, y, s * m, w * m)
+        return px, py - z * m
+
+    def face(s0: float, s1: float, w0: float, w1: float, z0: float, z1: float) -> list[Point]:
+        return [at(s0, z0, w0), at(s1, z0, w1), at(s1, z1, w1), at(s0, z1, w0)]
+
+    p.polygon(
+        [
+            at(-half - 0.4, 0, -1.1),
+            at(half + 3.6, 0, -1.1),
+            at(half + 3.6, 0, 0.9),
+            at(-half, 0, 1),
+        ],
+        shade(ground, 0.8),
+    )
+    for s in (-half + 0.65, half - 0.65):
+        _food_wheel(p, *at(s, 0.6, 0.9), 0.6 * m, shade(FOOD_WHEEL, 0.75))
+    _bar(p, at(half - 0.2, 0.9, 0.42), at(half + 2.5, 1.32, 0.42), 0.1 * m, shade(FOOD_WAGON, 0.6))
+    p.polygon(face(-half, half, 0.85, 0.85, 1.0, 1.0 + side), shade(FOOD_WAGON, 0.82))
+    p.polygon(face(-half, -half, -0.85, 0.85, 1.0, 1.0 + side), shade(FOOD_WAGON, 0.95))
+    p.polygon(
+        [at(-half, 1.0, -0.85), at(half, 1.0, -0.85), at(half, 1.0, 0.85), at(-half, 1.0, 0.85)],
+        shade(FOOD_WAGON, 0.6),
+    )
+    cargo(lambda s, w: at(s, 1.0, w))
+    p.polygon(face(-half, half, -0.85, -0.85, 0.82, 1.0 + side), FOOD_WAGON)
+    for z in np.arange(1.0, 1.0 + side - 0.1, 0.24):
+        _bar(p, at(-half, z, -0.86), at(half, z, -0.86), 0.04 * m, shade(FOOD_WAGON, 0.7))
+    _bar(p, at(-half, 0.86, -0.86), at(half, 0.86, -0.86), 0.12 * m, shade(FOOD_WAGON, 0.55))
+    for s in (-half + 0.08, half - 0.08):
+        _bar(p, at(s, 0.82, -0.87), at(s, 1.0 + side, -0.87), 0.1 * m, shade(FOOD_WAGON, 0.65))
+    p.polygon(face(half, half, -0.85, 0.85, 0.82, 1.0 + side), shade(FOOD_WAGON, 0.74))
+    for s in (-half + 0.65, half - 0.65):
+        _food_wheel(p, *at(s, 0.6, -1.0), 0.6 * m, FOOD_WHEEL)
+    _food_horse(p, *at(half + 1.55, 0, 0))
+    _bar(p, at(half - 0.2, 0.9, -0.42), at(half + 2.5, 1.32, -0.42), 0.1 * m, FOOD_WAGON)
+
+
+def _food_basket(p: Painter, x: float, y: float, load: RGB) -> None:
+    """A round wicker basket 0.8 m across and half a metre high standing on (x, y), heaped with
+    `load`."""
+    m = METRE
+    r = 0.4 * m
+    _turned(p, x, y, [(0, 0.32 * m), (0.5 * m, r)], FOOD_WICKER)
+    rim = y - 0.5 * m
+    p.ellipse(x - r, rim - r / 2, x + r, rim + r / 2, shade(FOOD_WICKER, 0.8))
+    p.blob(x - 0.86 * r, rim - 0.7 * r, x + 0.86 * r, rim + 0.36 * r, load)
+    for dx, dy in ((-0.4, -0.3), (0.3, -0.1), (0, -0.55)):
+        cx, cy = x + dx * r, rim + dy * r
+        p.blob(cx - 0.2 * r, cy - 0.16 * r, cx + 0.2 * r, cy + 0.16 * r, shade(load, 1.22))
+
+
+def _food_cases(p: Painter, x: float, y: float, rows: tuple[int, ...], first: int = 0) -> None:
+    """Slatted cases of tins 1.1 by 0.8 m and 0.7 m high stacked on (x, y): a row of `rows[0]`
+    of them running along the lit walls, `rows[1]` on those and so on, the tins inside showing
+    between the slats silver with labels in red, yellow and green by turns from `first`, and
+    rows of silver lids on top."""
+    m = METRE
+    long, wide, tall = 1.1 * m, 0.8 * m, 0.7 * m
+    n = first
+    for level, count in enumerate(rows):
+        for k in range(count):
+            cx, cy = _iso(x, y, (k + level * 0.5) * long, 0)
+            top = p.hall(cx, cy - level * tall, long, wide, tall, FOOD_CASE, FOOD_TIN)
+            left, front, right, back = top
+            label = FOOD_LABELS[n % len(FOOD_LABELS)]
+            n += 1
+            for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
+                _patch(p, a, b, (0.07, 0.93), (0.18 * tall, 0.8 * tall), shade(FOOD_TIN, tone))
+                _patch(p, a, b, (0.07, 0.93), (0.3 * tall, 0.68 * tall), shade(label, tone))
+                for t in (0.36, 0.64):
+                    _bar(
+                        p,
+                        _on_wall(a, b, t, 0.18 * tall),
+                        _on_wall(a, b, t, 0.8 * tall),
+                        0.05 * m,
+                        shade(label, 0.6 * tone),
+                    )
+            for i in range(3):
+                for j in range(2):
+                    near = _on_wall(left, front, (i + 0.5) / 3, 0)
+                    far = _on_wall(back, right, (i + 0.5) / 3, 0)
+                    lx, ly = _on_wall(near, far, (j + 0.5) / 2, 0)
+                    p.ellipse(lx - 0.15 * m, ly - 0.08 * m, lx + 0.15 * m, ly + 0.08 * m, FOOD_TIN)
+
+
+def _food_tinplate(p: Painter, x: float, y: float, layers: int) -> None:
+    """Bundles of bright tinplate sheets 2 by 1 m from the rolling mill, for making the tins,
+    stacked `layers` deep on timber bearers on (x, y) along the lit walls, each bundle strapped
+    twice and its sheet edges glinting along its shaded end."""
+    m = METRE
+    for along in (-0.6, 0.6):
+        p.hall(*_iso(x, y, along * m, 0), 0.25 * m, 1.2 * m, 0.15 * m, shade(TIMBER, 0.6), None)
+    for k in range(layers):
+        lift = 0.15 * m + k * 0.4 * m
+        left, front, right, back = p.hall(
+            x, y - lift, 2 * m, 1 * m, 0.34 * m, shade(FOOD_TIN, 0.92), FOOD_TIN
+        )
+        for t in (0.25, 0.75):
+            _bar(
+                p,
+                _on_wall(left, front, t, 0),
+                _on_wall(left, front, t, 0.34 * m),
+                0.06 * m,
+                (70, 72, 80),
+            )
+            _bar(
+                p, _on_wall(left, front, t, 0), _on_wall(back, right, t, 0), 0.06 * m, (70, 72, 80)
+            )
+        for d in (0.1, 0.2):
+            _bar(
+                p,
+                _on_wall(front, right, 0, d * m),
+                _on_wall(front, right, 1, d * m),
+                0.03 * m,
+                shade(FOOD_TIN, 0.6),
+            )
+        if k < layers - 1:
+            _patch(p, left, front, (0, 1), (0.34 * m, 0.4 * m), shade(TIMBER, 0.6))
+
+
+def _food_window(
+    p: Painter,
+    a: Point,
+    b: Point,
+    length: float,
+    t: float,
+    wide: float,
+    span: tuple[float, float],
+    glass: RGB = MILL_GLASS,
+) -> None:
+    """A tall round-headed window of many panes in white-painted bars, framed in red brick on
+    the render with a cream stone sill, `wide` across about `t` along the wall under the edge
+    from `a` to `b`, which is `length` units long, from `span[0]` down the wall to `span[1]`."""
+    m = METRE
+    head, foot = span
+    half = wide / 2 / length
+    tone = 1.0 if glass == MILL_GLASS else 0.78
+    p.polygon(
+        _round_head(a, b, length, t, wide + 0.6 * m, head - 0.32 * m, foot),
+        shade(FOOD_BRICK, tone),
+    )
+    p.polygon(_round_head(a, b, length, t, wide, head, foot), glass)
+    bar = shade(FOOD_CREAM, tone)
+    _bar(p, _on_wall(a, b, t, head), _on_wall(a, b, t, foot), 0.07 * m, bar)
+    for drop in np.arange(head + wide / 2, foot - 0.3 * m, 0.7 * m):
+        _bar(p, _on_wall(a, b, t - half, drop), _on_wall(a, b, t + half, drop), 0.06 * m, bar)
+    _patch(
+        p, a, b, (t - half * 1.4, t + half * 1.4), (foot, foot + 0.28 * m), shade(FOOD_CREAM, tone)
+    )
+
+
+def _food_sign(p: Painter, a: Point, b: Point, length: float, t: float, drop: float) -> None:
+    """A painted board 6.4 by 2.4 m on the wall under the edge from `a` to `b`, which is `length`
+    units long, centred `t` along it with its top `drop` down: deep green in a gilt frame,
+    lettered in cream either side of a tin can painted big in its middle, silver shaded round its
+    side, with a red label banded in yellow."""
+    m = METRE
+
+    def at(s: float, d: float) -> Point:
+        return _on_wall(a, b, t + s * m / length, drop + d * m)
+
+    def quad(s0: float, s1: float, d0: float, d1: float) -> list[Point]:
+        return [at(s0, d0), at(s1, d0), at(s1, d1), at(s0, d1)]
+
+    def arc(d: float, r: float, turns: np.ndarray) -> list[Point]:
+        return [at(r * math.cos(a), d + 0.2 * r * math.sin(a)) for a in turns]
+
+    def band(d0: float, d1: float, r: float, s1: float) -> list[Point]:
+        lower = np.linspace(math.pi, math.acos(s1 / r), 9)
+        return [*arc(d0, r, lower[::-1]), *arc(d1, r, lower)]
+
+    p.polygon(quad(-3.2, 3.2, 0, 2.4), FOOD_GILT)
+    p.polygon(quad(-3.02, 3.02, 0.18, 2.22), FOOD_GREEN)
+    for side in (-1, 1):
+        for d, reach in ((0.7, 2.7), (1.2, 2.45), (1.7, 2.7)):
+            _bar(p, at(side * 1.15, d), at(side * reach, d), 0.2 * m, FOOD_CREAM)
+    r, lid, foot = 0.72, 0.5, 2.0
+    for s1, tone in ((r, 0.72), (0.3, 1.0), (-0.35, 1.12)):
+        p.polygon([at(-r, lid), *band(foot, foot, r, s1)[9:], at(s1, lid)], shade(FOOD_TIN, tone))
+        p.polygon(band(0.85, 1.8, r, s1), shade(FOOD_LABELS[0], tone))
+        p.polygon(band(1.17, 1.43, r, s1), shade(FOOD_LABELS[1], tone))
+    whole = np.linspace(0, 2 * math.pi, 18, endpoint=False)
+    p.polygon(arc(lid, r, whole), shade(FOOD_TIN, 1.12))
+    p.polygon(arc(lid, r * 0.8, whole), shade(FOOD_TIN, 0.86))
+
+
 def food_plant() -> Sprite:
-    """A cannery: a pale hall under a green roof with a row of windows, a loading door with cart
-    ruts worn out from it, a red label for a sign and crates of tins, beside two round banded
-    silos joined by a catwalk, with a puddle at their feet."""
-    p = Painter(26, 32, (12, 25))
-    foot = _footing(-2, 0, 8, 8)
+    """A Victorian cannery: a hall 18 by 12 m with walls 9 m high, rendered cream over a red-brick
+    plinth between red-brick pilasters, tall round-headed windows framed in brick, a silver
+    corrugated-iron roof with a glazed clerestory along its ridge and a vent breathing the steam
+    of the retorts, and a painted board of a big tin can over its front. A farm cart stands at its
+    cart door heaped with cabbages, its horse in the shafts and baskets of carrots and tomatoes
+    set down by the door; along the hall a loading dock is stacked with slatted cases of tins
+    labelled red, yellow and green, bundles of bright tinplate for making the tins wait by its
+    end, and behind it a brick boiler house with a coal heap and a tall round chimney smokes."""
+    m = METRE
+    p = Painter(44, 36, (19, 24))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 11) * m, (v - 4) * m)
+
+    def up(u: float, v: float, z: float) -> Point:
+        x, y = at(u, v)
+        return x, y - z * m
+
+    length, depth, high = 18 * m, 12 * m, 9 * m
+    p.polygon([at(0, -5.8), at(20, -5.8), at(27, -1.5), at(27, 4), at(0, 4)], FOOD_SETTS)
+    foot = _footing(*at(9, 6), length, depth)
     _bed(p, foot)
-    p.blob(2, -1, 13, 2.5, SOIL)
-    p.shadow(10, 3)
-    _track(p, foot[0], foot[1], (0.56, 0.86), 3)
-    wall = (222, 214, 192)
-    top = p.box(-2, 0, 8, 6, wall, (86, 128, 84))
+    _bed(p, _footing(*at(22, 8.5), 6 * m, 7 * m), margin=1)
+    p.shadow(15, 5, 4)
+    _tall_chimney(p, *at(24.5, 14), 34 * m)
+    top = p.hall(*at(9, 6), length, depth, high, FOOD_RENDER, None)
     left, front, right, _ = top
-    _plinth(p, top, 6, wall)
-    _stains(p, left, front, 6, (0.04, 0.24, 0.46), shade(wall, 0.62))
-    _stains(p, front, right, 6, (0.6, 0.9), shade(wall, 0.5))
-    p.line([left, front, right], shade((86, 128, 84), 1.3))
-    _patch(p, left, front, (0.06, 0.42), (0.8, 2), (196, 58, 48))
-    p.line([_on_wall(left, front, 0.12, 1.4), _on_wall(left, front, 0.36, 1.4)], (240, 230, 210))
-    for span in ((0.08, 0.2), (0.28, 0.4)):
-        _window(p, left, front, span, 2.8)
-    _door(p, left, front, (0.56, 0.86), 2.6, 6, lintel=shade(wall, 1.12))
-    _window(p, front, right, (0.2, 0.4), 2.4, shade(WINDOW, 0.8))
-    p.line([(4, -14), (0, -14), (0, -8)], shade(METAL, 0.75))
-    silo = shade(METAL, 1.1)
-    for x in (6, 10):
-        _turned(p, x - 0.5, 0.5, [(0, 1.8), (17, 1.8), (18.5, 1)], silo, cap=shade(METAL, 1.25))
-        for h in (6, 12):
-            _ring(p, x - 0.5, 0.5 - h, 1.8, shade(silo, 0.7))
-    p.line([(5.5, -18.5), (9.5, -18.5)], shade(METAL, 0.6))
-    p.line([(5.5, -19.5), (9.5, -19.5)], shade(METAL, 0.75))
-    _puddle(p, 8, 3.5, 1.4)
-    for x, y in ((-11, 3), (-1.5, 5.8)):
-        _crate(p, x, y)
+    for a, b, tone in ((left, front, 1.0), (front, right, 0.78)):
+        _patch(p, a, b, (0, 1), (high - 0.9 * m, high), shade(FOOD_BRICK, 0.92 * tone))
+        _patch(p, a, b, (0, 1), (0, 0.55 * m), shade(FOOD_BRICK, tone))
+        _patch(p, a, b, (0, 1), (0.55 * m, 0.75 * m), shade(FOOD_CREAM, tone))
+        _patch(p, a, b, (0, 1), (2.85 * m, 3.05 * m), shade(FOOD_BRICK, tone))
+        for t in (0.012, 0.988):
+            _bar(
+                p,
+                _on_wall(a, b, t, 0.5 * m),
+                _on_wall(a, b, t, high),
+                0.45 * m,
+                shade(FOOD_BRICK, tone),
+            )
+    _stains(p, left, front, high, (0.05, 0.29, 0.62, 0.96), shade(FOOD_RENDER, 0.72), 1.4 * m)
+    bays = 6
+    for k in range(1, bays):
+        t = k / bays
+        _bar(
+            p,
+            _on_wall(left, front, t, 3.05 * m),
+            _on_wall(left, front, t, high - 0.9 * m),
+            0.4 * m,
+            FOOD_BRICK,
+        )
+    for k in (0, 2, 3):
+        _food_window(p, left, front, length, (k + 0.5) / bays, 1.6 * m, (3.7 * m, 7.6 * m))
+    for k in (4, 5):
+        t = (k + 0.5) / bays
+        _food_window(p, left, front, length, t, 1.4 * m, (3.7 * m, 5.0 * m))
+        _patch(p, left, front, (t - 0.05, t + 0.05), (5.5 * m, high - 1.1 * m), FOOD_GREEN)
+        for s in (t - 0.017, t + 0.017):
+            _bar(
+                p,
+                _on_wall(left, front, s, 5.5 * m),
+                _on_wall(left, front, s, high - 1.1 * m),
+                0.05 * m,
+                shade(FOOD_GREEN, 0.7),
+            )
+        _bar(
+            p,
+            _on_wall(left, front, t - 0.06, 5.35 * m),
+            _on_wall(left, front, t + 0.06, 5.35 * m),
+            0.3 * m,
+            FOOD_BRICK,
+        )
+    t = 1.5 / bays
+    p.polygon(_round_head(left, front, length, t, 3.4 * m, 4.1 * m, high), FOOD_BRICK)
+    p.polygon(_round_head(left, front, length, t, 2.8 * m, 4.4 * m, high), DOORWAY)
+    for s in (t - 0.095, t + 0.072):
+        _patch(p, left, front, (s, s + 0.023), (5.6 * m, high - 0.05 * m), FOOD_GREEN)
+    for k in range(3):
+        _food_window(
+            p,
+            front,
+            right,
+            depth,
+            (k + 0.5) / 3,
+            1.6 * m,
+            (3.7 * m, 7.6 * m),
+            shade(MILL_GLASS, 0.85),
+        )
+    _food_sign(p, left, front, length, 0.5, 0.45 * m)
+    rise = 3.4 * m
+    p.gable(top, rise, FOOD_IRON, FOOD_RENDER)
+    for along in np.linspace(0.015, 0.985, 36):
+        _bar(
+            p,
+            _on_roof(top, rise, along, 0),
+            _on_roof(top, rise, along, 1),
+            0.08 * m,
+            shade(FOOD_IRON, 0.84),
+        )
+    _bar(p, _on_roof(top, rise, 0, 0), _on_roof(top, rise, 1, 0), 0.16 * m, shade(FOOD_IRON, 0.7))
+    gx, gy = _on_wall(front, right, 0.5, -rise * 0.42)
+    ring = [
+        (gx + 0.9 * m * math.cos(a), gy - 0.45 * m * math.cos(a) - 0.9 * m * math.sin(a))
+        for a in np.linspace(0, 2 * math.pi, 16, endpoint=False)
+    ]
+    p.polygon(ring, shade(FOOD_BRICK, 0.78))
+    p.polygon(
+        [(gx + (px - gx) * 0.7, gy + (py - gy) * 0.7) for px, py in ring], shade(MILL_GLASS, 0.85)
+    )
+    ridge_back, ridge_front = _ridge(top, rise)
+    rx, ry = _on_wall(ridge_back, ridge_front, 0.5, 0)
+    lantern = p.hall(rx, ry + 0.75 * m, 14 * m, 2.6 * m, 2.1 * m, FOOD_CREAM, None)
+    l_left, l_front, l_right, _ = lantern
+    for a, b, tone in ((l_left, l_front, 1.0), (l_front, l_right, 0.78)):
+        _patch(p, a, b, (0.02, 0.98), (0.25 * m, 1.3 * m), shade(NORTH_LIGHT, 0.8 * tone))
+        for s in np.linspace(0.02, 0.98, 16 if tone == 1.0 else 3):
+            _bar(
+                p,
+                _on_wall(a, b, s, 0.25 * m),
+                _on_wall(a, b, s, 1.3 * m),
+                0.07 * m,
+                shade(FOOD_CREAM, tone),
+            )
+    p.gable(lantern, 0.9 * m, FOOD_IRON, FOOD_CREAM)
+    vx, vy = _on_roof(top, rise, 0.27, 0.45)
+    _bar(p, (vx, vy + 0.3 * m), (vx, vy - 2.2 * m), 0.4 * m, (88, 90, 96))
+    _bar(p, (vx - 0.35 * m, vy - 2.2 * m), (vx + 0.35 * m, vy - 2.2 * m), 0.2 * m, (60, 62, 68))
+    _smoke(p, vx + 0.5, vy - 4, (242, 242, 244), 2)
+    boiler = p.hall(*at(22, 8.5), 6 * m, 7 * m, 5.5 * m, FOOD_BRICK, None)
+    b_left, b_front, b_right, _ = boiler
+    _plinth(p, boiler, 5.5 * m, FOOD_BRICK, 0.6 * m)
+    _bands(p, b_left, b_front, b_right, 0.3 * m, FOOD_CREAM, shade(FOOD_CREAM, 0.78))
+    _food_window(p, b_left, b_front, 6 * m, 0.3, 1.5 * m, (1.5 * m, 4.0 * m))
+    p.polygon(_round_head(b_left, b_front, 6 * m, 0.72, 1.8 * m, 2.2 * m, 5.5 * m), DOORWAY)
+    _food_window(
+        p, b_front, b_right, 7 * m, 0.5, 1.4 * m, (1.5 * m, 4.0 * m), shade(MILL_GLASS, 0.85)
+    )
+    p.gable(boiler, 2.2 * m, MILL_SLATE, FOOD_BRICK)
+    _roof_rows(p, boiler, 2.2 * m, MILL_SLATE)
+    cx, cy = at(26.2, 4.6)
+    coal = (46, 44, 48)
+    p.blob(cx - 2.6 * m, cy - 0.9 * m, cx + 2.4 * m, cy + 1.1 * m, shade(coal, 1.1))
+    _heap(p, cx, cy, 2 * m, 1.5 * m, coal)
+    for dx, dy in ((-1.2, -0.3), (-0.5, -0.9), (0.4, -0.5), (-0.2, 0.2), (1.1, 0.1)):
+        lx, ly = cx + dx * m, cy + dy * m
+        p.blob(lx - 0.18 * m, ly - 0.12 * m, lx + 0.18 * m, ly + 0.12 * m, (92, 92, 100))
+    _food_tinplate(p, *at(20.6, 2.6), 3)
+    _food_tinplate(p, *at(21.4, 0.6), 2)
+    for k in (2, 1, 0):
+        p.hall(
+            *at(10.5 - 0.35 * (k + 0.5), -1.2),
+            0.35 * m,
+            2 * m,
+            0.27 * (3 - k) * m,
+            shade(TIMBER, 0.8),
+            shade(TIMBER, 1.1),
+        )
+    dock = p.hall(
+        *at(14.25, -1.2), 7.5 * m, 2.4 * m, 1.1 * m, shade(FOOD_BRICK, 0.9), shade(TIMBER, 1.15)
+    )
+    for s in np.linspace(0.05, 0.95, 10):
+        _bar(
+            p,
+            _on_wall(dock[0], dock[3], s, 0),
+            _on_wall(dock[1], dock[2], s, 0),
+            0.05 * m,
+            shade(TIMBER, 0.85),
+        )
+    _food_cases(p, *up(11.2, -1.4, 1.1), (3, 2, 1))
+    _food_cases(p, *up(15.2, -1.0, 1.1), (2, 1), 1)
+    _food_cases(p, *up(17.0, -1.6, 1.1), (1,), 2)
+
+    def cabbages(on_bed: Callable[[float, float], Point]) -> None:
+        for z, spots in (
+            (0.2, (-1.3, -0.75, -0.2, 0.35, 0.9, 1.4)),
+            (0.55, (-0.9, -0.3, 0.3, 0.9)),
+        ):
+            for w in (0.48, 0.0, -0.48):
+                for k, s in enumerate(spots):
+                    cx, cy = on_bed(s, w)
+                    cy -= z * m
+                    tone = 1.0 if (k + round(w * 2)) % 2 else 0.86
+                    p.ellipse(
+                        cx - 0.32 * m,
+                        cy - 0.26 * m,
+                        cx + 0.32 * m,
+                        cy + 0.2 * m,
+                        shade(FOOD_CABBAGE, tone),
+                    )
+                    p.blob(
+                        cx - 0.2 * m,
+                        cy - 0.2 * m,
+                        cx + 0.02 * m,
+                        cy - 0.04 * m,
+                        shade(FOOD_CABBAGE, 1.25),
+                    )
+
+    for u, v, load in (
+        (2.5, -0.8, FOOD_TOMATO),
+        (1.6, -1.3, FOOD_CARROT),
+        (6.6, -1.1, FOOD_CARROT),
+        (2.8, -1.9, FOOD_CABBAGE),
+    ):
+        _food_basket(p, *at(u, v), load)
+    _food_cart(p, *at(4.4, -3.6), 3.4, 0.5, FOOD_SETTS, cabbages)
     return p.sprite()
 
 
@@ -2096,39 +2573,282 @@ def machine_works() -> Sprite:
     return p.sprite()
 
 
+BRICK_KILN: RGB = (166, 82, 56)
+BRICK_FIRED: RGB = (200, 88, 56)
+BRICK_ORANGE: RGB = (216, 124, 72)
+BRICK_GREEN: RGB = (220, 202, 162)
+BRICK_CLAY: RGB = (190, 160, 114)
+BRICK_PANTILE: RGB = (196, 98, 58)
+BRICK_DUST: RGB = (158, 112, 86)
+BRICK_GLOW: RGB = (246, 150, 54)
+
+
+def _brick_lattice(
+    p: Painter, a: Point, b: Point, cells: int, courses: int, tall: float, gap: RGB
+) -> None:
+    """The open lattice of a hack of green bricks set to dry on the wall under the edge from `a`
+    to `b`, `tall` units high: `courses` courses of `cells` bricks each, every other one left out
+    so the air goes through, the gaps in `gap`."""
+    for c in range(courses):
+        for j in range(cells):
+            if (c + j) % 2:
+                _patch(
+                    p,
+                    a,
+                    b,
+                    ((j + 0.12) / cells, (j + 0.88) / cells),
+                    (tall * (c + 0.15) / courses, tall * (c + 0.85) / courses),
+                    gap,
+                )
+
+
+def _brick_hack(p: Painter, x: float, y: float, long: float, wide: float, tall: float) -> None:
+    """A hack of green bricks drying on (x, y): `long` m along the lit walls, `wide` m across and
+    `tall` m high, of cream unfired clay stacked in an open lattice that shows on both its faces
+    and its top."""
+    m = METRE
+    left, front, right, back = p.hall(
+        x, y, long * m, wide * m, tall * m, BRICK_GREEN, shade(BRICK_GREEN, 1.06)
+    )
+    courses = max(2, round(tall / 0.3))
+    _brick_lattice(p, left, front, round(long / 0.3), courses, tall * m, (118, 100, 80))
+    _brick_lattice(p, front, right, round(wide / 0.3), courses, tall * m, (92, 78, 64))
+    for k in range(1, round(long / 0.3)):
+        t = k / round(long / 0.3)
+        _bar(
+            p,
+            _on_wall(left, front, t, 0),
+            _on_wall(back, right, t, 0),
+            0.04 * m,
+            shade(BRICK_GREEN, 0.8),
+        )
+
+
+def _brick_pallet(p: Painter, x: float, y: float, colour: RGB) -> None:
+    """A neat cube of a thousand-odd fired bricks, 1.2 by 1 m and 1.1 m high, stacked on a
+    timber pallet on (x, y), its courses and staggered joints showing on its faces."""
+    m = METRE
+    p.hall(x, y, 1.3 * m, 1.1 * m, 0.15 * m, shade(TIMBER, 0.7), shade(TIMBER, 0.85))
+    left, front, right, back = p.hall(
+        x, y - 0.15 * m, 1.2 * m, 1 * m, 1.1 * m, colour, shade(colour, 1.12)
+    )
+    for a, b, tone in ((left, front, 0.72), (front, right, 0.6)):
+        for c in range(1, 5):
+            drop = 1.1 * m * c / 5
+            _bar(p, _on_wall(a, b, 0, drop), _on_wall(a, b, 1, drop), 0.05 * m, shade(colour, tone))
+        for c in range(5):
+            for t in (0.25, 0.75) if c % 2 else (0.5,):
+                _bar(
+                    p,
+                    _on_wall(a, b, t, 1.1 * m * c / 5),
+                    _on_wall(a, b, t, 1.1 * m * (c + 1) / 5),
+                    0.04 * m,
+                    shade(colour, tone),
+                )
+    _bar(
+        p,
+        _on_wall(left, back, 0.5, 0),
+        _on_wall(front, right, 0.5, 0),
+        0.04 * m,
+        shade(colour, 0.8),
+    )
+
+
+def _brick_tub(p: Painter, x: float, y: float) -> None:
+    """A narrow-gauge tipping tub on (x, y) on the track along the lit walls: an iron V-skip 1.3 m
+    long on a low frame and four small wheels, heaped with raw clay."""
+    m = METRE
+
+    def at(s: float, z: float, w: float = 0) -> Point:
+        px, py = _iso(x, y, s * m, w * m)
+        return px, py - z * m
+
+    iron = (92, 92, 98)
+    for s in (-0.4, 0.4):
+        p.polygon(
+            [
+                at(s + 0.18 * math.cos(a), 0.2 + 0.18 * math.sin(a), 0.35)
+                for a in np.linspace(0, 2 * math.pi, 10)
+            ],
+            (50, 48, 50),
+        )
+    p.polygon(
+        [at(-0.65, 0.35, -0.3), at(0.65, 0.35, -0.3), at(0.65, 0.35, 0.3), at(-0.65, 0.35, 0.3)],
+        (60, 58, 62),
+    )
+    body = [at(-0.7, 1.0, -0.5), at(0.7, 1.0, -0.5), at(0.5, 0.4, -0.1), at(-0.5, 0.4, -0.1)]
+    p.polygon(
+        [at(0.7, 1.0, -0.5), at(0.7, 1.0, 0.5), at(0.5, 0.4, 0.1), at(0.5, 0.4, -0.1)],
+        shade(iron, 0.7),
+    )
+    p.polygon(body, iron)
+    cx, cy = at(0, 1.0, 0)
+    p.blob(cx - 0.75 * m, cy - 0.35 * m, cx + 0.75 * m, cy + 0.3 * m, BRICK_CLAY)
+    p.blob(cx - 0.4 * m, cy - 0.3 * m, cx + 0.2 * m, cy, shade(BRICK_CLAY, 1.12))
+    for s in (-0.4, 0.4):
+        p.polygon(
+            [
+                at(s + 0.18 * math.cos(a), 0.2 + 0.18 * math.sin(a), -0.35)
+                for a in np.linspace(0, 2 * math.pi, 10)
+            ],
+            (50, 48, 50),
+        )
+
+
 def brickworks() -> Sprite:
-    """A round Hoffmann kiln ringed with arched firing doors sooted above, around its tall banded
-    chimney, feed holes on its roof, a barrow track worn from its front door to a heap of clay
-    spreading over the ground, and stacks of new red bricks on ground red with brick dust."""
-    p = Painter(34, 54, (16, 44))
-    kiln = (152, 98, 76)
-    x, y, r = -2, -1, 10
-    p.blob(x - r - 2, y - r / 2 - 1, x + r + 2, y + r / 2 + 1.5, SOIL)
-    p.blob(6, 1, 16, 7.5, (146, 104, 82))
-    _spill(p, -12, 7, 3, (176, 122, 86))
-    p.shadow(14, 5)
-    _track(p, (-5, 2.5), (1, 5.5), (0.3, 0.6), 4)
-    _turned(p, x, y, [(0, r), (6, r)], kiln)
-    _ring(p, x, y - 0.8, r, shade(kiln, 0.7))
-    for a in (0.35, 0.95, 1.55, 2.15, 2.75):
-        ax, ay = x + r * math.cos(a), y + r / 2 * math.sin(a)
-        p.rect(ax - 1, ay - 4, ax + 1, ay, (52, 36, 32))
-        p.point(ax - 0.5, ay - 5, shade(kiln, 1.35))
-        p.line([(ax, ay - 5.5), (ax, ay - 6)], shade(kiln, 0.62))
-    _turned(p, x, y - 6, [(0, r + 1), (3, r - 4)], (96, 86, 86), cap=(118, 106, 104))
-    for a in (0.5, 1.2, 1.9, 2.6):
-        p.point(x + (r - 1) * math.cos(a), y - 7.5 + (r - 1) / 2 * math.sin(a), (60, 54, 54))
-    _smoking_chimney(p, x, y - 8, y - 35, shade(BRICK, 0.9), puffs=2)
-    _heap(p, -12, 7, 3, 2.5, (176, 122, 86))
-    for bx, by in ((13, 2), (8.5, 5.5)):
-        stack = p.hall(bx, by, 4, 3, 3, BRICK, shade(BRICK, 1.25))
-        for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
-            _band(p, a, b, 1.5, shade(BRICK, 1.3))
-            p.line([_on_wall(a, b, 0.5, 0), _on_wall(a, b, 0.5, 1.5)], shade(BRICK, 0.7))
-            p.line([_on_wall(a, b, 0.25, 1.5), _on_wall(a, b, 0.25, 3)], shade(BRICK, 0.7))
-            p.line([_on_wall(a, b, 0.75, 1.5), _on_wall(a, b, 0.75, 3)], shade(BRICK, 0.7))
-    for px, py in ((5, 8), (10, 8.5)):
-        p.point(px, py, BRICK)
+    """A Victorian brickworks round a Hoffmann ring kiln: a long low oval of sooty brick 26 by
+    11 m, its battered walls pierced all round by arched wickets, some bricked up for the firing
+    and one glowing, the feeding floor on its crown under a pantiled hipped roof on open posts,
+    and its tall round chimney rising from the middle. Before it an open drying shed shelters a
+    hack of cream green bricks stacked in an open lattice, with two more hacks out in the yard;
+    beside it a clay pit is dug into the ground, a puddle on its floor, with tipping tubs on a
+    narrow-gauge track at its edge, and in a yard red with brick dust stand neat pallets of fired
+    red bricks by a small brick office."""
+    m = METRE
+    p = Painter(41, 48, (18, 35))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 10.5) * m, (v - 0.5) * m)
+
+    def up(u: float, v: float, z: float) -> Point:
+        x, y = at(u, v)
+        return x, y - z * m
+
+    p.polygon(
+        [at(-10, -1), at(-3, -8.5), at(33.5, -8.5), at(33.5, -0.5), at(24, 9), at(-10, 10)],
+        BRICK_DUST,
+    )
+    u0, u1, v0, v1, d = -9.5, -1.5, -1.0, 9.0, 2.2
+    p.polygon([at(u0, v0), at(u0, v1), at(u0 + d, v1 - d), at(u0 + d, v0)], shade(BRICK_CLAY, 0.62))
+    p.polygon([at(u0, v1), at(u1, v1), at(u1, v1 - d), at(u0 + d, v1 - d)], shade(BRICK_CLAY, 0.92))
+    for q, tone in ((0.3, 0.8), (0.55, 1.04), (0.8, 0.78)):
+        _bar(p, at(u0 + q * d, v1 - q * d), at(u1, v1 - q * d), 0.12 * m, shade(BRICK_CLAY, tone))
+    _bar(p, at(u0, v1), at(u1, v1), 0.25 * m, (88, 104, 56))
+    _bar(p, at(u0, v0), at(u0, v1), 0.25 * m, (88, 104, 56))
+    p.polygon(
+        [at(u0 + d, v0), at(u1, v0), at(u1, v1 - d), at(u0 + d, v1 - d)], shade(BRICK_CLAY, 0.8)
+    )
+    px, py = at(-4.5, 3)
+    p.blob(px - 2.2 * m, py - 0.8 * m, px + 2.2 * m, py + 0.8 * m, PUDDLE)
+    p.blob(px - 1.4 * m, py - 0.5 * m, px - 0.2 * m, py - 0.1 * m, shade(PUDDLE, 1.3))
+    for w in (-0.3, 0.3):
+        _bar(p, at(-1.5, -2 + w), at(5, -2 + w), 0.08 * m, (70, 66, 64))
+    _bed(p, _footing(*at(13, 5.5), 26 * m, 11 * m))
+    p.shadow(16, 6, 5)
+    high, r = 3.6 * m, 5.5
+    f = r * math.sqrt(2) * m
+    ends = (at(5.5, 5.5), at(20.5, 5.5))
+    batter = [(0, f + 0.35 * m), (0.9 * m, f), (high, f)]
+    _turned(p, *ends[0], batter, BRICK_KILN)
+    b_left, b_front, _, _ = p.hall(*at(13, 5.5), 15 * m, 11 * m, high, BRICK_KILN, None)
+    _turned(p, *ends[1], batter, BRICK_KILN)
+    _patch(p, b_left, b_front, (0, 1), (high - 0.9 * m, high), shade(BRICK_KILN, 0.84))
+    lid = (110, 92, 84)
+    for ex, ey in ends:
+        p.blob(ex - f, ey - high - f / 2, ex + f, ey - high + f / 2, lid)
+    p.polygon([up(5.5, 0, 3.6), up(20.5, 0, 3.6), up(20.5, 11, 3.6), up(5.5, 11, 3.6)], lid)
+
+    def wicket(x: float, y: float, kind: int) -> None:
+        def arch(half: float, crown: float) -> list[Point]:
+            turns = np.linspace(0, math.pi, 7)
+            return [
+                (x - half, y),
+                (x + half, y),
+                *[(x + half * math.cos(a), y - crown + half - half * math.sin(a)) for a in turns],
+            ]
+
+        _bar(p, (x, y - 2.0 * m), (x + 0.2 * m, y - high + 0.1 * m), 0.5 * m, (92, 54, 44))
+        p.polygon(arch(0.78 * m, 2.0 * m), shade(BRICK_KILN, 1.12))
+        fill = (shade(BRICK_KILN, 0.96), DOORWAY, BRICK_GLOW)[kind]
+        p.polygon(arch(0.58 * m, 1.8 * m), fill)
+        if kind == 0:
+            for drop in (0.35, 0.75, 1.15):
+                _bar(
+                    p,
+                    (x - 0.55 * m, y - drop * m),
+                    (x + 0.55 * m, y - drop * m),
+                    0.05 * m,
+                    shade(fill, 0.75),
+                )
+        if kind == 2:
+            p.blob(x - 0.32 * m, y - 1.3 * m, x + 0.32 * m, y - 0.1 * m, (255, 214, 120))
+
+    for k, kind in enumerate((1, 0, 1, 2, 0, 1)):
+        wicket(*_on_wall(b_left, b_front, (k + 0.5) / 6, high), kind)
+    for (ex, ey), turns in ((ends[0], (2.75, 2.45)), (ends[1], (1.95, 1.2, 0.5))):
+        for kind, a in zip((0, 1, 0), turns, strict=False):
+            wicket(ex + f * math.cos(a), ey + f / 2 * math.sin(a), kind)
+    store = p.hall(*up(13, 5.5, 3.6), 19 * m, 7.6 * m, 1.3 * m, (50, 40, 36), None)
+    for a, b, posts in ((store[0], store[1], 9), (store[1], store[2], 3)):
+        for k in range(posts + 1):
+            px, py = _on_wall(a, b, k / posts, 1.3 * m)
+            _bar(p, (px, py), (px, py - 1.3 * m), 0.22 * m, shade(TIMBER, 0.8))
+    tile = BRICK_PANTILE
+    ru0, ru1, rv0, rv1, eave, rise = 2.9, 23.1, 1.3, 9.7, 4.9, 2.8
+    run = (rv1 - rv0) / 2
+    r_left, r_front = up(ru0, rv0, eave), up(ru1, rv0, eave)
+    r_right, r_back = up(ru1, rv1, eave), up(ru0, rv1, eave)
+    ridge_back, ridge_front = (
+        up(ru0 + run, rv0 + run, eave + rise),
+        up(ru1 - run, rv0 + run, eave + rise),
+    )
+    p.polygon([r_back, r_right, ridge_front, ridge_back], shade(tile, 0.68), shade(tile, 0.45))
+    p.polygon([r_left, r_back, ridge_back], shade(tile, 0.9), shade(tile, 0.55))
+    p.polygon([r_front, r_right, ridge_front], shade(tile, 0.74), shade(tile, 0.5))
+    p.polygon([r_left, r_front, ridge_front, ridge_back], tile, shade(tile, 0.6))
+    for u in np.linspace(ru0 + 0.5, ru1 - 0.5, 40):
+        reach = min(u - ru0, ru1 - u, run)
+        _bar(
+            p,
+            up(u, rv0, eave),
+            up(u, rv0 + reach, eave + rise * reach / run),
+            0.06 * m,
+            shade(tile, 0.86),
+        )
+    _bar(p, r_left, r_front, 0.14 * m, shade(tile, 0.7))
+    _bar(p, ridge_back, ridge_front, 0.22 * m, shade(tile, 1.2))
+    _tall_chimney(p, *up(13, 5.5, eave + rise - 1.0), 44 * m)
+    _brick_tub(p, *at(0.2, -2))
+    _brick_tub(p, *at(2.1, -2))
+    shed = _footing(*up(6, -5.5, 2.8), 17 * m, 4 * m)
+    s_left, s_front, s_right, s_back = shed
+    for k in range(7):
+        px, py = _on_wall(s_back, s_right, k / 6, 2.8 * m)
+        _bar(p, (px, py), (px, py - 2.8 * m), 0.2 * m, shade(TIMBER, 0.6))
+    _brick_hack(p, *at(6, -5.5), 15, 1.6, 1.5)
+    for k in range(7):
+        px, py = _on_wall(s_left, s_front, k / 6, 2.8 * m)
+        _bar(p, (px, py), (px, py - 2.8 * m), 0.2 * m, shade(TIMBER, 0.75))
+    p.gable(shed, 1.2 * m, shade(tile, 0.8), TIMBER)
+    _roof_rows(p, shed, 1.2 * m, shade(tile, 0.8))
+    for u, v in ((16.6, -6), (18.9, -6)):
+        _brick_hack(p, *at(u, v), 2, 1.4, 1.3)
+    office = p.hall(*at(23.5, -6.5), 5 * m, 4 * m, 4 * m, BRICK_ORANGE, None)
+    o_left, o_front, o_right, _ = office
+    _plinth(p, office, 4 * m, BRICK_ORANGE, 0.5 * m)
+    _bands(p, o_left, o_front, o_right, 0.3 * m, BRICK_GREEN, shade(BRICK_GREEN, 0.8))
+    _food_window(p, o_left, o_front, 5 * m, 0.25, 1.1 * m, (1.2 * m, 2.9 * m))
+    _patch(p, o_left, o_front, (0.58, 0.8), (1.3 * m, 4 * m), DOOR)
+    _patch(p, o_left, o_front, (0.56, 0.82), (1.05 * m, 1.3 * m), BRICK_GREEN)
+    _food_window(
+        p, o_front, o_right, 4 * m, 0.5, 1.1 * m, (1.2 * m, 2.9 * m), shade(MILL_GLASS, 0.85)
+    )
+    p.gable(office, 2.2 * m, tile, BRICK_ORANGE)
+    _roof_rows(p, office, 2.2 * m, tile)
+    cx, cy = _on_roof(office, 2.2 * m, 0.2, 0.8)
+    p.hall(cx, cy, 0.6 * m, 0.6 * m, 1.4 * m, BRICK_FIRED, (60, 52, 50))
+    pallets = [
+        (28, -1.5, BRICK_FIRED),
+        (30, -1.5, BRICK_ORANGE),
+        (32, -1.5, BRICK_FIRED),
+        (28, -4, BRICK_ORANGE),
+        (30, -4, BRICK_FIRED),
+        (32, -4, BRICK_FIRED),
+        (28, -6.5, BRICK_FIRED),
+        (30, -6.5, BRICK_FIRED),
+    ]
+    for u, v, colour in sorted(pallets, key=lambda e: e[0] - e[1]):
+        _brick_pallet(p, *at(u, v), colour)
     return p.sprite()
 
 
@@ -3817,49 +4537,338 @@ def printing_works() -> Sprite:
     return p.sprite()
 
 
+SUGAR_BRICK: RGB = (186, 94, 62)
+SUGAR_CREAM: RGB = (234, 216, 172)
+SUGAR_WHITE: RGB = (246, 246, 242)
+SUGAR_BLUE: RGB = (48, 84, 168)
+SUGAR_BEET: RGB = (218, 194, 150)
+SUGAR_GROUND: RGB = (148, 132, 106)
+SUGAR_BALLAST: RGB = (126, 120, 112)
+SUGAR_RAIL: RGB = (84, 82, 88)
+SUGAR_SLEEPER: RGB = (90, 66, 48)
+SUGAR_WAGON: RGB = (128, 74, 54)
+
+
+def _sugar_window(
+    p: Painter, a: Point, b: Point, length: float, t: float, wide: float, span: tuple[float, float]
+) -> None:
+    """A sash window with a segmental head under a cream brick arch and a white sill, its frame
+    and bars painted sugar white, `wide` across about `t` along the wall under the edge from `a`
+    to `b`, which is `length` units long, from `span[0]` down the wall to `span[1]`; darker on
+    the shaded wall."""
+    m = METRE
+    head, foot = span
+    tone = 1.0 if b[1] > a[1] else 0.8
+
+    def outline(half: float, top: float, rise: float) -> list[Point]:
+        crown = [
+            _on_wall(a, b, t + half * math.cos(turn), top + rise - rise * math.sin(turn))
+            for turn in np.linspace(0, math.pi, 7)
+        ]
+        return [_on_wall(a, b, t - half, foot), _on_wall(a, b, t + half, foot), *crown]
+
+    half = wide / 2 / length
+    pad = 0.18 * m / length
+    p.polygon(outline(half + pad, head - 0.3 * m, 0.4 * m), shade(SUGAR_CREAM, tone))
+    p.polygon(outline(half + pad * 0.5, head - 0.08 * m, 0.3 * m), shade(SUGAR_WHITE, tone))
+    p.polygon(outline(half, head, 0.25 * m), shade(MILL_GLASS, tone))
+    bar = shade(SUGAR_WHITE, tone)
+    _bar(p, _on_wall(a, b, t, head), _on_wall(a, b, t, foot), 0.08 * m, bar)
+    middle = (head + foot) / 2 + 0.1 * m
+    _bar(p, _on_wall(a, b, t - half, middle), _on_wall(a, b, t + half, middle), 0.12 * m, bar)
+    _patch(
+        p,
+        a,
+        b,
+        (t - half - pad, t + half + pad),
+        (foot, foot + 0.22 * m),
+        shade(SUGAR_WHITE, tone * 0.95),
+    )
+
+
+def _sugar_loaf(p: Painter, x: float, y: float, tall: float) -> None:
+    """A sugarloaf `tall` units high standing on (x, y): a tall cone of white sugar wrapped in
+    blue paper up to near its rounded tip, lit on the left."""
+    half = tall * 0.2
+    wrap = tall * 0.74
+    tip = (x, y - tall)
+    p.polygon([(x - half, y), (x, y + half * 0.4), tip], SUGAR_BLUE)
+    p.polygon([(x, y + half * 0.4), (x + half, y), tip], shade(SUGAR_BLUE, 0.7))
+    top = 1 - wrap / tall
+    p.polygon(
+        [(x - half * top, y - wrap), (x + half * top, y - wrap), tip],
+        SUGAR_WHITE,
+    )
+    p.polygon([(x + half * top * 0.2, y - wrap), (x + half * top, y - wrap), tip], (204, 206, 210))
+    p.line(
+        [(x - half * 0.55, y - tall * 0.3), (x - half * 0.3, y - tall * 0.6)],
+        shade(SUGAR_BLUE, 1.35),
+    )
+
+
+def _sugar_bags(p: Painter, x: float, y: float, rows: tuple[int, ...]) -> None:
+    """White sacks of sugar 0.9 m long stacked on (x, y): a row of `rows[0]` of them lying along
+    the lit walls, `rows[1]` on those and so on, plump on top, each stamped in blue."""
+    m = METRE
+    long, wide, tall = 0.9 * m, 0.6 * m, 0.34 * m
+    for level, count in enumerate(rows):
+        for k in range(count):
+            cx, cy = _iso(x, y, (k + level * 0.5) * long, 0)
+            left, front, right, _ = p.hall(
+                cx, cy - level * tall, long, wide, tall, shade(SUGAR_WHITE, 0.92), SUGAR_WHITE
+            )
+            mx, my = _on_wall(left, right, 0.5, 0)
+            p.blob(mx - 0.42 * m, my - 0.2 * m, mx + 0.42 * m, my + 0.14 * m, SUGAR_WHITE)
+            _patch(p, left, front, (0.35, 0.65), (0.1 * m, 0.24 * m), SUGAR_BLUE)
+
+
+def _sugar_beet(p: Painter, x: float, y: float, length: float, depth: float, high: float) -> None:
+    """A long clamp of pale sugar beet `length` m along the lit walls and `depth` m across,
+    heaped `high` m up on (x, y): sloping lit along its front, hipped at its shaded end, and
+    lumpy with roots."""
+    m = METRE
+    rng = np.random.default_rng(7)
+
+    def at(s: float, w: float, z: float) -> Point:
+        px, py = _iso(x, y, s * m, w * m)
+        return px, py - z * m
+
+    half, side, ridge = length / 2, depth / 2, length / 2 - depth / 2
+    p.polygon(
+        [at(-half, -side, 0), at(half, -side, 0), at(ridge, 0, high), at(-ridge, 0, high)],
+        SUGAR_BEET,
+    )
+    p.polygon([at(half, -side, 0), at(half, side, 0), at(ridge, 0, high)], shade(SUGAR_BEET, 0.76))
+    for _ in range(int(length * depth * 2.2)):
+        up = rng.uniform(0.05, 0.95)
+        s = rng.uniform(-half + side * up, half - side * up)
+        w = -side * (1 - up)
+        px, py = at(s, w, high * up)
+        tone = rng.choice([0.78, 0.9, 1.08, 1.18])
+        r = rng.uniform(0.16, 0.24) * m
+        p.blob(px - r, py - r * 0.7, px + r, py + r * 0.7, shade(SUGAR_BEET, tone))
+    for _ in range(int(depth * depth * 2.2)):
+        up = rng.uniform(0.05, 0.9)
+        w = rng.uniform(-side, side) * (1 - up)
+        px, py = at(half - side * up, w, high * up)
+        r = rng.uniform(0.16, 0.24) * m
+        tone = rng.choice([0.62, 0.7, 0.8, 0.88])
+        p.blob(px - r, py - r * 0.7, px + r, py + r * 0.7, shade(SUGAR_BEET, tone))
+
+
+def _sugar_siding(p: Painter, a: Point, b: Point) -> None:
+    """A short railway siding on cinder ballast running along the lit walls from `a` to `b` on
+    the ground: sleepers every 0.7 m, two rails, and a red buffer stop at `a`."""
+    m = METRE
+    run = math.dist(a, b) / math.hypot(1, 0.5) / m
+
+    def at(s: float, w: float, z: float = 0) -> Point:
+        px, py = _iso(*_on_wall(a, b, s / run, 0), 0, w * m)
+        return px, py - z * m
+
+    p.polygon([at(-0.4, -1.5), at(run, -1.5), at(run, 1.5), at(-0.4, 1.5)], SUGAR_BALLAST)
+    for s in np.arange(0.3, run, 0.7):
+        _bar(p, at(s, -1.25), at(s, 1.25), 0.24 * m, SUGAR_SLEEPER)
+    for w in (0.72, -0.72):
+        _bar(p, at(-0.2, w, 0.1), at(run, w, 0.1), 0.12 * m, SUGAR_RAIL)
+        _bar(p, at(-0.2, w, 0.14), at(run, w, 0.14), 0.04 * m, (170, 170, 176))
+    for w in (0.7, -0.7):
+        _bar(p, at(0, w), at(0, w, 0.9), 0.2 * m, (60, 52, 48))
+    p.polygon([at(0, -1.2, 0.7), at(0, 1.2, 0.7), at(0, 1.2, 1.1), at(0, -1.2, 1.1)], (186, 52, 40))
+    p.polygon(
+        [at(0, -1.2, 0.7), at(0.25, -1.2, 0.7), at(0.25, -1.2, 1.1), at(0, -1.2, 1.1)],
+        (210, 70, 54),
+    )
+
+
+def _sugar_wagon(p: Painter, x: float, y: float) -> None:
+    """An open wooden goods wagon 6 m long on the siding at (x, y), its red-oxide planked sides a
+    metre high on a dark underframe and four spoked wheels, heaped with sugar beet."""
+    m = METRE
+
+    def at(s: float, z: float, w: float = 0) -> Point:
+        px, py = _iso(x, y, s * m, w * m)
+        return px, py - z * m
+
+    for s in (-1.8, 1.8):
+        _food_wheel(p, *at(s, 0.48, 0.72), 0.48 * m, (70, 66, 66))
+    left, front, right, back = p.hall(*at(0, 0.9), 6 * m, 2.4 * m, 1 * m, SUGAR_WAGON, None)
+    p.polygon([left, front, right, back], shade(SUGAR_BEET, 0.7))
+    for d in (0.34, 0.67):
+        _bar(
+            p,
+            _on_wall(left, front, 0, d * m),
+            _on_wall(left, front, 1, d * m),
+            0.05 * m,
+            shade(SUGAR_WAGON, 0.7),
+        )
+    for t in (0.015, 0.5, 0.985):
+        _bar(
+            p, _on_wall(left, front, t, 0), _on_wall(left, front, t, 1 * m), 0.14 * m, (52, 48, 48)
+        )
+    _bar(
+        p, _on_wall(left, front, 0, 1 * m), _on_wall(left, front, 1, 1 * m), 0.24 * m, (52, 48, 48)
+    )
+    for s in np.linspace(-2.6, 2.6, 9):
+        for w in (0.7, 0.2, -0.3, -0.75):
+            lift = 0.4 * (1 - abs(w + 0.05) / 0.8) * (1 - abs(s) / 3.4)
+            cx, cy = at(s + w * 0.25, 1.95 + lift, w)
+            tone = 1.12 if (round(s * 3) + round(w * 5)) % 2 else 0.9
+            p.blob(
+                cx - 0.28 * m, cy - 0.2 * m, cx + 0.28 * m, cy + 0.18 * m, shade(SUGAR_BEET, tone)
+            )
+    for s in (-1.8, 1.8):
+        _food_wheel(p, *at(s, 0.48, -0.85), 0.48 * m, (70, 66, 66))
+
+
 def sugar_refinery() -> Sprite:
-    """A tall refinery rendered sugar white over a dark plinth stained by the damp, with rows of arched windows
-    and a cornice, a big banded square chimney, a cart track worn out of its door past a heap of
-    sugar beet spreading over the ground, and white sacks and sugar loaves in blue paper at its
-    foot."""
-    p = Painter(34, 61, (15, 51))
-    foot = _footing(-3, 0, 8, 8)
+    """A Victorian sugar refinery: a block 20 by 12 m and six storeys, 18 m to its cornice, in
+    warm red brick banded in cream at every floor, with rows of white-painted sash windows under
+    cream arches, blue taking-in doors stacked up one bay under a hoist with a sack swinging from
+    it, and a slate roof with a louvred ventilator along its ridge. At its end rises the
+    cream-brick char house, a tower for the bone-char filters, louvred at its top under a slate
+    pyramid, with a boiler house at its foot and a tall round chimney smoking beside it. Before it
+    a siding brings wagons of pale sugar beet to a long beet clamp, white sacks of sugar wait by
+    its door, and a dray stands loaded with sugarloaves in their blue paper."""
+    m = METRE
+    p = Painter(43, 40, (18, 29))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 12) * m, (v - 2) * m)
+
+    length, depth, high = 20 * m, 12 * m, 18 * m
+    p.polygon([at(-0.5, -8), at(28, -8), at(28, 0), at(-0.5, 0)], SUGAR_GROUND)
+    foot = _footing(*at(10, 6), length, depth)
     _bed(p, foot)
-    _bed(p, _footing(8, -3, 2, 2), margin=1)
-    beet = (200, 170, 128)
-    _spill(p, -12, 6, 2.5, beet)
-    p.shadow(13, 4, reach=5)
-    _track(p, foot[0], foot[1], (0.53, 0.77), 3.5)
-    wall = (232, 226, 210)
-    lintel = shade(wall, 1.1)
-    tall = 34 * CHIMNEY_SHARE
-    stack = p.box(8, -3, 2, tall, shade(BRICK, 0.95), (60, 52, 50))
-    for a, b in ((stack[0], stack[1]), (stack[1], stack[2])):
-        p.line([_on_wall(a, b, 0, 2), _on_wall(a, b, 1, 2)], (220, 220, 214))
-        _band(p, a, b, tall * 0.4, shade(wall, 0.65))
-        _band(p, a, b, tall - 1, shade(wall, 0.6))
-    _smoke(p, 9, -9 - tall, puffs=4)
-    top = p.box(-3, 0, 8, 18, wall, (92, 86, 94))
+    _bed(p, _footing(*at(23.5, 3.5), 7 * m, 7 * m), margin=1)
+    p.shadow(16, 6, 6)
+    _tall_chimney(p, *at(28.5, 11), 50 * m)
+    top = p.hall(*at(10, 6), length, depth, high, SUGAR_BRICK, None)
     left, front, right, _ = top
-    _plinth(p, top, 18, wall)
-    _stains(p, left, front, 18, (0.08, 0.33, 0.85), shade(wall, 0.6), 2)
-    _stains(p, front, right, 18, (0.15, 0.5, 0.85), shade(wall, 0.5), 2)
-    _bands(p, left, front, right, 0.8, lintel, shade(wall, 0.95))
-    p.line([left, front, right], shade((92, 86, 94), 1.3))
-    _windows(p, left, front, (0.2, 0.45, 0.7, 0.92), (2.5, 6, 9.5, 13), 2, arch=lintel)
-    _windows(p, left, front, (0.2, 0.92), (15.5,), 1)
-    _windows(p, front, right, (0.3, 0.7), (2.5, 6, 9.5, 13, 15.5), 2, shade(WINDOW, 0.75))
-    _door(p, left, front, (0.55, 0.75), 15, 18, (70, 50, 40), lintel)
-    _heap(p, -12, 6, 2.5, 2, beet)
-    for x, y in ((-13, 5.5), (-11.5, 4.6)):
-        p.point(x, y, (226, 206, 170))
-    white, blue = (240, 240, 236), (70, 100, 180)
-    for x, y in ((9, 4), (11, 2.5), (10, 1)):
-        p.ellipse(x - 2, y - 3, x + 2, y, white)
-        p.point(x, y - 2.5, shade(white, 0.7))
-    for x, y in ((3, 7), (6, 7.5)):
-        p.polygon([(x - 1.5, y), (x, y - 6), (x + 1.5, y)], white, shade(white, 0.7))
-        p.polygon([(x - 1.5, y), (x - 1, y - 2), (x + 1, y - 2), (x + 1.5, y)], blue)
+    _plinth(p, top, high, SUGAR_BRICK, 1.0 * m)
+    _stains(p, left, front, high, (0.03, 0.27, 0.52, 0.94), shade(SUGAR_BRICK, 0.7), 1.6 * m)
+    floors = ((1.0, 2.6), (3.8, 5.4), (6.6, 8.2), (9.4, 11.0), (12.2, 13.8), (15.0, 16.8))
+    for a, b, tone, bays in ((left, front, 1.0, 8), (front, right, 0.8, 5)):
+        _patch(p, a, b, (0, 1), (0, 0.6 * m), shade(SUGAR_CREAM, tone))
+        _patch(p, a, b, (0, 1), (0.6 * m, 0.75 * m), shade(SUGAR_BRICK, 0.7 * tone))
+        for drop in (3.25, 6.05, 8.85, 11.65):
+            _patch(p, a, b, (0, 1), (drop * m, (drop + 0.2) * m), shade(SUGAR_CREAM, tone))
+        _patch(p, a, b, (0, 1), (14.3 * m, 14.65 * m), shade(SUGAR_CREAM, tone))
+        span = length if bays == 8 else depth
+        for k in range(bays):
+            t = (k + 0.5) / bays
+            for head, foot_at in floors:
+                if bays == 8 and k == 6:
+                    continue
+                _sugar_window(p, a, b, span, t, 1.1 * m, (head * m, foot_at * m))
+    t = 6.5 / 8
+    for head, foot_at in floors[:5]:
+        _patch(
+            p,
+            left,
+            front,
+            (t - 0.034, t + 0.034),
+            ((head - 0.1) * m, (foot_at + 0.3) * m),
+            SUGAR_CREAM,
+        )
+        _patch(p, left, front, (t - 0.028, t + 0.028), (head * m, (foot_at + 0.3) * m), SUGAR_BLUE)
+        _bar(
+            p,
+            _on_wall(left, front, t, head * m),
+            _on_wall(left, front, t, (foot_at + 0.3) * m),
+            0.05 * m,
+            shade(SUGAR_BLUE, 0.65),
+        )
+    p.polygon(_round_head(left, front, length, t, 2.6 * m, 14.9 * m, high), SUGAR_CREAM)
+    p.polygon(_round_head(left, front, length, t, 2.1 * m, 15.15 * m, high), DOORWAY)
+    _patch(p, left, front, (t - 0.05, t - 0.004), (15.9 * m, high), SUGAR_BLUE)
+    rise = 4.5 * m
+    p.gable(top, rise, MILL_SLATE, SUGAR_BRICK)
+    _roof_rows(p, top, rise, MILL_SLATE, (0.25, 0.5, 0.75))
+    ridge_back, ridge_front = _ridge(top, rise)
+    vx, vy = _on_wall(ridge_back, ridge_front, 0.42, 0)
+    vent = p.hall(vx, vy + 0.5 * m, 10 * m, 1.6 * m, 1.5 * m, shade(SUGAR_CREAM, 0.9), None)
+    for a, b, tone in ((vent[0], vent[1], 1.0), (vent[1], vent[2], 0.8)):
+        for k in range(1, 4):
+            drop = 1.0 * m * k / 4
+            _bar(
+                p,
+                _on_wall(a, b, 0, drop),
+                _on_wall(a, b, 1, drop),
+                0.12 * m,
+                shade(SUGAR_CREAM, 0.55 * tone),
+            )
+    p.gable(vent, 0.7 * m, MILL_SLATE, shade(SUGAR_CREAM, 0.9))
+    hx, hy = _on_wall(left, front, t, 0)
+    hood = p.hall(hx - 0.4 * m, hy + 1.4 * m, 2.4 * m, 1.6 * m, 2.4 * m, SUGAR_BRICK, None)
+    h_left, h_front, h_right, h_back = hood
+    _patch(p, h_left, h_front, (0.2, 0.8), (0.9 * m, 2.4 * m), SUGAR_BLUE)
+    near, far = _on_wall(h_left, h_front, 0.5, -1.2 * m), _on_wall(h_back, h_right, 0.5, -1.2 * m)
+    p.polygon([h_front, h_right, far, near], shade(MILL_SLATE, 0.72), shade(MILL_SLATE, 0.5))
+    p.polygon([h_left, h_back, far, near], MILL_SLATE, shade(MILL_SLATE, 0.6))
+    p.polygon([h_left, h_front, near], SUGAR_BRICK, shade(SUGAR_BRICK, 0.55))
+    beam = _on_wall(h_left, h_front, 0.5, 0.7 * m)
+    tip = (beam[0] - 1.4 * m, beam[1] + 0.7 * m)
+    _bar(p, beam, tip, 0.22 * m, (54, 50, 50))
+    _bar(p, tip, (tip[0], tip[1] + 3.4 * m), 0.06 * m, (60, 54, 50))
+    sx, sy = tip[0], tip[1] + 4.4 * m
+    p.ellipse(sx - 0.38 * m, sy - 1.1 * m, sx + 0.38 * m, sy + 0.1 * m, SUGAR_WHITE)
+    _bar(
+        p,
+        (sx - 0.2 * m, sy - 0.9 * m),
+        (sx + 0.2 * m, sy - 0.9 * m),
+        0.08 * m,
+        shade(SUGAR_WHITE, 0.7),
+    )
+    tower = p.hall(*at(23.5, 3.5), 7 * m, 7 * m, 26 * m, SUGAR_CREAM, None)
+    t_left, t_front, t_right, _ = tower
+    _plinth(p, tower, 26 * m, SUGAR_CREAM, 1.0 * m)
+    for a, b, tone in ((t_left, t_front, 1.0), (t_front, t_right, 0.8)):
+        brick = shade(SUGAR_BRICK, tone)
+        _patch(p, a, b, (0, 1), (0, 0.7 * m), brick)
+        for drop in (5.2, 10.6, 16.0, 21.4):
+            _patch(p, a, b, (0, 1), (drop * m, (drop + 0.35) * m), brick)
+        for s in (0.03, 0.97):
+            _bar(p, _on_wall(a, b, s, 0.7 * m), _on_wall(a, b, s, 25 * m), 0.4 * m, brick)
+        _patch(p, a, b, (0.2, 0.8), (1.4 * m, 4.4 * m), (52, 48, 52))
+        for d in np.arange(1.7, 4.3, 0.45):
+            _bar(
+                p,
+                _on_wall(a, b, 0.2, d * m),
+                _on_wall(a, b, 0.8, d * m),
+                0.12 * m,
+                shade(SUGAR_CREAM, 0.85 * tone),
+            )
+        for head in (6.4, 11.8, 17.2):
+            for s in (0.34, 0.66):
+                _sugar_window(p, a, b, 7 * m, s, 1.0 * m, (head * m, (head + 2.8) * m))
+    _sugar_window(p, t_front, t_right, 7 * m, 0.5, 1.0 * m, (22.6 * m, 24.4 * m))
+    p.polygon(_round_head(t_left, t_front, 7 * m, 0.5, 1.8 * m, 22.6 * m, 26 * m), DOORWAY)
+    apex = ((t_left[0] + t_right[0]) / 2, (t_left[1] + t_right[1]) / 2 - 4.5 * m)
+    p.polygon([t_left, t_front, apex], MILL_SLATE, shade(MILL_SLATE, 0.6))
+    p.polygon([t_front, t_right, apex], shade(MILL_SLATE, 0.72), shade(MILL_SLATE, 0.5))
+    _bar(p, apex, (apex[0], apex[1] - 1.6 * m), 0.12 * m, (50, 50, 56))
+    p.blob(apex[0] - 0.3 * m, apex[1] - 1.9 * m, apex[0] + 0.3 * m, apex[1] - 1.3 * m, FOOD_GILT)
+    boiler = p.hall(*at(29.5, 4.5), 5 * m, 6 * m, 6 * m, SUGAR_BRICK, None)
+    b_left, b_front, b_right, _ = boiler
+    _plinth(p, boiler, 6 * m, SUGAR_BRICK, 0.7 * m)
+    _bands(p, b_left, b_front, b_right, 0.3 * m, SUGAR_CREAM, shade(SUGAR_CREAM, 0.8))
+    _sugar_window(p, b_left, b_front, 5 * m, 0.5, 1.4 * m, (1.4 * m, 3.6 * m))
+    p.polygon(_round_head(b_front, b_right, 6 * m, 0.5, 2.2 * m, 2.4 * m, 6 * m), DOORWAY)
+    p.gable(boiler, 2 * m, MILL_SLATE, SUGAR_BRICK)
+    _roof_rows(p, boiler, 2 * m, MILL_SLATE)
+    _sugar_beet(p, *at(5.2, -2.6), 10, 3.4, 2.2)
+    _sugar_bags(p, *at(13.6, -1.0), (3, 2, 1))
+    _sugar_bags(p, *at(17.2, -1.4), (2, 1))
+
+    def loaves(on_bed: Callable[[float, float], Point]) -> None:
+        for w in (0.42, -0.3):
+            for s in np.linspace(-1.2, 1.2, 5):
+                _sugar_loaf(p, *on_bed(s + w * 0.3, w), 1.0 * m)
+
+    _food_cart(p, *at(13.4, -4.0), 3.4, 0.3, SUGAR_GROUND, loaves)
+    _sugar_siding(p, at(0, -6.6), at(14, -6.6))
+    _sugar_wagon(p, *at(5.6, -6.6))
     return p.sprite()
 
 
