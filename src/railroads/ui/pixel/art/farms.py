@@ -82,14 +82,6 @@ def _footing(p: Painter, top: Top, height: float, colour: RGB = FOOTING, reach: 
     )
 
 
-def _door_step(x: float, y: float, length: float, depth: float, along: float) -> Point:
-    """The ground before a door `along` the lit wall of a hall `length` by `depth` standing at
-    (x, y)."""
-    fx, fy = x + (length - depth) / 2, y + (length + depth) / 4
-    back = length * (1 - along)
-    return fx - back, fy - back / 2 + 0.3
-
-
 def _stack(p: Painter, x: float, y: float, half: float, tall: float, colour: RGB) -> None:
     """A rounded haystack `half` across and `tall` high standing on (x, y), lit on the left."""
     p.blob(x - half, y - tall, x + half, y + half * 0.3, shade(colour, 0.78))
@@ -119,13 +111,6 @@ def _ruts(p: Painter, points: list[Point], colour: RGB = EARTH) -> None:
     _track(p, points, 1.4, colour)
     for side in (-0.7, 0.7):
         p.line([(x + side, y + side / 3) for x, y in points], shade(colour, 0.72))
-
-
-def _mud(p: Painter, x: float, y: float, half: float) -> None:
-    """Trampled wet mud on the ground round (x, y), `half` across, with a glint of a puddle."""
-    p.blob(x - half, y - half / 2, x + half, y + half / 2, shade(MUD, 1.25))
-    p.blob(x - half * 0.75, y - half * 0.32, x + half * 0.75, y + half * 0.36, MUD)
-    p.line([(x - half * 0.4, y + half * 0.1), (x - half * 0.1, y + half * 0.1)], (132, 150, 156))
 
 
 def _strewn(p: Painter, x: float, y: float, half: float, colour: RGB, count: int = 5) -> None:
@@ -1100,26 +1085,6 @@ def potato_farm() -> Sprite:
     for x, y in ((2, 4), (2.8, 4.6), (4, 4.4), (-6.6, 5.4), (-4, 4.8)):
         p.point(x, y, tuber)
     return p.sprite()
-
-
-def _paddy(p: Painter, x: float, y: float, half: float, water: RGB, shoot: RGB) -> None:
-    """A flooded rice paddy on the ground round (x, y), `half` across, inside a low earth bank,
-    with rows of green shoots standing in the water."""
-    bank = (128, 108, 70)
-    p.polygon(
-        [(x - half, y), (x, y + half / 2), (x + half, y), (x, y - half / 2)],
-        bank,
-        shade(bank, 0.7),
-    )
-    inner = half - 1.2
-    p.polygon([(x - inner, y), (x, y + inner / 2), (x + inner, y), (x, y - inner / 2)], water)
-    p.line([(x - inner + 1.5, y - 0.4), (x - 0.5, y - inner / 2 + 0.6)], shade(water, 1.25))
-    for row in range(-2, 3):
-        for k in range(-2, 3):
-            u, v = x + 1.6 * k + 1.6 * row, y + 0.8 * k - 0.8 * row
-            if abs(u - x) / inner + abs(v - y) / (inner / 2) < 0.8:
-                p.point(u, v - 1, shoot)
-                p.point(u, v, shade(shoot, 0.72))
 
 
 def rice_paddy() -> Sprite:

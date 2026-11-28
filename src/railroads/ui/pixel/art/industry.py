@@ -4634,65 +4634,764 @@ OIL_YELLOW: RGB = (232, 184, 40)
 TANK_WHITE: RGB = (226, 226, 222)
 
 
-def _storage_tank(p: Painter, x: float, y: float, r: float, h: float) -> None:
-    """A big round oil storage tank on the ground at (x, y), `r` across and `h` tall: a low earth
-    bund round it, white steel walls with a yellow band, a shallow domed roof, and a stair
-    climbing its lit side."""
-    p.blob(x - r - 1.6, y - r / 2 - 0.8, x + r + 1.6, y + r / 2 + 0.8, (150, 136, 108))
-    p.blob(x - r - 0.8, y - r / 2 - 0.4, x + r + 0.8, y + r / 2 + 0.4, (176, 168, 150))
-    profile = [(0, r), (h, r), (h + 0.5, r * 0.9), (h + 0.9, r * 0.62), (h + 1.1, r * 0.2)]
-    _turned(p, x, y, profile, TANK_WHITE)
-    for drop in (h * 0.6, h * 0.6 + 0.8):
-        _ring(p, x, y - drop, r, OIL_YELLOW)
-    _ring(p, x, y - h, r, shade(TANK_WHITE, 0.62))
-    stair = shade(TANK_WHITE, 0.45)
-    p.line([(x - r + 0.3, y - 0.2), (x - r * 0.55, y + r * 0.18 - h)], stair)
-    p.line([(x - r + 0.9, y + 0.2), (x - r * 0.55 + 0.6, y + r * 0.22 - h)], stair)
+OIL_STEEL: RGB = (88, 92, 100)
+OIL_CRUDE: RGB = (64, 62, 64)
+OIL_RUST: RGB = (150, 84, 50)
+OIL_AMBER: RGB = (236, 164, 44)
+OIL_KEROSENE: RGB = (240, 204, 104)
+OIL_ALUMINIUM: RGB = (168, 170, 168)
+OIL_GRAVEL: RGB = (150, 142, 126)
+OIL_PAD: RGB = (172, 168, 158)
+OIL_BRICK: RGB = (150, 82, 60)
+OIL_FIRE: RGB = (252, 156, 52)
+OIL_FLAME: RGB = (250, 140, 40)
+OIL_GLOW: RGB = (255, 232, 150)
+OIL_BALLAST: RGB = (124, 116, 104)
+OIL_SLEEPER: RGB = (90, 70, 54)
+OIL_RAIL: RGB = (150, 150, 156)
+OIL_EARTH: RGB = (138, 120, 88)
+OIL_WEATHERED: RGB = (98, 92, 88)
+OIL_WAGON: RGB = (44, 42, 44)
+OIL_BLACK: RGB = (40, 38, 40)
+OIL_FRAME: RGB = (66, 68, 74)
+OIL_HANDRAIL: RGB = (190, 186, 176)
+OIL_PIPES: tuple[RGB, ...] = (OIL_BLACK, OIL_RUST, OIL_AMBER, (150, 150, 150))
+
+
+def _oil_band(
+    p: Painter,
+    x: float,
+    y: float,
+    half: float,
+    thick: float,
+    colour: RGB,
+    span: tuple[float, float] = (0, math.pi),
+) -> None:
+    """A band `thick` high round the front of an upright round thing whose axis passes through
+    (x, y), `half` across, from `span[0]` to `span[1]` of the way round (0 is its right, a half
+    turn its left)."""
+    turns = np.linspace(span[0], span[1], 13)
+    upper = [(x + half * math.cos(a), y + half / 2 * math.sin(a) - thick) for a in turns]
+    lower = [(x + half * math.cos(a), y + half / 2 * math.sin(a)) for a in turns[::-1]]
+    p.polygon(upper + lower, colour)
+
+
+def _oil_dome(p: Painter, x: float, y: float, half: float, rise: float, roof: RGB) -> None:
+    """A shallow domed roof `half` across and `rise` high on a round wall whose top is centred at
+    (x, y): dark at its rim, lit towards its crown, with a glint on its left."""
+    steps = 7
+    for k in range(steps + 1):
+        f = k / steps
+        r = half * math.sqrt(1 - f * 0.94)
+        cy = y - rise * f
+        tone = shade(roof, 0.82 + 0.38 * f)
+        p.blob(x - r, cy - r / 2, x + r, cy + r / 2, tone)
+    p.blob(
+        x - half * 0.62, y - rise - half * 0.22, x - half * 0.1, y - rise * 0.4, shade(roof, 1.32)
+    )
+
+
+def _oil_column(
+    p: Painter, x: float, y: float, wide: float, tall: float, metal: RGB = OIL_STEEL
+) -> None:
+    """A distillation column `wide` metres across and `tall` high standing on (x, y): a darker
+    skirt at its foot, a shell of steel with a sheen down its lit side, ringed with catwalks every
+    six metres and climbed by a caged ladder, rust running from under each catwalk, a dished head
+    lit on top with a davit, and a vapour line falling from its head down its shaded side."""
+    m = METRE
+    r = wide * m / math.sqrt(2)
+    skirt, h = 1.8 * m, tall * m
+    _turned(p, x, y, [(0, r * 1.12), (skirt, r * 1.12)], shade(metal, 0.62))
+    head = [(0, r), (h - skirt, r), (h - skirt + 0.3 * r, 0.84 * r), (h - skirt + 0.55 * r, 0)]
+    _turned(p, x, y - skirt, head, metal)
+    _bar(p, (x - 0.5 * r, y - skirt), (x - 0.5 * r, y - h + 0.1 * r), 0.55 * m, shade(metal, 1.2))
+    _bar(p, (x - 0.56 * r, y - skirt), (x - 0.56 * r, y - h), 0.2 * m, shade(metal, 1.55))
+    p.blob(x - 0.7 * r, y - h - 0.4 * r, x - 0.05 * r, y - h + 0.05 * r, shade(metal, 1.5))
+    for z in np.arange(skirt + 3 * m, h - 1 * m, 3 * m):
+        _oil_band(p, x, y - z, r, 0.1 * m, shade(metal, 0.8))
+    decks = list(np.arange(6 * m, h - 2 * m, 6 * m)) + [h - 0.5 * m]
+    wall = r + 1.1 * m
+    ladder = 0.72 * math.pi
+    lx = x + (r + 0.35 * m) * math.cos(ladder)
+    ly = y + (r + 0.35 * m) / 2 * math.sin(ladder)
+    for side in (-0.22, 0.22):
+        _bar(
+            p,
+            (lx + side * m, ly - skirt),
+            (lx + side * m, ly - decks[-1]),
+            0.12 * m,
+            shade(metal, 1.45),
+        )
+    for n, z in enumerate(decks):
+        for a, reach in ((0.4, 2.2), (0.88, 1.5), (0.18, 1.2)):
+            a = (a + 0.23 * n) % 1
+            reach *= 0.6 + 0.4 * ((n * 7 + round(a * 10)) % 3) / 2
+            sx = x + r * math.cos(a * math.pi)
+            sy = y + r / 2 * math.sin(a * math.pi) - z
+            _bar(p, (sx, sy), (sx, sy + reach * m), 0.22 * m, shade(OIL_RUST, 0.85))
+        _oil_band(p, x, y - z, wall, 0.35 * m, shade(metal, 0.5))
+        _oil_band(p, x, y - z - 0.35 * m, wall, 0.1 * m, shade(metal, 1.35))
+        _oil_band(p, x, y - z - 1.1 * m, wall, 0.09 * m, shade(metal, 1.25))
+        for a in (0.08, 0.3, 0.55, 0.8, 0.95):
+            px = x + wall * math.cos(a * math.pi)
+            py = y + wall / 2 * math.sin(a * math.pi) - z
+            _bar(p, (px, py - 0.35 * m), (px, py - 1.1 * m), 0.08 * m, shade(metal, 1.2))
+    for a, reach, colour in ((0.42, 0.72, (116, 118, 120)), (0.6, 0.45, shade(OIL_RUST, 0.8))):
+        out = r + 0.5 * m
+        px = x + out * math.cos(a * math.pi)
+        py = y + out / 2 * math.sin(a * math.pi)
+        sx = x + r * math.cos(a * math.pi)
+        sy = y + r / 2 * math.sin(a * math.pi)
+        z = reach * h
+        _oil_pipe(
+            p,
+            [(sx, sy - z), (px, py - z), (px, py - 0.6 * m), (px - 0.8 * m, py + 0.2 * m)],
+            colour,
+            0.4,
+        )
+    crown = y - h - 0.55 * r
+    _bar(p, (x, crown), (x, crown - 2.2 * m), 0.16 * m, shade(metal, 0.7))
+    _bar(p, (x, crown - 2.2 * m), (x - 1.4 * m, crown - 1.8 * m), 0.14 * m, shade(metal, 0.7))
+    vx = x + r + 0.7 * m
+    line = shade(metal, 0.75)
+    _bar(p, (x + 0.3 * r, crown + 0.2 * r), (x + 0.3 * r, crown - 0.8 * m), 0.4 * m, line)
+    _bar(p, (x + 0.3 * r, crown - 0.8 * m), (vx, crown - 0.4 * m), 0.4 * m, line)
+    _bar(p, (vx, crown - 0.4 * m), (vx, y - 5 * m), 0.4 * m, line)
+    _bar(
+        p, (vx - 0.12 * m, crown - 0.4 * m), (vx - 0.12 * m, y - 5 * m), 0.1 * m, shade(metal, 1.3)
+    )
+
+
+def _oil_crude_tank(p: Painter, x: float, y: float, wide: float, tall: float) -> None:
+    """A big squat crude tank `wide` metres across and `tall` high standing on (x, y) inside a low
+    earth bund: black steel courses lit down the left with a sheen, rust running from its rim, a
+    shallow domed roof lit on its crown with a handrail round its edge and a vent at its top, and
+    a stair winding up its front from the right to the roof on its left."""
+    m = METRE
+    r = wide * m / math.sqrt(2)
+    h = tall * m
+    out = r + 3.2 * m
+    p.blob(
+        x - out - 1.2 * m,
+        y - out / 2 - 0.4 * m,
+        x + out + 1.2 * m,
+        y + out / 2 + 0.8 * m,
+        shade(OIL_EARTH, 0.8),
+    )
+    p.blob(x - out, y - out / 2, x + out, y + out / 2 + 0.2 * m, shade(OIL_EARTH, 1.12))
+    p.blob(
+        x - out + 1.2 * m,
+        y - out / 2 + 0.9 * m,
+        x + out - 1.2 * m,
+        y + out / 2 - 0.2 * m,
+        shade(OIL_EARTH, 0.72),
+    )
+    _oil(p, x - r * 0.6, y + r * 0.4, 1.4 * m)
+    _turned(p, x, y, [(0, r), (h, r)], OIL_CRUDE)
+    for z in np.arange(1.9 * m, h - 0.5 * m, 1.9 * m):
+        _oil_band(p, x, y - z, r, 0.1 * m, shade(OIL_CRUDE, 0.7))
+    sheen = [(x - 0.62 * r, 0.9 * m, 1.35), (x - 0.5 * r, 0.3 * m, 1.75)]
+    for sx, wide_bar, tone in sheen:
+        _bar(p, (sx, y + 0.39 * r), (sx, y + 0.39 * r - h), wide_bar, shade(OIL_CRUDE, tone))
+    for a, reach in ((0.15, 0.5), (0.33, 0.35), (0.5, 0.6), (0.62, 0.3), (0.86, 0.45)):
+        sx = x + r * math.cos(a * math.pi)
+        sy = y + r / 2 * math.sin(a * math.pi) - h
+        _bar(p, (sx, sy), (sx, sy + reach * h), 0.35 * m, shade(OIL_RUST, 0.85))
+    roof = (112, 106, 102)
+    _oil_band(p, x, y - h + 0.3 * m, r, 0.5 * m, shade(OIL_CRUDE, 0.5))
+    _oil_dome(p, x, y - h, r, 0.16 * wide * m, roof)
+    _oil_band(p, x, y - h - 1 * m, r * 0.98, 0.1 * m, (196, 194, 184))
+    for a in (0.1, 0.35, 0.6, 0.9):
+        px = x + 0.98 * r * math.cos(a * math.pi)
+        py = y + 0.98 * r / 2 * math.sin(a * math.pi) - h
+        _bar(p, (px, py), (px, py - 1 * m), 0.1 * m, (196, 194, 184))
+    vent = y - h - 0.16 * wide * m
+    _turned(
+        p,
+        x,
+        vent + 0.2 * m,
+        [(0, 0.7 * m), (0.9 * m, 0.7 * m), (1.2 * m, 0.9 * m)],
+        shade(roof, 0.7),
+        shade(roof, 0.5),
+    )
+    stair = (192, 188, 176)
+    a0, a1 = 0.18 * math.pi, 0.97 * math.pi
+    turns = np.linspace(a0, a1, 24)
+    rise = np.linspace(0, h, 24)
+    out = r + 1.2 * m
+
+    def at(a: float, z: float, half: float) -> Point:
+        return x + half * math.cos(a), y + half / 2 * math.sin(a) - z
+
+    p.polygon(
+        [at(a, z, r) for a, z in zip(turns, rise, strict=True)]
+        + [at(a, z, out) for a, z in zip(turns[::-1], rise[::-1], strict=True)],
+        shade(stair, 0.62),
+    )
+    p.polygon(
+        [at(a, z + 0.3 * m, out) for a, z in zip(turns, rise, strict=True)]
+        + [at(a, z, out) for a, z in zip(turns[::-1], rise[::-1], strict=True)],
+        stair,
+    )
+    p.line([at(a, z + 1.1 * m, out) for a, z in zip(turns, rise, strict=True)], stair)
+    for a, z in list(zip(turns, rise, strict=True))[::3]:
+        _bar(p, at(a, z, out), at(a, z + 1.1 * m, out), 0.1 * m, stair)
+
+
+def _oil_product_tank(p: Painter, x: float, y: float, wide: float, tall: float, band: RGB) -> None:
+    """A product tank `wide` metres across and `tall` high standing on (x, y): weathered aluminium
+    paint lit on the left, a band in the colour of what it holds, a low coned roof lit on top
+    and a caged ladder up its lit side."""
+    m = METRE
+    r = wide * m / math.sqrt(2)
+    h = tall * m
+    _turned(p, x, y, [(0, r), (h, r)], OIL_ALUMINIUM)
+    _bar(
+        p,
+        (x - 0.55 * r, y + 0.4 * r),
+        (x - 0.55 * r, y + 0.4 * r - h),
+        0.5 * m,
+        shade(OIL_ALUMINIUM, 1.18),
+    )
+    for z in np.arange(1.8 * m, h, 1.8 * m):
+        _oil_band(p, x, y - z, r, 0.08 * m, shade(OIL_ALUMINIUM, 0.82))
+    _oil_band(p, x, y - h * 0.72, r, 0.9 * m, band)
+    _oil_band(p, x, y - h * 0.72 - 0.9 * m, r, 0.15 * m, shade(band, 1.2))
+    _oil_dome(p, x, y - h, r, 0.14 * wide * m, shade(OIL_ALUMINIUM, 0.95))
+    a = 0.78 * math.pi
+    lx, ly = x + (r + 0.3 * m) * math.cos(a), y + (r + 0.3 * m) / 2 * math.sin(a)
+    for side in (-0.25, 0.25):
+        _bar(p, (lx + side * m, ly), (lx + side * m, ly - h - 1 * m), 0.12 * m, (70, 70, 74))
+
+
+def _oil_rack(
+    p: Painter, a: Point, b: Point, across: Point, high: float, pipes: tuple[RGB, ...]
+) -> None:
+    """A pipe rack on the ground from `a` to `b` reaching `across` to either side of that line,
+    `high` metres tall: steel bents every six metres with a beam at the top and one halfway, and
+    `pipes` laid side by side on both tiers, each lit along its top."""
+    m = METRE
+    if across[1] > 0:
+        across = (-across[0], -across[1])
+    length = math.hypot(b[0] - a[0], (b[1] - a[1]) * 2) / m
+    bents = max(2, round(length / 6) + 1)
+    steel = (70, 72, 78)
+    tiers = (high * 0.55 * m, high * m)
+
+    def off(pt: Point, k: float, z: float) -> Point:
+        return pt[0] + across[0] * k, pt[1] + across[1] * k - z
+
+    for k in (1, -1):
+        for i in range(bents):
+            foot = _on_wall(a, b, i / (bents - 1), 0)
+            _bar(
+                p,
+                off(foot, k, 0),
+                off(foot, k, tiers[1]),
+                0.35 * m,
+                shade(steel, 1.15 if k < 0 else 0.9),
+            )
+        if k == 1:
+            for z in tiers:
+                for j in range(len(pipes)):
+                    t = 0.8 - 1.6 * j / max(1, len(pipes) - 1)
+                    colour = pipes[(j + (z == tiers[1])) % len(pipes)]
+                    _bar(p, off(a, t, z + 0.25 * m), off(b, t, z + 0.25 * m), 0.45 * m, colour)
+                    _bar(
+                        p,
+                        off(a, t, z + 0.42 * m),
+                        off(b, t, z + 0.42 * m),
+                        0.12 * m,
+                        shade(colour, 1.7),
+                    )
+    for i in range(bents):
+        foot = _on_wall(a, b, i / (bents - 1), 0)
+        for z in tiers:
+            _bar(p, off(foot, 1, z), off(foot, -1, z), 0.3 * m, steel)
+    for z in tiers:
+        _bar(p, off(a, -1, z), off(b, -1, z), 0.25 * m, shade(steel, 1.3))
+
+
+def _oil_stack(p: Painter, x: float, y: float, wide: float, tall: float) -> None:
+    """A steel stack `wide` metres across standing on (x, y), drawn for `tall` metres and lowered
+    (CHIMNEY_SHARE): black steel lit down its left, banded, scorched rust at its top under a lit
+    lip."""
+    m = METRE
+    r = wide * m / math.sqrt(2)
+    h = tall * m * CHIMNEY_SHARE
+    _turned(p, x, y, [(0, r * 1.15), (h, r * 0.9)], OIL_CRUDE)
+    _bar(p, (x - 0.5 * r, y), (x - 0.45 * r, y - h), 0.25 * m, shade(OIL_CRUDE, 1.6))
+    _turned(p, x, y - h + 2.5 * m, [(0, r * 0.92), (2.5 * m, r * 0.9)], shade(OIL_RUST, 0.8))
+    for z in np.arange(4 * m, h - 3 * m, 4 * m):
+        _oil_band(p, x, y - z, r * (1.15 - 0.25 * z / h), 0.15 * m, shade(OIL_CRUDE, 0.6))
+    _turned(p, x, y - h, [(0, r * 1.1), (0.5 * m, r * 1.1)], shade(OIL_CRUDE, 0.8), (30, 28, 30))
+
+
+def _oil_furnace(p: Painter, x: float, y: float, long: float = 9) -> None:
+    """A pipe still's furnace standing on (x, y), `long` by 5 m and 6 m tall: brick walls held by
+    dark steel buckstays, fire doors glowing along the foot of its lit wall, a convection box on
+    its roof and a slim steel stack rising from the back of it."""
+    m = METRE
+    length, depth, high = long * m, 5 * m, 6 * m
+    top = p.hall(x, y, length, depth, high, OIL_BRICK, shade(OIL_STEEL, 0.9))
+    left, front, right, _ = top
+    stay = (52, 52, 56)
+    for a, b, n in ((left, front, round(long / 1.5)), (front, right, 4)):
+        for k in range(n):
+            t = (k + 0.5) / n
+            _bar(p, _on_wall(a, b, t, 0.2 * m), _on_wall(a, b, t, high), 0.32 * m, stay)
+        _bar(p, _on_wall(a, b, 0, 0.25 * m), _on_wall(a, b, 1, 0.25 * m), 0.35 * m, stay)
+        _bar(p, _on_wall(a, b, 0, high * 0.45), _on_wall(a, b, 1, high * 0.45), 0.2 * m, stay)
+    doors = round(long / 1.8)
+    for k in range(doors):
+        t = (k + 1) / (doors + 1)
+        _patch(
+            p,
+            left,
+            front,
+            (t - 0.36 / long, t + 0.36 / long),
+            (high - 1.6 * m, high - 0.6 * m),
+            (40, 30, 28),
+        )
+        _patch(
+            p,
+            left,
+            front,
+            (t - 0.22 / long, t + 0.22 / long),
+            (high - 1.4 * m, high - 0.8 * m),
+            OIL_FIRE,
+        )
+    sx, sy = _iso(x, y - high, (long / 2 - 1.9) * m, 1.6 * m)
+    _oil_stack(p, sx, sy, 1.3, 34)
+    box = p.hall(
+        x - 0.8 * m,
+        y - high,
+        (long - 4) * m,
+        3 * m,
+        2.6 * m,
+        shade(OIL_STEEL, 1.05),
+        shade(OIL_STEEL, 1.3),
+    )
+    for a, b in ((box[0], box[1]), (box[1], box[2])):
+        for t in (0.25, 0.5, 0.75):
+            _bar(
+                p, _on_wall(a, b, t, 0), _on_wall(a, b, t, 2.6 * m), 0.15 * m, shade(OIL_STEEL, 0.6)
+            )
+
+
+def _oil_frame(p: Painter, x: float, y: float, length: float, depth: float) -> None:
+    """An open steel structure `length` by `depth` metres standing on (x, y), three decks high at
+    5, 10 and 14 m: plated decks with lit edges and handrails, posts at its corners, crossed
+    braces on its lit face, two insulated heat exchangers lying on its top deck and a drum on the
+    middle one, with pumps under it."""
+    m = METRE
+    steel, rail = OIL_FRAME, OIL_HANDRAIL
+    decks = (5, 10, 14)
+    foot = _footing(x, y, length * m, depth * m)
+    left, front, right, back = foot
+
+    def up(pt: Point, z: float) -> Point:
+        return pt[0], pt[1] - z * m
+
+    for pt in (back, left, right):
+        _bar(p, pt, up(pt, decks[-1] + 1.1), 0.4 * m, shade(steel, 0.8))
+    for u in (0.3, 0.7):
+        px, py = _on_wall(left, front, u, 0)
+        cx, cy = _iso(px, py, 0, depth * m * 0.5)
+        _turned(p, cx, cy, [(0, 0.7 * m), (1.1 * m, 0.7 * m), (1.4 * m, 0.4 * m)], OIL_STEEL)
+    for n, z in enumerate(decks):
+        plate = [up(pt, z) for pt in (left, front, right, back)]
+        p.polygon(plate, shade(steel, 0.85), shade(steel, 0.6))
+        if n == 1:
+            cx, cy = _iso(*up(back, z), length * m * 0.35, -depth * m * 0.5)
+            _turned(p, cx, cy, [(0, 1.1 * m), (2.4 * m, 1.1 * m), (2.8 * m, 0.6 * m)], OIL_RUST)
+            _bar(
+                p, (cx - 0.6 * m, cy), (cx - 0.6 * m, cy - 2.6 * m), 0.25 * m, shade(OIL_RUST, 1.4)
+            )
+        if n == 2:
+            for v in (0.3, 0.7):
+                a = _iso(*up(left, z + 0.9), length * m * 0.12, depth * m * v)
+                b = _iso(*up(left, z + 0.9), length * m * 0.85, depth * m * v)
+                _oil_lying(p, a, b, 0.75, OIL_ALUMINIUM)
+        for a, b, tone in ((left, front, 1.3), (front, right, 1.05)):
+            _bar(p, up(a, z), up(b, z), 0.4 * m, shade(steel, tone))
+            _bar(p, up(a, z + 1.1), up(b, z + 1.1), 0.1 * m, rail)
+    for pt in (left, front, right):
+        _bar(
+            p, pt, up(pt, decks[-1] + 1.1), 0.4 * m, shade(steel, 1.2 if pt is not right else 0.95)
+        )
+    lows = (0, *decks)
+    for k in range(len(decks)):
+        z0, z1 = lows[k], lows[k + 1]
+        _bar(p, up(left, z0), up(front, z1), 0.18 * m, shade(steel, 1.1))
+        _bar(p, up(front, z0), up(left, z1), 0.18 * m, shade(steel, 1.1))
+
+
+def _oil_cracker(p: Painter, x: float, y: float) -> None:
+    """A catalytic cracker standing on (x, y): an open steel structure 9 by 7 m and 14 m high
+    carrying a fat regenerator of rusted steel and a tall slim reactor in aluminium paint, joined
+    by a sloping riser, the regenerator's flue climbing to a stack of its own."""
+    m = METRE
+    _oil_frame(p, x, y, 9, 7)
+    deck = 14 * m
+    gx, gy = _iso(x, y - deck, -1.5 * m, 1 * m)
+    rx, ry = _iso(x, y - deck, 2.5 * m, -0.5 * m)
+    big = 6 * m / math.sqrt(2)
+    _oil_stack(p, *_iso(gx, gy, -1 * m, 3.4 * m), 1.2, 30)
+    shell = (104, 88, 78)
+    _turned(
+        p,
+        gx,
+        gy,
+        [(0, big * 0.7), (1.5 * m, big), (9 * m, big), (11 * m, big * 0.55), (11.6 * m, 0)],
+        shell,
+    )
+    _bar(
+        p, (gx - 0.5 * big, gy - 1.5 * m), (gx - 0.5 * big, gy - 9 * m), 0.4 * m, shade(shell, 1.4)
+    )
+    for a in (0.2, 0.45, 0.7, 0.9):
+        sx = gx + big * math.cos(a * math.pi)
+        sy = gy + big / 2 * math.sin(a * math.pi)
+        _bar(p, (sx, sy - 9 * m), (sx, sy - (6 + 2 * a) * m), 0.3 * m, shade(OIL_RUST, 0.85))
+    for z in (4 * m, 8 * m):
+        _oil_band(p, gx, gy - z, big + 0.8 * m, 0.3 * m, shade(OIL_STEEL, 0.55))
+        _oil_band(p, gx, gy - z - 1 * m, big + 0.8 * m, 0.08 * m, OIL_HANDRAIL)
+    _oil_pipe(p, [(gx + 0.3 * big, gy - 10.5 * m), (rx - 0.3 * m, ry - 15 * m)], OIL_ALUMINIUM, 0.9)
+    slim = 3.2 * m / math.sqrt(2)
+    _turned(
+        p,
+        rx,
+        ry,
+        [(0, slim), (17 * m, slim), (18.2 * m, slim * 0.55), (18.6 * m, 0)],
+        OIL_ALUMINIUM,
+    )
+    _bar(
+        p, (rx - 0.5 * slim, ry), (rx - 0.5 * slim, ry - 17 * m), 0.3 * m, shade(OIL_ALUMINIUM, 1.2)
+    )
+    for z in (5 * m, 10 * m, 15 * m):
+        _oil_band(p, rx, ry - z, slim, 0.1 * m, shade(OIL_ALUMINIUM, 0.7))
+        _oil_band(p, rx, ry - z, slim + 0.9 * m, 0.3 * m, shade(OIL_STEEL, 0.55))
+        _oil_band(p, rx, ry - z - 1 * m, slim + 0.9 * m, 0.08 * m, OIL_HANDRAIL)
+
+
+def _oil_sphere(p: Painter, x: float, y: float, wide: float) -> None:
+    """A ball tank of liquid gas `wide` metres round standing on (x, y) on a ring of legs: aluminium
+    paint lit on its upper left with a band round its middle, braced legs and a stair."""
+    m = METRE
+    rho = wide / 2
+    half, tall = rho * math.sqrt(2) * m, rho * math.sqrt(1.5) * m
+    cy = y - (rho + 1.2) * m
+    legs = [k * math.pi / 4 for k in range(8)]
+    steel = (96, 98, 104)
+    for a in legs:
+        lx, ly = x + 0.8 * half * math.cos(a), y + 0.8 * half / 2 * math.sin(a)
+        if math.sin(a) < 0:
+            _bar(p, (lx, ly), (lx, cy), 0.4 * m, shade(steel, 0.8))
+    p.ellipse(x - half, cy - tall, x + half, cy + tall, shade(OIL_ALUMINIUM, 0.8))
+    p.blob(x - half * 0.95, cy - tall * 0.97, x + half * 0.7, cy + tall * 0.75, OIL_ALUMINIUM)
+    p.blob(
+        x - half * 0.8, cy - tall * 0.9, x + half * 0.2, cy + tall * 0.1, shade(OIL_ALUMINIUM, 1.12)
+    )
+    p.blob(
+        x - half * 0.6,
+        cy - tall * 0.75,
+        x - half * 0.15,
+        cy - tall * 0.35,
+        shade(OIL_ALUMINIUM, 1.32),
+    )
+    _oil_band(p, x, cy + 0.15 * m, half, 0.3 * m, OIL_AMBER)
+    for a in legs:
+        lx, ly = x + 0.8 * half * math.cos(a), y + 0.8 * half / 2 * math.sin(a)
+        if math.sin(a) >= 0:
+            _bar(p, (lx, ly), (lx, cy + half / 2 * math.sin(a)), 0.45 * m, steel)
+    for k in range(4):
+        a, b = legs[k], legs[k + 1]
+        ax, ay = x + 0.8 * half * math.cos(a), y + 0.8 * half / 2 * math.sin(a)
+        bx, by = x + 0.8 * half * math.cos(b), y + 0.8 * half / 2 * math.sin(b)
+        _bar(p, (ax, ay - 0.3 * m), (bx, by - (rho * 0.9) * m), 0.12 * m, shade(steel, 1.2))
+    sx = x - 1.05 * half
+    _bar(p, (sx + 2.5 * m, y + 0.5 * m), (sx, cy - 0.2 * tall), 0.3 * m, (176, 172, 162))
+
+
+def _oil_flare(p: Painter, x: float, y: float, tall: float) -> None:
+    """A modest flare stack `tall` metres high standing on (x, y): a slim steel pipe held by guy
+    wires, a small platform under its tip and a bright flame burning off gas at its top."""
+    m = METRE
+    h = tall * m
+    wire = (120, 120, 124)
+    for dx, dy in ((-4, 1.2), (3.6, 1.6), (0.8, -2.4)):
+        _bar(p, (x + dx * m, y + dy * m), (x, y - h * 0.62), 0.1 * m, wire)
+    _bar(p, (x, y), (x, y - h), 0.6 * m, (64, 64, 70))
+    _bar(p, (x - 0.15 * m, y), (x - 0.15 * m, y - h), 0.18 * m, (130, 130, 138))
+    for z in (h * 0.3, h * 0.55, h * 0.8):
+        _bar(p, (x - 0.3 * m, y - z), (x + 0.3 * m, y - z), 0.7 * m, (196, 64, 52))
+    _oil_band(p, x, y - h + 1.5 * m, 1.2 * m, 0.25 * m, (90, 90, 96))
+    tip = y - h
+    p.soft([(x - 2.4 * m, tip - 5 * m, x + 2.6 * m, tip + 0.6 * m)], OIL_FLAME, 0.45, 1.2)
+    p.polygon([(x - 1.2 * m, tip), (x + 1.3 * m, tip), (x + 0.6 * m, tip - 4.2 * m)], OIL_FLAME)
+    p.blob(x - 1.2 * m, tip - 2.4 * m, x + 1.3 * m, tip + 0.2 * m, OIL_FLAME)
+    p.blob(x - 0.6 * m, tip - 1.6 * m, x + 0.7 * m, tip, OIL_GLOW)
+    p.blob(x - 0.25 * m, tip - 0.9 * m, x + 0.3 * m, tip, (255, 252, 236))
+
+
+def _oil_siding(p: Painter, a: Point, length: float) -> None:
+    """A siding on ballast running `length` metres along the lit walls from `a`, standard gauge,
+    with sleepers every metre and a buffer stop at its end."""
+    m = METRE
+
+    def at(s: float, k: float, z: float = 0) -> Point:
+        px, py = _iso(a[0], a[1], s * m, k * m)
+        return px, py - z * m
+
+    p.polygon([at(0, -1.9), at(length, -1.9), at(length, 1.9), at(0, 1.9)], OIL_BALLAST)
+    p.polygon([at(0, 1.9), at(length, 1.9), at(length, 1.4), at(0, 1.4)], shade(OIL_BALLAST, 0.85))
+    for s in np.arange(0.5, length, 0.9):
+        _bar(p, at(s, -1.3), at(s, 1.3), 0.28 * m, OIL_SLEEPER)
+    for k in (-0.72, 0.72):
+        _bar(p, at(0, k), at(length, k), 0.14 * m, OIL_RAIL)
+        _bar(p, at(length - 0.2, k), at(length - 0.2, k, 1.1), 0.25 * m, (52, 50, 52))
+    _bar(p, at(length - 0.2, -1, 0.9), at(length - 0.2, 1, 0.9), 0.45 * m, (196, 60, 48))
+
+
+def _oil_lying(p: Painter, a: Point, b: Point, radius: float, colour: RGB) -> None:
+    """A round barrel lying with its axis from `a` to `b` along the lit walls, `radius` metres
+    round: lit along its top, its near end shaded."""
+    m = METRE
+    turns = np.linspace(0, 2 * math.pi, 24, endpoint=False)
+
+    def ring(c: Point, rad: float) -> list[Point]:
+        return [
+            (c[0] + rad * m * math.cos(t), c[1] - rad * m / 2 * math.cos(t) - rad * m * math.sin(t))
+            for t in turns
+        ]
+
+    hull = _oil_hull(ring(a, radius) + ring(b, radius))
+    p.polygon(hull, colour, shade(colour, 0.55))
+    for t, wide, tone in ((0.62, 0.5, 1.5), (0.7, 0.18, 2.1)):
+        da = (
+            radius * m * math.cos(t * math.pi),
+            -radius * m / 2 * math.cos(t * math.pi) - radius * m * math.sin(t * math.pi),
+        )
+        _bar(
+            p,
+            (a[0] + da[0], a[1] + da[1]),
+            (b[0] + da[0], b[1] + da[1]),
+            wide * m,
+            shade(colour, tone),
+        )
+    p.polygon(ring(b, radius), shade(colour, 0.78), shade(colour, 0.55))
+
+
+def _oil_hull(points: list[Point]) -> list[Point]:
+    """The convex hull of `points`, round it in order."""
+    pts = sorted(set(points))
+
+    def cross(o: Point, a: Point, b: Point) -> float:
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: list[Point] = []
+    for pt in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], pt) <= 0:
+            lower.pop()
+        lower.append(pt)
+    upper: list[Point] = []
+    for pt in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], pt) <= 0:
+            upper.pop()
+        upper.append(pt)
+    return lower[:-1] + upper[:-1]
+
+
+def _oil_wagon(p: Painter, x: float, y: float, colour: RGB) -> None:
+    """A four-wheeled rail tank wagon 8 m long standing on the track at (x, y) along the lit
+    walls: a dark frame on two axles with buffers, a barrel lit along its top with a dome and a
+    walkway."""
+    m = METRE
+
+    def at(u: float, v: float, z: float) -> Point:
+        px, py = _iso(x, y, u * m, v * m)
+        return px, py - z * m
+
+    frame = (38, 36, 38)
+    for u in (-2.2, 2.2):
+        for v in (0.75, -0.75):
+            cx, cy = at(u, v, 0.48)
+            p.ellipse(
+                cx - 0.5 * m,
+                cy - 0.48 * m,
+                cx + 0.5 * m,
+                cy + 0.48 * m,
+                (44, 42, 44) if v > 0 else (60, 58, 60),
+            )
+            if v < 0:
+                p.blob(cx - 0.15 * m, cy - 0.15 * m, cx + 0.15 * m, cy + 0.15 * m, (120, 118, 116))
+    fx, fy = at(0, 0, 0.95)
+    p.hall(fx, fy, 8 * m, 2.3 * m, 0.45 * m, frame, shade(frame, 1.4))
+    for u in (-4.2, 4.2):
+        for v in (-0.6, 0.6):
+            _bar(p, at(u * 0.95, v, 1.2), at(u, v, 1.2), 0.3 * m, (70, 68, 70))
+    _oil_lying(p, at(-3.6, 0, 2.5), at(3.6, 0, 2.5), 1.15, colour)
+    dx, dy = at(0, 0, 3.55)
+    _turned(p, dx, dy, [(0, 0.55 * m), (0.6 * m, 0.55 * m), (0.8 * m, 0.3 * m)], colour)
+    p.blob(dx - 0.45 * m, dy - 0.9 * m, dx - 0.05 * m, dy - 0.5 * m, shade(colour, 2.2))
+    _bar(p, at(-3, -0.5, 3.9), at(3, -0.5, 3.9), 0.1 * m, (150, 148, 140))
+
+
+def _oil_loading_rack(p: Painter, a: Point, length: float, arms: tuple[float, ...]) -> None:
+    """A loading rack `length` metres long beside a siding, along the lit walls from `a`: steel
+    posts every four metres carrying a walkway 4.5 m up with its handrail, a header of black and
+    amber pipes, loading arms swung down at `arms` metres along it, a stair at its end and an
+    amber sample lamp glowing on its last post."""
+    m = METRE
+
+    def at(u: float, v: float, z: float) -> Point:
+        px, py = _iso(a[0], a[1], u * m, v * m)
+        return px, py - z * m
+
+    steel, rail = OIL_FRAME, OIL_HANDRAIL
+    posts = np.linspace(0, length, max(2, round(length / 4) + 1))
+    for u in posts:
+        _bar(p, at(u, 0, 0), at(u, 0, 5.6), 0.35 * m, steel)
+    for z, colour in ((3.2, OIL_BLACK), (3.9, OIL_AMBER)):
+        _bar(p, at(0, 0.1, z), at(length, 0.1, z), 0.45 * m, colour)
+        _bar(p, at(0, 0.1, z + 0.2), at(length, 0.1, z + 0.2), 0.12 * m, shade(colour, 1.6))
+    p.polygon(
+        [at(0, 0.2, 4.6), at(length, 0.2, 4.6), at(length, -1.2, 4.6), at(0, -1.2, 4.6)],
+        shade(steel, 0.85),
+    )
+    _bar(p, at(0, -1.2, 4.45), at(length, -1.2, 4.45), 0.3 * m, shade(steel, 1.5))
+    for v in (0.2, -1.2):
+        _bar(p, at(0, v, 5.6), at(length, v, 5.6), 0.1 * m, rail)
+    for u in posts:
+        _bar(p, at(u, -1.2, 4.6), at(u, -1.2, 5.6), 0.1 * m, rail)
+    for u in arms:
+        _bar(p, at(u, -0.4, 4.4), at(u + 0.4, -2.2, 4.9), 0.25 * m, OIL_BLACK)
+        _bar(p, at(u + 0.4, -2.2, 4.9), at(u + 0.4, -3.0, 4.0), 0.25 * m, OIL_BLACK)
+        _bar(p, at(u + 0.4, -2.2, 4.95), at(u + 0.4, -2.2, 5.5), 0.12 * m, rail)
+    run = 4.4
+    for k in range(8):
+        f = (k + 0.5) / 8
+        _bar(
+            p,
+            at(length + 0.2 + run * f, -1.1, 4.6 * (1 - f)),
+            at(length + 0.2 + run * f, -0.1, 4.6 * (1 - f)),
+            0.18 * m,
+            (150, 148, 140),
+        )
+    for v in (-1.1, -0.1):
+        _bar(p, at(length + 0.2, v, 4.6), at(length + 0.2 + run, v, 0), 0.16 * m, steel)
+    _bar(p, at(length + 0.2, -1.1, 5.6), at(length + 0.2 + run, -1.1, 1), 0.1 * m, rail)
+    lx, ly = at(length, 0, 5.9)
+    p.soft([(lx - 1.3 * m, ly - 1.3 * m, lx + 1.3 * m, ly + 1.3 * m)], OIL_AMBER, 0.55, 0.8)
+    p.blob(lx - 0.4 * m, ly - 0.4 * m, lx + 0.4 * m, ly + 0.4 * m, OIL_GLOW)
+
+
+def _oil_pipe(p: Painter, points: list[Point], colour: RGB, wide: float = 0.45) -> None:
+    """A pipe `wide` metres thick run through `points`, lit along its top."""
+    m = METRE
+    lift = 0.3 * wide * m
+    for k in range(len(points) - 1):
+        _bar(p, points[k], points[k + 1], wide * m, colour)
+    for k in range(len(points) - 1):
+        (ax, ay), (bx, by) = points[k], points[k + 1]
+        _bar(p, (ax, ay - lift), (bx, by - lift), lift, shade(colour, 1.7))
+
+
+def _oil_link(
+    p: Painter, a: Point, b: Point, gap: tuple[float, float], z: float, colour: RGB | None = None
+) -> None:
+    """A pipe in `colour` `z` metres up between two round things standing on `a` and `b`, from the
+    skin of the first, `gap[0]` metres from its axis, to the skin of the second, `gap[1]` from
+    its; or with no `colour` a catwalk bridge of steel grating with handrails on both sides."""
+    m = METRE
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    du, dv = (dx + 2 * dy) / 2, (dx - 2 * dy) / 2
+    run = math.hypot(du, dv) or 1.0
+    du, dv = du / run, dv / run
+
+    def along(pt: Point, k: float, side: float, up: float) -> Point:
+        px, py = _iso(pt[0], pt[1], (du * k - dv * side) * m, (dv * k + du * side) * m)
+        return px, py - up * m
+
+    start, end = (a, gap[0]), (b, -gap[1])
+    if colour is not None:
+        _oil_pipe(p, [along(*start, 0, z), along(*end, 0, z)], colour)
+        return
+    steel, rail = OIL_FRAME, OIL_HANDRAIL
+    far = 1 if du + dv > 0 else -1
+    _bar(p, along(*start, 0.6 * far, z + 1.05), along(*end, 0.6 * far, z + 1.05), 0.1 * m, rail)
+    p.polygon(
+        [along(*start, 0.6, z), along(*end, 0.6, z), along(*end, -0.6, z), along(*start, -0.6, z)],
+        shade(steel, 0.9),
+    )
+    _bar(
+        p,
+        along(*start, -0.6 * far, z - 0.15),
+        along(*end, -0.6 * far, z - 0.15),
+        0.3 * m,
+        shade(steel, 1.45),
+    )
+    _bar(p, along(*start, -0.6 * far, z + 1.05), along(*end, -0.6 * far, z + 1.05), 0.1 * m, rail)
+
+
+def _oil_yard(p: Painter, corners: list[Point]) -> None:
+    """The gravelled ground of a refinery over the four `corners` on the ground, with a dark lip."""
+    m = METRE
+    p.polygon([(x, y + 0.7 * m) for x, y in corners], shade(OIL_GRAVEL, 0.62))
+    p.polygon(corners, OIL_GRAVEL, shade(OIL_GRAVEL, 0.85))
 
 
 def refinery() -> Sprite:
-    """An oil refinery filling its cell, after the great refineries of the oil age: two tall brick
-    chimneys smoking at the back, tall silver distillation columns ringed with yellow walkways, a
-    pipe rack carrying yellow pipes, a flare burning on a red-and-white stack, and at the front
-    big round white storage tanks banded in oil yellow, each in its earth bund with a stair up
-    its side."""
-    p = Painter(50, 64, (24, 52))
-    plate = (168, 164, 156)
-    _plate(p, plate)
-    for x, y in ((-3, -6), (9, -3), (-12, 1)):
-        _oil(p, x, y, 1.2)
-    for x, y in ((-13, -3.5), (-9.5, -5.5)):
-        _smoking_chimney(p, x, y, y - 34, shade(BRICK, 0.95), smoke=(150, 148, 150))
-    fx, fy = 12, -4
-    p.line([(fx, fy), (fx, fy - 36)], (90, 90, 96))
-    p.line([(fx + 1, fy), (fx + 1, fy - 36)], (124, 124, 130))
-    for y in (-34, -30, -26):
-        p.line([(fx, fy + y), (fx + 1, fy + y)], (206, 60, 50))
-    p.blob(fx - 2, fy - 43, fx + 3, fy - 36, (246, 150, 40))
-    p.blob(fx - 0.5, fy - 40, fx + 1.5, fy - 37, (255, 220, 120))
-    metal = (176, 178, 184)
-    for x, y, r, h in ((1, -5, 2, 22), (5.5, -3.5, 2.5, 30), (-3, -2.5, 2, 18)):
-        _turned(p, x, y, [(0, r), (h, r), (h + 1.5, r * 0.6)], metal)
-        for ring in range(6, h, 6):
-            p.line([(x - r - 1, y - ring), (x + r + 1, y - ring)], OIL_YELLOW)
-            p.line(
-                [(x - r - 1, y - ring + 0.5), (x + r + 1, y - ring + 0.5)], shade(OIL_YELLOW, 0.6)
-            )
-        p.line([(x + r - 0.5, y - 1), (x + r - 0.5, y - h)], shade(metal, 0.62))
-    rack = (96, 96, 104)
-    for x in (-15, -8, -1, 6, 13):
-        p.line([(x, 0), (x, -6)], rack)
-    for h, colour in (
-        (6, rack),
-        (5, OIL_YELLOW),
-        (4, shade(OIL_YELLOW, 0.75)),
-        (3, (120, 120, 128)),
-    ):
-        p.line([(-15, -h), (13, -h)], colour)
-    for x in (-11, -4, 3, 10):
-        p.point(x, -5.5, (206, 60, 50))
-    for x, y, r, h in ((12.5, 1.5, 3.5, 3.5), (-8.5, 3.5, 5, 4.5), (3, 5.5, 5, 4.5)):
-        _storage_tank(p, x, y, r, h)
+    """An oil refinery, 31 by 27 m on a gravelled yard: a dense tangle of five distillation
+    columns of dark steel and rust from 20 to 34 m tall, ringed with catwalks, climbed by ladders
+    and laced with pipes and pipe racks round an open steel structure of heat exchangers; a
+    brick furnace with fire doors glowing and its slim steel stack; one big black crude tank under
+    a shallow dome with a stair winding up it inside its earth bund; two product tanks banded
+    amber; a loading rack with its amber lamp over two of three tank wagons on its siding; and a
+    modest flare burning at the back."""
+    m = METRE
+    p = Painter(56, 76, (28, 56))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 15.5) * m, (v - 13.5) * m)
+
+    _oil_yard(p, [at(0, 0), at(31, 0), at(31, 27), at(0, 27)])
+    for u0, v0, u1, v1 in ((16.5, 11.5, 26.5, 26.5), (14.5, 4.5, 26.5, 11.5)):
+        p.polygon([at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)], OIL_PAD, shade(OIL_PAD, 0.8))
+    for u, v, r in ((17, 6.5, 1.6), (25, 19, 1.2), (12.5, 25, 1.4), (30, 5.5, 1.3)):
+        _oil(p, *at(u, v), r * m)
+    _oil_flare(p, *at(3, 24.5), 30)
+    a, b, c, d, e = at(14.5, 23), at(19.5, 24.5), at(27.5, 25), at(24, 22.5), at(25, 18.5)
+    _oil_column(p, *a, 4.2, 24)
+    _oil_link(p, a, b, (2.1, 1.7), 11, OIL_BLACK)
+    _oil_column(p, *b, 3.4, 34)
+    _oil_column(p, *c, 2.4, 22)
+    _oil_link(p, b, d, (1.7, 1.5), 14, OIL_RUST)
+    _oil_link(p, b, d, (1.7, 1.5), 18)
+    _oil_column(p, *d, 3, 29, OIL_WEATHERED)
+    _oil_link(p, d, c, (1.5, 1.2), 12)
+    _oil_rack(
+        p,
+        at(14, 19.5),
+        at(23, 19.5),
+        _iso(0, 0, 0, 1.6 * m),
+        7,
+        OIL_PIPES,
+    )
+    _oil_rack(
+        p, at(15, 7.5), at(15, 25), _iso(0, 0, 1.4 * m, 0), 5.5, (OIL_BLACK, OIL_AMBER, OIL_RUST)
+    )
+    _oil_crude_tank(p, *at(6.5, 15), 12, 8)
+    _oil_link(p, d, e, (1.5, 1.3), 6)
+    _oil_column(p, *e, 2.6, 20, OIL_WEATHERED)
+    _oil_frame(p, *at(21.5, 15), 7, 5)
+    _oil_product_tank(p, *at(29, 17.5), 6.5, 8, OIL_AMBER)
+    _oil_furnace(p, *at(21, 8.5))
+    _oil_product_tank(p, *at(28.5, 10), 5.5, 6.5, OIL_KEROSENE)
+    _oil_loading_rack(p, at(3.5, 5), 14.5, (3.5, 12.5))
+    _oil_siding(p, at(0, 2), 31)
+    for u in (7, 16, 25.5):
+        _oil_wagon(p, *at(u, 2), OIL_WAGON)
     return p.sprite()
 
 

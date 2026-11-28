@@ -10,12 +10,36 @@ import numpy as np
 
 from railroads.ui.pixel.art.industry import (
     GLAZING,
+    OIL_ALUMINIUM,
+    OIL_AMBER,
+    OIL_BLACK,
+    OIL_KEROSENE,
+    OIL_PAD,
+    OIL_PIPES,
+    OIL_RUST,
+    OIL_STEEL,
+    OIL_WAGON,
+    OIL_WEATHERED,
     _bed,
     _car,
     _door,
     _drum,
     _footing,
     _oil,
+    _oil_column,
+    _oil_cracker,
+    _oil_crude_tank,
+    _oil_flare,
+    _oil_frame,
+    _oil_furnace,
+    _oil_link,
+    _oil_loading_rack,
+    _oil_product_tank,
+    _oil_rack,
+    _oil_siding,
+    _oil_sphere,
+    _oil_wagon,
+    _oil_yard,
     _plane,
     _puddle,
     _ring,
@@ -45,6 +69,7 @@ from railroads.ui.pixel.art.painter import (
     shade,
 )
 from railroads.ui.pixel.art.parts import (
+    METRE,
     _band,
     _bands,
     _flag,
@@ -113,21 +138,6 @@ def _column(p: Painter, x: float, y: float, r: float, tall: float, metal: RGB = 
     p.line([(x + r - 0.5, y - 1), (x + r - 0.5, y - tall)], shade(metal, 0.62))
 
 
-def _oil_tank(p: Painter, x: float, y: float, r: float = 4.5, tall: float = 4) -> None:
-    """A squat white storage tank standing on (x, y) with a stair up its side."""
-    _turned(p, x, y, [(0, r), (tall, r)], TANK_WHITE, cap=shade(TANK_WHITE, 1.08))
-    p.line([(x - r + 0.5, y - 0.5), (x - 1, y - tall - 0.5)], shade(TANK_WHITE, 0.65))
-
-
-def _floating_tank(p: Painter, x: float, y: float, r: float, tall: float) -> None:
-    """A wide white crude tank standing on (x, y), its floating roof sunk inside its rim and a red
-    band round it."""
-    _turned(p, x, y, [(0, r), (tall, r)], TANK_WHITE, cap=shade(TANK_WHITE, 0.82))
-    p.blob(x - r + 1, y - tall - r / 2 + 1.2, x + r - 1, y - tall + r / 2 - 0.2, (170, 172, 176))
-    _ring(p, x, y - tall * 0.5, r, VALVE)
-    p.line([(x - r + 0.5, y - 0.5), (x - r * 0.3, y - tall - 0.5)], shade(TANK_WHITE, 0.62))
-
-
 def _flare(p: Painter, x: float, y: float, tall: float, size: float = 1.0) -> None:
     """A tall red-and-white flare stack standing on (x, y), burning off gas in a big flame."""
     p.line([(x, y), (x, y - tall)], (90, 90, 96))
@@ -160,142 +170,136 @@ def _rack(p: Painter, u0: float, u1: float, v: float, tall: float, pipes: tuple[
         p.point(x, y - tall + 0.5, VALVE)
 
 
-def _cracker(p: Painter, x: float, y: float, frame_tall: float, size: float = 1.0) -> None:
-    """A catalytic cracker standing on (x, y): an open steel frame with a fat regenerator and a
-    tall slim reactor on top, joined by a sloping riser and climbed by stairs."""
-    s = size
-    w = 4 * s
-    ground = {"l": (x - w, y), "f": (x, y + w / 2), "r": (x + w, y), "b": (x, y - w / 2)}
-
-    def up(k: str, h: float) -> Point:
-        gx, gy = ground[k]
-        return gx, gy - h
-
-    steel = (88, 90, 98)
-    levels = [frame_tall * f for f in (0.35, 0.7, 1.0)]
-    p.line([ground["b"], up("b", frame_tall)], shade(steel, 0.8))
-    for h in levels:
-        p.line([up("l", h), up("b", h), up("r", h)], shade(steel, 0.8))
-    p.polygon(
-        [up("l", frame_tall), up("b", frame_tall), up("r", frame_tall), up("f", frame_tall)],
-        (120, 122, 128),
-        steel,
-    )
-    tx, ty = up("f", frame_tall)
-    ty -= w / 2
-    _turned(p, tx - 1.4 * s, ty, [(0, 2.6 * s), (7 * s, 2.6 * s), (9 * s, 1.2 * s)], COLUMN)
-    _ring(p, tx - 1.4 * s, ty - 3.5 * s, 2.6 * s, shade(COLUMN, 0.6))
-    rx = tx + 2.2 * s
-    _turned(p, rx, ty + 0.5, [(0, 1.5 * s), (16 * s, 1.5 * s), (17.5 * s, 0.8 * s)], COLUMN)
-    for h in (5, 10):
-        _ring(p, rx, ty + 0.5 - h * s, 1.5 * s, shade(COLUMN, 0.6))
-    p.line([(tx - 1.4 * s, ty - 9 * s), (rx, ty - 14 * s)], (150, 120, 60))
-    for k in "lfr":
-        p.line([ground[k], up(k, frame_tall)], steel)
-    for h in levels:
-        p.line([up("l", h), up("f", h), up("r", h)], steel)
-    p.line([up("l", 0), up("f", levels[0])], steel)
-    p.line([up("f", levels[0]), up("r", levels[1])], steel)
-    p.line([up("l", levels[1]), up("f", levels[2])], steel)
-
-
-def _heater(p: Painter, x: float, y: float) -> None:
-    """A boxy fired heater standing on (x, y), its burners glowing along its foot and two thin
-    stacks on top."""
-    wall = (190, 182, 170)
-    top = p.box(x, y, 2.5, 7, wall, shade(wall, 1.1))
-    _patch(p, top[0], top[1], (0.15, 0.85), (5.6, 6.4), FLAME)
-    _band(p, top[0], top[1], 2.5, shade(wall, 0.7))
-    for dx in (-1, 1):
-        p.line([(x + dx, y - 7.5), (x + dx, y - 14)], (110, 110, 116))
-        p.point(x + dx, y - 14.5, (70, 70, 76))
-
-
 def big_refinery() -> Sprite:
-    """A bigger oil refinery: a cluster of four silver distillation columns ringed with walkways, a
-    catalytic cracker on its steel frame, a fired heater glowing at its foot, a pipe rack with red
-    valves, a tank farm of squat white tanks behind a bund wall, a tank wagon on the siding and two
-    flares burning on their tall red-and-white stacks."""
-    p = Painter(52, 66, (25, 51))
-    plate = (168, 164, 156)
-    _plate(p, plate, 24)
-    p.polygon(
-        [_iso(0, 0, u, v) for u, v in ((-11.5, -11.5), (0, -11.5), (0, -4), (-11.5, -4))],
-        shade(plate, 0.92),
-        shade(plate, 0.6),
+    """A bigger oil refinery, 39 by 34 m: a skyline of six distillation columns of dark steel and
+    rust up to 40 m tall, ringed with catwalks, bridged by walkways and laced with pipes and pipe
+    racks, an open structure of heat exchangers and a catalytic cracker with its regenerator,
+    reactor and stack; a long brick furnace with its fire doors glowing; two black crude tanks
+    under shallow domes with stairs winding up them inside their bunds; three product tanks
+    banded amber; a loading rack with its amber lamp over three of four tank wagons on its
+    siding; and a flare burning at the back."""
+    m = METRE
+    p = Painter(64, 88, (32, 64))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 19.5) * m, (v - 17) * m)
+
+    _oil_yard(p, [at(0, 0), at(39, 0), at(39, 34), at(0, 34)])
+    for u0, v0, u1, v1 in ((19, 13, 38, 33.5), (17, 5, 32, 13)):
+        p.polygon([at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)], OIL_PAD, shade(OIL_PAD, 0.8))
+    for u, v, r in ((20, 7, 1.6), (33, 26, 1.2), (16, 31, 1.4), (37, 5.5, 1.3), (27, 15, 1.1)):
+        _oil(p, *at(u, v), r * m)
+    _oil_flare(p, *at(5, 32), 36)
+    _oil_crude_tank(p, *at(7.5, 27), 11, 8)
+    a, b, c, d = at(21, 30.5), at(26.5, 31.5), at(31.5, 30), at(36, 31.5)
+    e, f = at(24, 23), at(35, 23.5)
+    _oil_column(p, *a, 4.6, 27)
+    _oil_link(p, a, b, (2.3, 1.8), 12)
+    _oil_link(p, a, b, (2.3, 1.8), 20, OIL_RUST)
+    _oil_column(p, *b, 3.6, 40)
+    _oil_column(p, *d, 2.4, 23)
+    _oil_link(p, b, c, (1.8, 1.4), 18)
+    _oil_link(p, b, c, (1.8, 1.4), 9, OIL_BLACK)
+    _oil_column(p, *c, 2.8, 31, OIL_WEATHERED)
+    _oil_link(p, c, d, (1.4, 1.2), 12)
+    _oil_rack(
+        p,
+        at(19, 25.5),
+        at(37, 25.5),
+        _iso(0, 0, 0, 1.6 * m),
+        7.5,
+        OIL_PIPES,
     )
-    for u, v in ((3, -7), (6, -9.5), (7, 1), (-9, 4)):
-        _oil(p, *_iso(0, 0, u, v), 1.2)
-    for u, v, tall, size in ((11, 11, 40, 1.1), (7, 12, 32, 0.9)):
-        _flare(p, *_iso(0, 0, u, v), tall, size)
-    for u, v, r, h in ((-9, 6, 2, 18), (-4, 9, 2.5, 36), (-6, 4, 3, 28), (-1, 6, 2, 22)):
-        _column(p, *_iso(0, 0, u, v), r, h)
-    _cracker(p, *_iso(0, 0, 7, 3), 10)
-    _heater(p, *_iso(0, 0, 1, -1))
-    _rack(p, -11, 11, -3, 6, ((150, 120, 60), (110, 150, 180)))
-    bund = shade(plate, 0.75)
-    p.line(
-        [_iso(0, 0, u, v) for u, v in ((-11, -11), (0, -11), (0, -4.5), (-11, -4.5), (-11, -11))],
-        bund,
-    )
-    for u, v in ((-7.5, -6.5), (-2.5, -7), (-8, -10), (-3, -10.5)):
-        _oil_tank(p, *_iso(0, 0, u, v), 3.4, 3.5)
-    _siding(p, 2, 11.5, -9)
-    _tank_wagon(p, 7, -9, WAGON)
+    _oil_rack(p, at(17, 7), at(17, 32), _iso(0, 0, 1.4 * m, 0), 6, (OIL_BLACK, OIL_AMBER, OIL_RUST))
+    _oil_link(p, b, e, (1.8, 1.6), 24)
+    _oil_column(p, *e, 3.2, 34, OIL_WEATHERED)
+    _oil_link(p, c, f, (1.4, 1.5), 16)
+    _oil_column(p, *f, 3, 27)
+    _oil_crude_tank(p, *at(7.5, 13), 14, 9)
+    _oil_frame(p, *at(22.5, 17), 6, 5)
+    _oil_cracker(p, *at(30.5, 18))
+    _oil_product_tank(p, *at(36.5, 17.5), 5, 7, OIL_KEROSENE)
+    _oil_furnace(p, *at(24.5, 9), 12)
+    for u, v, wide, tall in ((35.5, 10.5, 6, 7.5), (36.5, 4.5, 4.5, 5.5)):
+        _oil_product_tank(p, *at(u, v), wide, tall, OIL_AMBER)
+    _oil_loading_rack(p, at(3, 5), 23.5, (3.5, 12.5, 21.5))
+    _oil_siding(p, at(0, 2), 39)
+    for u in (6.5, 15.5, 24.5, 33.5):
+        _oil_wagon(p, *at(u, 2), OIL_WAGON)
     return p.sprite()
 
 
 def mega_refinery() -> Sprite:
-    """A great oil refinery, the showpiece of the map: a row of silver distillation columns, the
-    tallest towering over it all with steam rising from it, two catalytic crackers on their steel
-    frames, fired heaters glowing, three flares burning, pipe racks with red valves, a tank farm of
-    wide crude tanks with floating roofs, two ball tanks of gas and a train of tank wagons on the
-    siding."""
-    p = Painter(62, 81, (30, 64))
-    plate = (168, 164, 156)
-    _plate(p, plate, 29)
-    p.polygon(
-        [_iso(0, 0, u, v) for u, v in ((-14, -14), (-1, -14), (-1, -5), (-14, -5))],
-        shade(plate, 0.92),
-        shade(plate, 0.6),
+    """A great oil refinery, the showpiece of the map, 43 by 38 m: a wall of five distillation
+    columns of dark steel and rust up to 54 m tall bridged by walkways at three levels, a fat
+    vacuum column and three more columns before them, all ringed with catwalks and laced with
+    pipes and pipe racks; an open structure of heat exchangers and a catalytic cracker with its
+    regenerator, reactor and stack; a long brick furnace with its fire doors glowing and its
+    stack; two big black crude tanks under shallow domes with stairs winding up them inside
+    their bunds; two ball tanks of gas and two product tanks banded amber; a loading rack with
+    its amber lamp over three of four tank wagons on its siding; and two flares burning at the
+    back."""
+    m = METRE
+    p = Painter(70, 104, (35, 78))
+
+    def at(u: float, v: float) -> Point:
+        return _iso(0, 0, (u - 21.5) * m, (v - 19) * m)
+
+    _oil_yard(p, [at(0, 0), at(43, 0), at(43, 38), at(0, 38)])
+    for u0, v0, u1, v1 in ((19.5, 12.5, 42.5, 37.5), (16.5, 5, 33, 12.5)):
+        p.polygon([at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)], OIL_PAD, shade(OIL_PAD, 0.8))
+    for u, v, r in ((21, 6.5, 1.6), (36, 29, 1.3), (17, 35, 1.4), (41, 4.5, 1.3), (28, 14, 1.2)):
+        _oil(p, *at(u, v), r * m)
+    _oil_flare(p, *at(3, 36), 44)
+    _oil_flare(p, *at(13, 36.5), 34)
+    _oil_crude_tank(p, *at(8.5, 29.5), 13, 9)
+    wall = [at(u, v) for u, v in ((21.5, 34.5), (26.5, 35.5), (31.5, 34.5), (36.5, 35.5), (41, 34))]
+    sizes = (
+        (3.4, 36, OIL_STEEL),
+        (4, 54, OIL_STEEL),
+        (3, 44, OIL_WEATHERED),
+        (3.4, 38, OIL_STEEL),
+        (2.4, 28, OIL_WEATHERED),
     )
-    for u, v in ((-4, 2), (6, -6), (9, 5), (-11, 3)):
-        _oil(p, *_iso(0, 0, u, v), 1.3)
-    for u, v, tall, size in ((14, 13, 46, 1.2), (9, 14, 38, 1.0), (14, 8, 30, 0.8)):
-        _flare(p, *_iso(0, 0, u, v), tall, size)
-    for u, v, r, h in (
-        (-6, 13, 2, 22),
-        (-11, 10, 2.5, 30),
-        (-2, 11, 2.5, 30),
-        (-7, 8.5, 3.5, 42),
-        (-12, 5.5, 2, 20),
-        (-3, 6, 2.5, 26),
-    ):
-        _column(p, *_iso(0, 0, u, v), r, h)
-    sx, sy = _iso(0, 0, -7, 8.5)
-    _smoke(p, sx + 1, sy - 47, STEAM, 3)
-    _cracker(p, *_iso(0, 0, 9, 6), 12, 1.1)
-    _cracker(p, *_iso(0, 0, 4, 1), 9)
-    for u in (-9, -6):
-        _heater(p, *_iso(0, 0, u, 0.5))
-    _rack(p, -14, 14, -3, 7, ((150, 120, 60), (110, 150, 180), (70, 70, 76)))
-    for u, v in ((5, -7), (10.5, -6)):
-        x, y = _iso(0, 0, u, v)
-        for dx in (-2.5, 0, 2.5):
-            p.line([(x + dx, y), (x + dx, y - 3)], shade(METAL, 0.7))
-        p.ellipse(x - 3.5, y - 9.5, x + 3.5, y - 2.5, TANK_WHITE)
-        p.blob(x - 2.4, y - 8.6, x - 0.4, y - 6.6, shade(TANK_WHITE, 1.08))
-        p.line([(x - 3.5, y - 6), (x + 3.5, y - 6)], VALVE)
-    bund = shade(plate, 0.75)
-    p.line(
-        [_iso(0, 0, u, v) for u, v in ((-14, -14), (-1, -14), (-1, -5), (-14, -5), (-14, -14))],
-        bund,
+    for k, (foot, (wide, tall, metal)) in enumerate(zip(wall, sizes, strict=True)):
+        _oil_column(p, *foot, wide, tall, metal)
+        if k:
+            gap = (sizes[k - 1][0] / 2, wide / 2)
+            for z in (10, 22, 32)[: 1 + (tall > 30) + (tall > 40)]:
+                _oil_link(p, wall[k - 1], foot, gap, z)
+            _oil_link(p, wall[k - 1], foot, gap, 16, OIL_BLACK if k % 2 else OIL_RUST)
+    _oil_rack(
+        p,
+        at(19.5, 30),
+        at(42, 30),
+        _iso(0, 0, 0, 1.6 * m),
+        8,
+        OIL_PIPES,
     )
-    for u, v in ((-10.5, -8), (-4.5, -8), (-10.5, -12), (-4.5, -12)):
-        _floating_tank(p, *_iso(0, 0, u, v), 4.6, 4)
-    _siding(p, 1, 14.5, -12)
-    for k in range(2):
-        _tank_wagon(p, 4.5 + 5.5 * k, -12, WAGON)
+    _oil_rack(
+        p, at(18, 7), at(18, 37), _iso(0, 0, 1.4 * m, 0), 6.5, (OIL_BLACK, OIL_AMBER, OIL_RUST)
+    )
+    vac, g, h, i = at(23.5, 25.5), at(29.5, 26.5), at(34, 26), at(39, 25.5)
+    _oil_link(p, wall[1], g, (2, 1.5), 26)
+    _oil_column(p, *g, 3, 40, OIL_WEATHERED)
+    _oil_link(p, g, h, (1.5, 1.4), 14)
+    _oil_column(p, *h, 2.8, 32)
+    _oil_link(p, h, i, (1.4, 1.5), 11, OIL_ALUMINIUM)
+    _oil_column(p, *i, 3, 26, OIL_WEATHERED)
+    _oil_link(p, vac, g, (3.3, 1.5), 20)
+    _oil_column(p, *vac, 6.5, 30)
+    _oil_crude_tank(p, *at(9, 13.5), 16, 10)
+    _oil_frame(p, *at(24.5, 18.5), 7, 5)
+    _oil_cracker(p, *at(33, 19.5))
+    _oil_sphere(p, *at(40, 20.5), 6)
+    _oil_product_tank(p, *at(30, 13.5), 4, 6, OIL_KEROSENE)
+    _oil_sphere(p, *at(40, 13), 6)
+    _oil_furnace(p, *at(23.5, 9), 14)
+    _oil_product_tank(p, *at(36, 8), 6, 7.5, OIL_AMBER)
+    _oil_loading_rack(p, at(2.5, 5), 25.5, (3, 12, 21))
+    _oil_siding(p, at(0, 2), 37.5)
+    for u in (5.5, 14.5, 23.5, 32.5):
+        _oil_wagon(p, *at(u, 2), OIL_WAGON)
     return p.sprite()
 
 
