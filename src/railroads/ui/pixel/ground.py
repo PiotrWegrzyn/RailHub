@@ -1,8 +1,7 @@
 """The ground of the pixel map, worked out at one pixel per art pixel: broad soft patches of a few
 shades per biome, meadow, savanna, tundra and desert blended from their own kinds of ground,
 water shallow by the shore and deep away from it with lit waves, soft sandy shores, slopes lit from
-the top left by the land's real heights, a warm glow where buildings are served, small signs of
-deposits (sheep grazing wool land, rocks showing their ore elsewhere), fields of crops ploughed
+the top left by the land's real heights, small signs of deposits (sheep grazing wool land, rocks showing their ore elsewhere), fields of crops ploughed
 into the ground under farms and rows of trees under orchards. Hills and mountains are raised, lit
 and coloured by railroads.ui.pixel.relief. Textures come from noise over the map's plane and from
 each pixel's place, so chunks meet without seams and look the same each time they are drawn."""
@@ -16,7 +15,6 @@ import numpy.typing as npt
 from railroads.sim.constructions import Building, BuildingKind, Constructions
 from railroads.sim.grids import Cell, FloatArray, Grid, HexGrid, IntArray
 from railroads.sim.tilemap import Deposit, Relief, Terrain, TileMap
-from railroads.sim.trade import Satisfaction
 from railroads.ui.biomes import Biome, biome_grid
 from railroads.ui.building_spots import Plot, plots_of
 from railroads.ui.pixel.ground_palette import (
@@ -83,7 +81,6 @@ from railroads.ui.pixel.ground_palette import (
     GARDEN,
     GARDEN_LEAVES,
     GARDEN_ROWS,
-    GLOW,
     GOLDEN_GREENS,
     GRASSES,
     GRASSY,
@@ -122,7 +119,6 @@ from railroads.ui.pixel.ground_palette import (
     ROLL_SPAN,
     ROLL_STEP,
     SAND,
-    SERVED_GLOW,
     SHADE_REACH,
     SHADOW_COLOUR,
     SHADOW_REACH,
@@ -206,15 +202,9 @@ from railroads.ui.pixel.streams import (
 )
 
 
-def glow_strength(levels: npt.NDArray[np.int8]) -> FloatArray:
-    """How strongly each cell glows for its Satisfaction; -1 (nothing trading) does not."""
-    table = np.array([0.0, *(SERVED_GLOW[level] for level in Satisfaction)])
-    return table[levels.astype(np.int64) + 1]
-
-
 class Ground:
     """The ground of one map, drawn a block of art pixels at a time, and what it is drawn from:
-    each cell's biome, the slopes' light, the fields and groves, and how satisfied each cell is."""
+    each cell's biome, the slopes' light, and the fields and groves."""
 
     def __init__(
         self,
@@ -234,8 +224,6 @@ class Ground:
         # The cells round each cell that points AROUND a point in it can lie in, and where cells
         # round a cell lie off the map, which never change.
         self._round, self._off_round = _cells_round(tile_map.grid)
-        # Each cell's Satisfaction, or -1 where nothing trades.
-        self.satisfaction = np.full(tile_map.grid.shape, -1, dtype=np.int8)
         self._hills = land & (tile_map.relief == Relief.HILLS)
         self._relief_light = self._light_slopes(angle_deg)
         self._wet, self._foot = self._surroundings()
@@ -387,12 +375,6 @@ class Ground:
             rgb[land] *= self._natural(x[land], y[land])
         self._draw_streams(rgb, x, y, r, c, land, left, top)
         self._shores(rgb, water, rows, inside)
-        # Ground that does not glow keeps its colour exactly, so only glowing ground is blended.
-        strength = glow_strength(self.satisfaction[r, c])
-        glowing = (strength > 0) & dry
-        if glowing.any():
-            served = strength[glowing].astype(np.float32)[:, None]
-            rgb[glowing] = rgb[glowing] * (1 - served) + np.array(GLOW, np.float32) * served
         if self.tile_map.deposits is not None:
             _sign_deposits(rgb, self.tile_map.deposits[r, c], left, top, wet)
         alpha = inside.astype(np.float32)

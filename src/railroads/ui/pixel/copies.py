@@ -4,8 +4,7 @@ browser (railroads.ui.pixel.web_painter), so the frames never wait on painting.
 A copy starts from the whole world pickled as it is, its heights, ground and scenery already worked
 out, which is quicker than working them out again and needs far less memory on the way. It then
 keeps up with the changes the world has since: buildings, track, stations and forests, taken up the
-way the world takes them up (PixelWorld.buildings_changed), and the satisfaction the ground glows
-with. Painted the same way from the same state, a copy's chunks are the very pixels the world
+way the world takes them up (PixelWorld.buildings_changed). Painted the same way from the same state, a copy's chunks are the very pixels the world
 paints itself. Nothing here needs imgui, which a worker doesn't load.
 
 A worker also draws the fine pictures of a train's look (train_page), which take a frame of their
@@ -82,15 +81,14 @@ def world_message(world: PixelWorld) -> bytes:
 
 @dataclass(frozen=True)
 class Seen:
-    """How far a copy has caught up with its world: the world's counts of changes to buildings
-    and to satisfaction when the copy last heard of them."""
+    """How far a copy has caught up with its world: the world's count of changes to buildings
+    when the copy last heard of them."""
 
     buildings: int
-    satisfaction: int
 
     @classmethod
     def now(cls, world: PixelWorld) -> Self:
-        return cls(world.buildings_version, world.satisfaction_version)
+        return cls(world.buildings_version)
 
 
 def update_message(world: PixelWorld, seen: Seen) -> bytes | None:
@@ -105,8 +103,6 @@ def update_message(world: PixelWorld, seen: Seen) -> bytes | None:
         update["constructions"] = {k: v for k, v in constructions.items() if k != "tile_map"}
         update["vegetation"] = world.tile_map.vegetation
         update["station_levels"] = dict(world.station_levels)
-    if world.satisfaction_version != seen.satisfaction:
-        update["satisfaction"] = world.satisfaction
     if not update:
         return None
     return pickle.dumps(update, protocol=pickle.HIGHEST_PROTOCOL)
@@ -144,8 +140,6 @@ class WorldCopy:
             object.__setattr__(world.tile_map, "vegetation", vegetation)
             world.station_levels = update["station_levels"]
             world.buildings_changed(())
-        if "satisfaction" in update:
-            world.satisfaction = update["satisfaction"]
 
     def paint(self, number: int, drawing: Drawing) -> Rgba | None:
         """The chunk (ChunkJob.drawing) painted from its world, or None if the chunk is of a world

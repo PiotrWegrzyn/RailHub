@@ -9,7 +9,6 @@ import numpy as np
 
 from railroads.sim.constructions import BuildingKind
 from railroads.sim.goods import HOMES, MAKES, RECIPES
-from railroads.sim.trade import Satisfaction
 from railroads.ui.biomes import Biome
 from railroads.ui.pixel.art.parts import METRE as SPRITE_METRE
 from railroads.ui.pixel.art.parts import SCALE as SPRITE_SCALE
@@ -232,19 +231,6 @@ FOOT_TINT = SHADOW_TINT * 0.8
 WARP = 0.32
 WARP_FINE = 0.12
 WARP_BROAD = 0.3
-
-
-# Land whose buildings are content or thriving is washed with a warm glow: how strongly, by
-# their satisfaction.
-GLOW: RGB = (255, 214, 110)
-
-
-SERVED_GLOW = {
-    Satisfaction.UNSATISFIED: 0.0,
-    Satisfaction.SHORT: 0.06,
-    Satisfaction.CONTENT: 0.12,
-    Satisfaction.THRIVING: 0.24,
-}
 
 
 # Farms grow wheat, which is what they make; other crops grow in rows (CROP_ROWS) over soil.

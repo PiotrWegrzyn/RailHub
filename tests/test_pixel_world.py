@@ -18,7 +18,6 @@ from railroads.sim.constructions import (
 )
 from railroads.sim.grids import Cell, Grid, HexGrid, SquareGrid
 from railroads.sim.tilemap import Relief, Temperature, Terrain, TileMap, Vegetation
-from railroads.sim.trade import Satisfaction
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH, TILT
 from railroads.ui.pixel import track_art
 from railroads.ui.pixel.art.ports import port_sprite
@@ -945,20 +944,6 @@ def test_grass_lies_darker_in_the_shade_of_a_tree(sheet: SpriteSheet) -> None:
     foot = (20 + 1, 40 + 3)
     assert shaded[foot].sum() < 0.85 * open_grass[foot].sum()
     assert np.array_equal(shaded[:, :20], open_grass[:, :20])
-
-
-def test_only_a_change_of_glow_marks_chunks_to_draw_again(sheet: SpriteSheet) -> None:
-    world = make_world(sheet)
-    levels = world.satisfaction.copy()
-    levels[3, 3] = Satisfaction.UNSATISFIED
-    unseen = world.satisfaction_changed(levels)
-    levels = levels.copy()
-    levels[3, 3] = Satisfaction.THRIVING
-
-    seen = world.satisfaction_changed(levels)
-
-    assert unseen == set()
-    assert seen
 
 
 def test_a_chunk_drawn_over_ground_laid_on_its_ground_matches_the_whole_chunk(

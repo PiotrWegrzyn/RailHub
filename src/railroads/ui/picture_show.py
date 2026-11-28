@@ -2,7 +2,6 @@
 (railroads.ui.history_pictures) over the whole window, its ground drawn by the graphics card
 (railroads.ui.pixel.ground_shader) where the picture leaves it out, as the game draws its own."""
 
-import numpy as np
 from imgui_bundle import hello_imgui, imgui
 
 from railroads.ui.history_pictures import GroundLook, Picture
@@ -68,13 +67,11 @@ class PictureShow:
         if shader is None:
             return None
         if shader.cells_version != picture.year:
-            glow = np.zeros(ground.shape, dtype=np.float64)
             shader.set_cells(
                 cell_info(
                     picture.biomes,
                     ground.deposits,
                     ground.hills,
-                    glow,
                     ground.mountains,
                     ground.streams,
                 ),

@@ -25,7 +25,7 @@ from railroads.sim.steps import Steps, finish
 from railroads.sim.tilemap import Relief, TileMap
 from railroads.sim.track_rules import TrackBed
 from railroads.ui.iso_camera import PIXEL_CELL_WIDTH
-from railroads.ui.pixel.ground import Ground, art_pixels, glow_strength
+from railroads.ui.pixel.ground import Ground, art_pixels
 from railroads.ui.pixel.ground_palette import (
     APRON,
     CANOPY_REACH,
@@ -162,20 +162,9 @@ class PixelWorld:
             if finest.names != sheet.names:
                 raise ValueError("The finest sprite sheet must hold the same sprites in order")
             self._sprites[FINEST] = _Sprites.of_bytes(finest)
-        # How many times buildings and satisfaction have changed, so copies of the world painting
-        # elsewhere (railroads.ui.pixel.copies) know when to catch up.
+        # How many times buildings have changed, so copies of the world painting elsewhere
+        # (railroads.ui.pixel.copies) know when to catch up.
         self.buildings_version = 0
-        self.satisfaction_version = 0
-
-    @property
-    def satisfaction(self) -> npt.NDArray[np.int8]:
-        """Each cell's Satisfaction, or -1 where nothing trades, which the ground glows with."""
-        return self.ground.satisfaction
-
-    @satisfaction.setter
-    def satisfaction(self, levels: npt.NDArray[np.int8]) -> None:
-        self.ground.satisfaction = levels
-        self.satisfaction_version += 1
 
     def sprite(self, index: int) -> tuple[int, npt.NDArray[np.float32], tuple[int, int]]:
         """A sprite as the finest sheet held as pixels from 0 to 1 holds it: that sheet's
@@ -277,13 +266,6 @@ class PixelWorld:
             self.scenery.y[mills].astype(np.float32),
             reaches[self.scenery.sprite][mills] * MILL_CLEARING,
         )
-
-    def satisfaction_changed(self, levels: npt.NDArray[np.int8]) -> set[tuple[int, int]]:
-        """Takes each cell's new satisfaction; returns the chunks whose glow changed. Most
-        changes of level, such as from not trading to unsatisfied, leave the glow as it was."""
-        changed = np.argwhere(glow_strength(levels) != glow_strength(self.satisfaction))
-        self.satisfaction = levels.copy()
-        return self._chunks_around([(int(r), int(c)) for r, c in changed])
 
     def _chunks_around(self, cells: Iterable[Cell]) -> set[tuple[int, int]]:
         cells = list(cells)

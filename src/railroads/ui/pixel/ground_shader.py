@@ -2,8 +2,7 @@
 from the art pixel under it the way railroads.ui.pixel.ground does on the CPU (Ground.render):
 which hex cell it lies in, the cell's biome and its ramp of shades picked by noise, meadows,
 savanna, tundra and desert with blades, flowers and dunes, tufts, water deep or shallow with
-waves and glints and soft sandy shores, the light on the slopes, the glow where buildings are
-served and the signs of deposits. Hills and mountains rise as railroads.ui.pixel.relief raises
+waves and glints and soft sandy shores, the light on the slopes and the signs of deposits. Hills and mountains rise as railroads.ui.pixel.relief raises
 them: the heights worked out from the same rasters, lit by their slopes and coloured with
 foothills, bare rock and snow, then lifted, each art pixel showing the nearest ground below raised
 up to it. The noise reads the same table of random numbers as the CPU's, so both draw the same
@@ -54,7 +53,6 @@ from railroads.ui.pixel.gl_util import (
 )
 from railroads.ui.pixel.ground_glsl import (
     BLOW_UP,
-    GLOW_STEPS,
     PLOT_REACH,
     TREE_SHADE_REACH,
     VERTEX,
@@ -79,13 +77,12 @@ def cell_info(
     biomes: npt.NDArray[np.integer],
     deposits: npt.NDArray[np.integer] | None,
     hills: npt.NDArray[np.bool_],
-    glow: FloatArray,
     mountains: npt.NDArray[np.bool_] | None = None,
     streams: npt.NDArray[np.uint8] | None = None,
 ) -> npt.NDArray[np.uint8]:
-    """What the shader needs of each cell, as (rows, cols, 4) bytes: its biome, its deposit, 1 on
-    hills and 2 on mountains with its links along a minor river (streams.stream_links) four
-    times over, and how strongly it glows in GLOW_STEPS."""
+    """What the shader needs of each cell, as (rows, cols, 4) bytes: its biome, its deposit, and 1
+    on hills and 2 on mountains with its links along a minor river (streams.stream_links) four
+    times over."""
     info = np.zeros((*biomes.shape, 4), dtype=np.uint8)
     info[..., 0] = biomes
     if deposits is not None:
@@ -95,7 +92,6 @@ def cell_info(
         info[..., 2] |= mountains.astype(np.uint8) << 1
     if streams is not None:
         info[..., 2] |= streams << 2
-    info[..., 3] = np.rint(np.asarray(glow) * GLOW_STEPS)
     return info
 
 

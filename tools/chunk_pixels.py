@@ -121,7 +121,6 @@ def world_of(saved: SavedGame) -> PixelWorld:
         fine=SpriteSheet.load_fine(),
         station_levels=saved.game.railway.levels,
     )
-    world.satisfaction = saved.game.growth.satisfaction().copy()
     return world
 
 
