@@ -1,6 +1,6 @@
 """What is special about a tile's level on a board (railroads.sim.tiles), for the marks above its
-card: an era its wagons come with, once every supply tile reaches it; an engine it opens for sale;
-a kind of bridge it opens for building; the buyers a demand level opens. A level brings nothing
+card: an era its wagons come with, once every supply tile reaches it; an engine a demand level
+opens for sale; a kind of bridge it opens for building; the buyers a demand level opens. A level brings nothing
 special when it only adds its share."""
 
 from dataclasses import dataclass
@@ -93,16 +93,16 @@ def _found_perks(board: Board, tile: Tile, level: int) -> list[LevelPerk]:
         if opened == (board, tile, level)
     ]
     if board == Board.DEMAND:
+        engines = [
+            LevelPerk(Perk.ENGINE, f"New engine for sale: {ENGINES[name].title}")
+            for name, (of, at) in OPENED_BY.items()
+            if of == tile and at == level
+        ]
         buyers = opened_at(tile, level)
-        return bridges + ([LevelPerk(Perk.BUYERS, buyers)] if buyers else [])
+        return engines + bridges + ([LevelPerk(Perk.BUYERS, buyers)] if buyers else [])
     found = [
         LevelPerk(Perk.ERA, era_text(number))
         for number, era in enumerate(ERAS, 1)
         if number > 1 and era.level == level
-    ]
-    found += [
-        LevelPerk(Perk.ENGINE, f"New engine for sale: {ENGINES[name].title}")
-        for name, (of, at) in OPENED_BY.items()
-        if of == tile and at == level
     ]
     return found + bridges

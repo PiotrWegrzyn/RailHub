@@ -104,12 +104,10 @@ from railroads.sim.train_names import train_titles
 from railroads.sim.trains import (
     BURN_ALONE,
     ENGINES,
-    EXPRESS_FARE,
     FIRST_ENGINE,
     FROM_SHED,
     GENERATIONS,
     IN_SHED,
-    MAGLEV_FARE,
     OPENED_BY,
     SLOWDOWN,
     TO_SHED,
@@ -296,7 +294,7 @@ class Railway:
         return tuple(bridge for bridge in Bridge if boards.bridge_open(bridge, self.year))
 
     def engines(self) -> list[str]:
-        """The engines the player can buy now: those whose supply tile has reached its level
+        """The engines the player can buy now: those whose demand tile has reached its level
         (engine_open), but not those a newer one of their line has replaced (Engine.replaces)."""
         opened = [name for name in ENGINES if self.engine_open(name)]
         return [
@@ -306,20 +304,20 @@ class Railway:
         ]
 
     def engine_open(self, name: str) -> bool:
-        """Whether an engine is on sale: once its supply tile has reached its level in the boards
+        """Whether an engine is on sale: once its demand tile has reached its level in the boards
         in play (railroads.sim.trains.OPENED_BY)."""
         tile, level = OPENED_BY[name]
-        return boards.of_year(self.year).supply.get(tile, 0) >= level
+        return boards.of_year(self.year).demand.get(tile, 0) >= level
 
     def can_carry(self, train: Train, cargo: Cargo) -> bool:
-        """Whether a train's engine takes cars of a good: an express takes only passengers, general
-        cars come with the era of GENERAL_CARS_ERA, and vehicles only once its cars are of a
-        generation that carries them (railroads.sim.trains.VEHICLES)."""
+        """Whether a train's engine takes cars of a good: an express takes only passengers and
+        mail, general cars come with the era of GENERAL_CARS_ERA, and vehicles only once its cars
+        are of a generation that carries them (railroads.sim.trains.VEHICLES)."""
         if isinstance(cargo, General) and boards.of_year(self.year).era < GENERAL_CARS_ERA:
             return False
         if isinstance(cargo, Good) and not self.car_capacity(cargo, train.engine):
             return False
-        return not ENGINES[train.engine].express or cargo == Good.PASSENGERS
+        return not ENGINES[train.engine].express or cargo in TRAVELLERS
 
     def buy(self, engine: str = FIRST_ENGINE, schedule: Schedule | None = None) -> Train | None:
         """Buys a train with an engine the player can buy, running `schedule` from its first stop
@@ -722,7 +720,7 @@ class Railway:
         cargo = [(car.good, car.load - car.origins.get(destination, 0.0)) for car in train.cars]
         earned = self.worth_at(destination, cargo)
         return [
-            amount * (self.fare_factor(train) if car.good in TRAVELLERS else 1.0)
+            amount * self.fare_factor(train, car.good)
             for amount, car in zip(earned, train.cars, strict=True)
         ]
 
@@ -782,11 +780,10 @@ class Railway:
         return stations, track_upkeep(self.constructions.track())
 
     @staticmethod
-    def fare_factor(train: Train) -> float:
-        """How much more passengers on this train pay: MAGLEV_FARE on a maglev, EXPRESS_FARE on
-        another express."""
-        engine = ENGINES[train.engine]
-        return MAGLEV_FARE if engine.maglev else EXPRESS_FARE if engine.express else 1.0
+    def fare_factor(train: Train, good: Good) -> float:
+        """How many times the usual fare a good pays on this train: its engine's fare for
+        passengers, the usual for anything else."""
+        return ENGINES[train.engine].fare if good == Good.PASSENGERS else 1.0
 
     def hand_out_now(self, station: Cell, good: Good) -> None:
         """Lets the buildings around a station take a good that has just reached it."""

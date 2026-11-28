@@ -10,7 +10,7 @@ from railroads.sim.demand import StationDemand
 from railroads.sim.goods import General, Good, Need
 from railroads.sim.railway import Railway, Ride
 from railroads.sim.trade import SCARCE_WORTH
-from railroads.sim.trains import ENGINES, EXPRESS_FARE, OPENED_BY, Car, Stop, Train
+from railroads.sim.trains import ENGINES, OPENED_BY, Car, Stop, Train
 from railroads.ui import buy_train
 from railroads.ui.station_offers import Offer
 from railroads.ui.train_table import Row, TrainTable, row_pitch
@@ -190,7 +190,7 @@ def test_an_express_shows_its_dining_car_and_dearer_fares_among_its_figures() ->
     pulls, fares = figures["Pulls up to"], figures["Fares"]
 
     assert pulls.endswith("coaches and a dining car")
-    assert fares == f"Passengers only, paying {EXPRESS_FARE - 1:.0%} more"
+    assert fares == "Passengers and mail only, passengers paying 2 times the fare"
 
 
 def test_an_engines_figures_show_the_fuel_it_burns_and_how_far_it_runs_between_stops() -> None:
@@ -202,12 +202,12 @@ def test_an_engines_figures_show_the_fuel_it_burns_and_how_far_it_runs_between_s
     assert figures["Range"] == "21 cells between stops"
 
 
-def test_an_engines_figures_say_which_supply_level_put_it_on_sale_and_when_it_was_first_built() -> (
+def test_an_engines_figures_say_which_demand_level_put_it_on_sale_and_when_it_was_first_built() -> (
     None
 ):
     figures = dict(engine_figures(ENGINES["goods"], opened=OPENED_BY["goods"]))
 
-    assert figures["On sale from"] == "Steel and metals supply 11"
+    assert figures["On sale from"] == "Coal demand 7"
     assert figures["First built"] == str(ENGINES["goods"].year)
 
 
@@ -470,7 +470,7 @@ def test_a_schedules_stop_says_how_many_of_its_cars_its_trains_take(
     _, railway = joined_stations()
     train = railway.buy()
     assert train is not None
-    routed(railway, train, [Stop((6, 3), [Good.COAL] * 5), Stop((6, 20))])
+    routed(railway, train, [Stop((6, 3), [Good.MAIL] * 5), Stop((6, 20))])
     window = showing_schedule(train)
     window._folded = {(train.schedule, 0): True}
     notes: list[str] = []

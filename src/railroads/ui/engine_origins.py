@@ -38,6 +38,19 @@ ORIGINS: dict[str, tuple[tuple[str, str], ...]] = {
     "modern_electric": (("DB Class 101", "DB_Class_101"),),
     "super_diesel": (),
     "maglev": (("Transrapid", "Transrapid"), ("SCMaglev L0 Series", "L0_Series")),
+    "consolidation": (("2-8-0 Consolidation (type)", "2-8-0"),),
+    "ten_wheeler": (("4-6-0 Ten-wheeler (type)", "4-6-0"),),
+    "mikado": (("PKP class Pt47", "PKP_class_Pt47"), ("2-8-2 Mikado (type)", "2-8-2")),
+    "universal_diesel": (("PKP class SU46", "PKP_class_SU46"),),
+    "modern_diesel": (("Siemens Eurorunner", "Siemens_Eurorunner"),),
+    "branch_tank": (("Prussian T 3", "Prussian_T_3"),),
+    "railmotor": (("GWR steam rail motors", "GWR_steam_rail_motors"),),
+    "diesel_railcar": (("Budd Rail Diesel Car", "Budd_Rail_Diesel_Car"),),
+    "light_unit": (("Alstom Coradia LINT", "Alstom_Coradia_LINT"),),
+    "interurban": (("Interurban (type)", "Interurban"),),
+    "suburban": (("DRG Class ET 167", "DRG_Class_ET_167"),),
+    "emu": (("PKP class EN57", "PKP_class_EN57"),),
+    "modern_unit": (("Stadler FLIRT", "Stadler_FLIRT"),),
 }
 
 

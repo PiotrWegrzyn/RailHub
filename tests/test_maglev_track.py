@@ -132,7 +132,7 @@ def test_rails_laid_along_a_guideway_leave_it_a_guideway() -> None:
 
 
 def test_maglev_track_opens_with_the_maglev_engine() -> None:
-    early = maglev_game(2026)
+    early = maglev_game(2015)
     ready = maglev_game(2040)
 
     opened = [game.railway.maglev_open for game in (early, ready)]
@@ -142,7 +142,7 @@ def test_maglev_track_opens_with_the_maglev_engine() -> None:
 
 
 def test_maglev_track_cannot_be_laid_before_it_opens() -> None:
-    game = maglev_game(2026)
+    game = maglev_game(2015)
     cash = game.finances.cash
 
     done = game.lay_track(WEST, (6, 9), maglev=True)

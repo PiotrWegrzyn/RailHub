@@ -100,20 +100,20 @@ def test_a_bridge_still_to_come_cannot_be_built() -> None:
     done = game.lay_track(WEST, EAST, bridge=Bridge.STEEL)
 
     assert not done.ok
-    assert "steel and metals supply 16" in done.message
+    assert "steel and metals demand 8" in done.message
 
 
-def test_stone_bridges_open_with_ore_and_stone_demand_and_steel_ones_with_steel_supply() -> None:
-    stone_tiles = [
+def test_stone_bridges_open_with_ore_and_stone_demand_and_steel_ones_with_steel_demand() -> None:
+    bridge_tiles = [
         (board, tile)
         for board in Board
         for tile in Tile
         if Perk.BRIDGE in {perk.kind for perk in perks(board, tile, 8)}
     ]
 
-    assert stone_tiles == [(Board.DEMAND, Tile.ORE)]
-    assert bridge_open(Bridge.STONE, 1850)
-    assert not bridge_open(Bridge.STEEL, 1850)
+    assert bridge_tiles == [(Board.DEMAND, Tile.ORE), (Board.DEMAND, Tile.STEEL)]
+    assert bridge_open(Bridge.STONE, 1870)
+    assert not bridge_open(Bridge.STEEL, 1870)
 
 
 def test_steel_track_laid_across_track_goes_over_it_as_a_flyover() -> None:

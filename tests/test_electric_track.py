@@ -17,7 +17,7 @@ def electric_game(year: int) -> Game:
 
 
 def test_electric_track_cannot_be_laid_before_it_opens() -> None:
-    game = electric_game(1924)
+    game = electric_game(1900)
     cash = game.finances.cash
 
     done = game.lay_track(WEST, (6, 9), electric=True)

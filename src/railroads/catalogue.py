@@ -21,8 +21,6 @@ from railroads.sim.ports import tiers_of
 from railroads.sim.tiles import Tile, good_era, kind_era, opened_from
 from railroads.sim.trains import (
     ENGINES,
-    EXPRESS_FARE,
-    MAGLEV_FARE,
     OPENED_BY,
     SLOWDOWN,
     Engine,
@@ -56,11 +54,11 @@ def most_pulled(engine: Engine) -> str:
 
 
 def fares_note(engine: Engine) -> str | None:
-    """What an express is paid more for its passengers; None for other engines."""
+    """What an express carries and how many times the usual fare its passengers pay; None for
+    other engines."""
     if not engine.express:
         return None
-    fare = MAGLEV_FARE if engine.maglev else EXPRESS_FARE
-    return f"Passengers only, paying {fare - 1:.0%} more"
+    return f"Passengers and mail only, passengers paying {engine.fare:g} times the fare"
 
 
 def track_needed(engine: Engine) -> list[str]:
@@ -76,11 +74,11 @@ def engine_figures(
     engine: Engine, per_cell: float | None = None, opened: tuple[Tile, int] | None = None
 ) -> list[tuple[str, str]]:
     """What an engine can do, as labels and values for its table on the screen, with what its
-    fuel for a cell costs now and the supply tile level that put it on sale if given."""
+    fuel for a cell costs now and the demand tile level that put it on sale if given."""
     figures = []
     if opened is not None:
         tile, level = opened
-        figures.append(("On sale from", f"{tile.value.capitalize()} supply {level}"))
+        figures.append(("On sale from", f"{tile.value.capitalize()} demand {level}"))
     figures += [
         ("First built", str(engine.year)),
         ("Power", engine.power.value.capitalize()),
@@ -131,7 +129,7 @@ class EngineHelp:
     engine: Engine
     # The year its sale ends and the engine that ends it, if one does.
     sold_until: tuple[int, str] | None
-    # The supply tile and level that open it for sale, in words.
+    # The demand tile and level that open it for sale, in words.
     opened_by: str
     # The real engines it is drawn after, as names and Wikipedia links.
     origins: tuple[tuple[str, str], ...]
@@ -203,9 +201,9 @@ def _drawn_by_ports(good: Good) -> tuple[str, ...]:
 
 
 def opened_by(name: str) -> str:
-    """The supply tile and level that open an engine for sale, in words."""
+    """The demand tile and level that open an engine for sale, in words."""
     tile, level = OPENED_BY[name]
-    return f"{tile.value} supply level {level}"
+    return f"{tile.value} demand level {level}"
 
 
 @cache
