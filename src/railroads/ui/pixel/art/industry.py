@@ -3089,20 +3089,6 @@ def _drying_cloth(p: Painter, a: Point, b: Point, height: float) -> None:
         p.line([top0, (top0[0], top0[1] + drop)], shade(colour, 1.25))
 
 
-def _hide_frame(p: Painter, x: float, y: float, hide: RGB) -> None:
-    """A hide stretched to dry on a wooden frame standing on (x, y), dripping on the ground."""
-    p.blob(x + 0.5, y - 0.5, x + 4, y + 1, (100, 108, 60))
-    p.line([(x, y), (x, y - 7)], FRAME)
-    p.line([(x + 4, y - 1), (x + 4, y - 8)], FRAME)
-    p.line([(x, y - 7), (x + 4, y - 8)], FRAME)
-    p.polygon(
-        [(x + 1, y - 6), (x + 3, y - 7), (x + 3.5, y - 2), (x + 2, y - 1.5), (x + 0.5, y - 1)],
-        hide,
-        shade(hide, 0.65),
-    )
-    p.line([(x + 1, y - 6), (x + 3, y - 7)], FRAME)
-
-
 def _chair(p: Painter, x0: float, y0: float, s: float, colour: RGB = CHAIR) -> None:
     """A chair seen side on, standing on (x0, y0), `s` times the size of the small sign."""
     pts = ((0, 0), (0, -7), (1, -7), (1, -3), (5, -3), (5, 0), (4, 0), (4, -2), (1, -2), (1, 0))
