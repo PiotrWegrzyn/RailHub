@@ -5772,7 +5772,7 @@ def shoe_factory() -> Sprite:
         s0 = g0 + 0.035 + (g1 - g0 - 0.07) * k / 6
         _patch(p, left, front, (s0 + 0.004, s0 + 0.016), (-0.2 * m, 0.5 * m), GILT)
     bx, by = _on_wall(left, front, (g0 + g1) / 2, -3.6 * m)
-    _shoe_boot(p, bx, by + 0.2 * m, 2.5 * m)
+    _shoe_boot(p, bx, by + 0.2 * m, 3.6 * m)
     store = p.hall(*at(31, 4), 7 * m, 7 * m, 8 * m, shade(wall, 0.94), None)
     s_left, s_front, s_right, _ = store
     _plinth(p, store, 8 * m, wall, 0.5 * m)
